@@ -1,0 +1,4 @@
+segment_or_sku_id,service_level_target_pct,case_fill_rate_target_pct
+CRITICALITY_TIER_A,0.98,0.95
+CRITICALITY_TIER_B,0.94,0.9
+CRITICALITY_TIER_C,0.89,0.85

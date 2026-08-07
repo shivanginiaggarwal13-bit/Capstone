@@ -1,0 +1,9 @@
+customer_dc_id,dc_name,city,state,storage_capacity_units
+CDC01,Newark CFC,Newark,NJ,35650
+CDC02,Boston CFC,Boston,MA,61588
+CDC03,Chicago CFC,Chicago,IL,88537
+CDC04,Minneapolis CFC,Minneapolis,MN,74145
+CDC05,Atlanta CFC,Atlanta,GA,75668
+CDC06,Miami CFC,Miami,FL,73048
+CDC07,LA CFC,Los Angeles,CA,77163
+CDC08,Dallas CFC,Dallas,TX,60793

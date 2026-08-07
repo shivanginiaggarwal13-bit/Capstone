@@ -1,0 +1,6 @@
+b2b_customer_id,customer_name,channel_type,region
+BNR01,NorthStar Retail,RT,Northeast
+BNR02,Meridian Mart,RT,Midwest
+BNR03,Coastal Grocers,RT,West
+BNR04,Value Corner Stores,Brick-and-Mortar,South
+BNR05,Family Trade Stores,Brick-and-Mortar,Southwest

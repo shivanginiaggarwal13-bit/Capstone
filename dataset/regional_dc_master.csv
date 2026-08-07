@@ -1,0 +1,6 @@
+regional_dc_id,dc_name,city,state,storage_capacity_units
+RDC01,Northeast Regional DC,Newark,NJ,186603
+RDC02,Midwest Regional DC,Chicago,IL,271719
+RDC03,South Regional DC,Atlanta,GA,117189
+RDC04,West Regional DC,Los Angeles,CA,239473
+RDC05,Southwest Regional DC,Dallas,TX,140293

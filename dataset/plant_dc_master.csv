@@ -1,3 +1,5 @@
 plant_dc_id,plant_id,city,state,storage_capacity_units
-PDC01,PLANT01,Chicago,IL,313642
-PDC02,PLANT02,Atlanta,GA,259719
+PDC01,PLANT01,Atlanta, GA,407400
+PDC02,PLANT02,Dallas, TX,778580
+PDC03,PLANT03,Chicago, IL,425625
+PDC04,PLANT04,Los Angeles, CA,626344

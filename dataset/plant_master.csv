@@ -1,3 +1,5 @@
-plant_id,plant_name,city,state,production_capacity_units_per_period,no_inventory_flag
-PLANT01,Midwest Production Plant,Chicago,IL,871400,TRUE
-PLANT02,Southeast Production Plant,Atlanta,GA,1419164,TRUE
+plant_id,plant_name,city,state,production_capacity_units_per_week,no_inventory_flag
+PLANT01,Atlanta Production Center,Atlanta, GA,3397853,TRUE
+PLANT02,Dallas Production Center,Dallas, TX,3880206,TRUE
+PLANT03,Chicago Production Center,Chicago, IL,2542790,TRUE
+PLANT04,Los Angeles Production Center,Los Angeles, CA,3262345,TRUE

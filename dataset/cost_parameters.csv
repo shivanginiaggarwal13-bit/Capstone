@@ -1,13 +1,6 @@
 category,holding_cost_pct_annual,cost_of_capital_pct,stockout_cost_multiplier
-Apparel & Footwear,0.183,0.099,1.79
-Beverages,0.239,0.081,2.17
-Dairy & Bakery,0.332,0.088,2.4
-Electronics & Accessories,0.216,0.098,1.78
-Frozen Foods,0.308,0.1,2.24
-Grocery,0.183,0.088,2.48
-Health & Wellness,0.189,0.087,2.19
-Home & Kitchen,0.238,0.096,2.23
-Home Care,0.244,0.084,1.74
-Personal Care,0.185,0.086,1.7
-Snacks & Confectionery,0.234,0.087,1.5
-Stationery & Office,0.247,0.095,1.69
+Beverages,0.22,0.097,1.85
+Snacks & Confectionery,0.21,0.096,2.36
+Dairy & Bakery,0.34,0.084,1.94
+Frozen Foods,0.33,0.095,2.34
+Grocery,0.2,0.097,2.25

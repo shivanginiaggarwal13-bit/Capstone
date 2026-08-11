@@ -1,0 +1,501 @@
+sku_id,sku_code,category,subcategory,brand,list_price_usd,unit_cost_usd,margin_usd,margin_pct,holding_cost_per_unit_year_usd,shelf_life_days,segment,price_tier,seasonal_flag
+SKU0001,BEV-0001,Beverages,Liquor,Brand1,28.25,18.83,9.42,0.3335,4.14,281,Seasonal,Value,True
+SKU0002,BEV-0002,Beverages,Dry Wine,Brand2,2.43,1.66,0.77,0.3169,0.37,218,Intermediate,Premium,False
+SKU0003,BEV-0003,Beverages,Tea,Brand3,13.34,9.32,4.02,0.3013,2.05,167,Fast-Moving,Value,False
+SKU0004,BEV-0004,Beverages,Liquor,Brand4,12.46,8.67,3.79,0.3042,1.91,215,Fast-Moving,Value,False
+SKU0005,BEV-0005,Beverages,Liquor,Brand5,37.44,25.96,11.48,0.3066,5.71,350,Seasonal,Premium,True
+SKU0006,BEV-0006,Beverages,Liquor,Brand6,157.6,108.23,49.37,0.3133,23.81,328,Seasonal,Premium,True
+SKU0007,BEV-0007,Beverages,Liquor,Brand7,42.66,28.78,13.88,0.3254,6.33,193,Seasonal,Premium,True
+SKU0008,BEV-0008,Beverages,Dry Wine,Brand8,1.57,1.1,0.47,0.2994,0.24,183,Intermediate,Premium,False
+SKU0009,BEV-0009,Beverages,Liquor,Brand1,28.79,19.41,9.38,0.3258,4.27,177,Fast-Moving,Value,False
+SKU0010,BEV-0010,Beverages,Red Wine,Brand2,3.6,2.49,1.11,0.3083,0.55,281,Fast-Moving,Value,False
+SKU0011,BEV-0011,Beverages,Imported Wine,Brand3,31.49,21.45,10.04,0.3188,4.72,345,Intermediate,Value,False
+SKU0012,BEV-0012,Beverages,Liquor,Brand4,27.84,19.02,8.82,0.3168,4.18,282,Fast-Moving,Value,False
+SKU0013,BEV-0013,Beverages,Liquor,Brand5,17.21,12.04,5.17,0.3004,2.65,225,Seasonal,Value,True
+SKU0014,BEV-0014,Beverages,Red Wine,Brand6,11.62,7.98,3.64,0.3133,1.76,337,Seasonal,Premium,True
+SKU0015,BEV-0015,Beverages,Liquor,Brand7,17.45,11.82,5.63,0.3226,2.6,336,Fast-Moving,Value,False
+SKU0016,BEV-0016,Beverages,Dry Wine,Brand8,2.19,1.48,0.71,0.3242,0.33,303,Fast-Moving,Premium,False
+SKU0017,BEV-0017,Beverages,Liquor,Brand1,25.01,17.46,7.55,0.3019,3.84,272,Fast-Moving,Value,False
+SKU0018,BEV-0018,Beverages,Red Wine,Brand2,6.13,4.05,2.08,0.3393,0.89,289,Seasonal,Premium,True
+SKU0019,BEV-0019,Beverages,Liquor,Brand3,12.59,8.64,3.95,0.3137,1.9,222,Fast-Moving,Value,False
+SKU0020,BEV-0020,Beverages,Red Wine,Brand4,2.67,1.84,0.83,0.3109,0.4,252,Seasonal,Value,True
+SKU0021,BEV-0021,Beverages,Red Wine,Brand5,2.53,1.72,0.81,0.3202,0.38,201,Seasonal,Value,True
+SKU0022,BEV-0022,Beverages,Red Wine,Brand6,6.04,4.21,1.83,0.303,0.93,197,Intermediate,Premium,False
+SKU0023,BEV-0023,Beverages,Imported Wine,Brand7,85.55,58.55,27.0,0.3156,12.88,205,Fast-Moving,Premium,False
+SKU0024,BEV-0024,Beverages,Imported Wine,Brand8,22.25,15.53,6.72,0.302,3.42,324,Fast-Moving,Value,False
+SKU0025,BEV-0025,Beverages,Liquor,Brand1,10.86,7.28,3.58,0.3297,1.6,352,Fast-Moving,Value,False
+SKU0026,BEV-0026,Beverages,Energy Drink,Brand2,74.57,50.17,24.4,0.3272,11.04,208,Seasonal,Value,True
+SKU0027,BEV-0027,Beverages,Dry Wine,Brand3,1.33,0.92,0.41,0.3083,0.2,193,Fast-Moving,Value,False
+SKU0028,BEV-0028,Beverages,Red Wine,Brand4,4.79,3.24,1.55,0.3236,0.71,326,Intermediate,Value,False
+SKU0029,BEV-0029,Beverages,Liquor,Brand5,157.6,109.78,47.82,0.3034,24.15,299,Intermediate,Premium,False
+SKU0030,BEV-0030,Beverages,Liquor,Brand6,157.6,108.65,48.95,0.3106,23.9,246,Seasonal,Premium,True
+SKU0031,BEV-0031,Beverages,Liquor,Brand7,51.55,34.23,17.32,0.336,7.53,152,Seasonal,Premium,True
+SKU0032,BEV-0032,Beverages,Red Wine,Brand8,5.79,3.87,1.92,0.3316,0.85,342,Fast-Moving,Premium,False
+SKU0033,BEV-0033,Beverages,Dry Wine,Brand1,1.39,0.93,0.46,0.3309,0.2,365,Fast-Moving,Value,False
+SKU0034,BEV-0034,Beverages,Liquor,Brand2,77.49,52.06,25.43,0.3282,11.45,200,Seasonal,Premium,True
+SKU0035,BEV-0035,Beverages,Dry Wine,Brand3,1.33,0.92,0.41,0.3083,0.2,250,Fast-Moving,Value,False
+SKU0036,BEV-0036,Beverages,Dry Wine,Brand4,1.53,1.01,0.52,0.3399,0.22,342,Fast-Moving,Value,False
+SKU0037,BEV-0037,Beverages,Liquor,Brand5,70.39,47.8,22.59,0.3209,10.52,317,Fast-Moving,Premium,False
+SKU0038,BEV-0038,Beverages,Liquor,Brand6,8.5,5.94,2.56,0.3012,1.31,134,Intermediate,Value,False
+SKU0039,BEV-0039,Beverages,Energy Drink,Brand7,152.04,105.21,46.83,0.308,23.15,333,Fast-Moving,Premium,False
+SKU0040,BEV-0040,Beverages,Dry Wine,Brand8,2.18,1.47,0.71,0.3257,0.32,314,Fast-Moving,Premium,False
+SKU0041,BEV-0041,Beverages,Imported Wine,Brand1,68.92,46.0,22.92,0.3326,10.12,239,Intermediate,Premium,False
+SKU0042,BEV-0042,Beverages,Dry Wine,Brand2,1.33,0.92,0.41,0.3083,0.2,166,Fast-Moving,Value,False
+SKU0043,BEV-0043,Beverages,Dry Wine,Brand3,2.35,1.6,0.75,0.3191,0.35,313,Intermediate,Premium,False
+SKU0044,BEV-0044,Beverages,Liquor,Brand4,45.23,31.28,13.95,0.3084,6.88,248,Fast-Moving,Premium,False
+SKU0045,BEV-0045,Beverages,Liquor,Brand5,25.06,17.5,7.56,0.3017,3.85,307,Fast-Moving,Value,False
+SKU0046,BEV-0046,Beverages,Dry Wine,Brand6,1.43,0.99,0.44,0.3077,0.22,183,Seasonal,Value,True
+SKU0047,BEV-0047,Beverages,Liquor,Brand7,96.02,67.16,28.86,0.3006,14.78,177,Fast-Moving,Premium,False
+SKU0048,BEV-0048,Beverages,Liquor,Brand8,29.35,19.79,9.56,0.3257,4.35,257,Fast-Moving,Value,False
+SKU0049,BEV-0049,Beverages,Imported Wine,Brand1,32.96,22.63,10.33,0.3134,4.98,356,Intermediate,Value,False
+SKU0050,BEV-0050,Beverages,Red Wine,Brand2,10.21,6.82,3.39,0.332,1.5,334,Fast-Moving,Premium,False
+SKU0051,BEV-0051,Beverages,Dry Wine,Brand3,1.99,1.36,0.63,0.3166,0.3,289,Fast-Moving,Premium,False
+SKU0052,BEV-0052,Beverages,Liquor,Brand4,47.92,33.13,14.79,0.3086,7.29,127,Fast-Moving,Premium,False
+SKU0053,BEV-0053,Beverages,Liquor,Brand5,91.74,62.33,29.41,0.3206,13.71,341,Intermediate,Premium,False
+SKU0054,BEV-0054,Beverages,Liquor,Brand6,28.04,19.45,8.59,0.3063,4.28,212,Fast-Moving,Value,False
+SKU0055,BEV-0055,Beverages,Red Wine,Brand7,3.86,2.58,1.28,0.3316,0.57,228,Seasonal,Value,True
+SKU0056,BEV-0056,Beverages,Dry Wine,Brand8,2.0,1.36,0.64,0.32,0.3,135,Seasonal,Premium,True
+SKU0057,BEV-0057,Beverages,Dry Wine,Brand1,1.77,1.22,0.55,0.3107,0.27,215,Fast-Moving,Premium,False
+SKU0058,BEV-0058,Beverages,Dry Wine,Brand2,1.33,0.89,0.44,0.3308,0.2,345,Seasonal,Value,True
+SKU0059,BEV-0059,Beverages,Liquor,Brand3,30.87,20.74,10.13,0.3282,4.56,358,Seasonal,Value,True
+SKU0060,BEV-0060,Beverages,Red Wine,Brand4,5.59,3.75,1.84,0.3292,0.82,285,Seasonal,Premium,True
+SKU0061,BEV-0061,Beverages,Liquor,Brand5,29.04,19.47,9.57,0.3295,4.28,146,Fast-Moving,Value,False
+SKU0062,BEV-0062,Beverages,Energy Drink,Brand6,112.84,74.93,37.91,0.336,16.48,209,Intermediate,Premium,False
+SKU0063,BEV-0063,Beverages,Liquor,Brand7,11.28,7.51,3.77,0.3342,1.65,328,Fast-Moving,Value,False
+SKU0064,BEV-0064,Beverages,Energy Drink,Brand8,138.16,96.63,41.53,0.3006,21.26,180,Intermediate,Premium,False
+SKU0065,BEV-0065,Beverages,Red Wine,Brand1,12.31,8.43,3.88,0.3152,1.85,280,Seasonal,Premium,True
+SKU0066,BEV-0066,Beverages,Dry Wine,Brand2,1.62,1.1,0.52,0.321,0.24,214,Intermediate,Premium,False
+SKU0067,BEV-0067,Beverages,Liquor,Brand3,39.2,26.46,12.74,0.325,5.82,272,Fast-Moving,Premium,False
+SKU0068,BEV-0068,Beverages,Liquor,Brand4,78.87,52.19,26.68,0.3383,11.48,134,Seasonal,Premium,True
+SKU0069,BEV-0069,Beverages,Dry Wine,Brand5,2.21,1.54,0.67,0.3032,0.34,204,Seasonal,Premium,True
+SKU0070,BEV-0070,Beverages,Red Wine,Brand6,11.87,8.19,3.68,0.31,1.8,326,Fast-Moving,Premium,False
+SKU0071,BEV-0071,Beverages,Liquor,Brand7,16.84,11.63,5.21,0.3094,2.56,228,Seasonal,Value,True
+SKU0072,BEV-0072,Beverages,Liquor,Brand8,20.67,13.96,6.71,0.3246,3.07,177,Intermediate,Value,False
+SKU0073,BEV-0073,Beverages,Liquor,Brand1,112.5,77.68,34.82,0.3095,17.09,335,Fast-Moving,Premium,False
+SKU0074,BEV-0074,Beverages,Red Wine,Brand2,3.25,2.15,1.1,0.3385,0.47,343,Fast-Moving,Value,False
+SKU0075,BEV-0075,Beverages,Energy Drink,Brand3,81.64,53.93,27.71,0.3394,11.86,295,Fast-Moving,Value,False
+SKU0076,BEV-0076,Beverages,Energy Drink,Brand4,68.86,45.98,22.88,0.3323,10.12,291,Seasonal,Value,True
+SKU0077,BEV-0077,Beverages,Liquor,Brand5,10.38,6.99,3.39,0.3266,1.54,221,Seasonal,Value,True
+SKU0078,BEV-0078,Beverages,Liquor,Brand6,32.19,21.51,10.68,0.3318,4.73,260,Seasonal,Value,True
+SKU0079,BEV-0079,Beverages,Dry Wine,Brand7,1.33,0.9,0.43,0.3233,0.2,258,Intermediate,Value,False
+SKU0080,BEV-0080,Beverages,Dry Wine,Brand8,2.24,1.55,0.69,0.308,0.34,128,Intermediate,Premium,False
+SKU0081,BEV-0081,Beverages,Energy Drink,Brand1,103.9,71.01,32.89,0.3166,15.62,269,Seasonal,Premium,True
+SKU0082,BEV-0082,Beverages,Dry Wine,Brand2,1.37,0.92,0.45,0.3285,0.2,206,Fast-Moving,Value,False
+SKU0083,BEV-0083,Beverages,Red Wine,Brand3,8.14,5.41,2.73,0.3354,1.19,232,Seasonal,Premium,True
+SKU0084,BEV-0084,Beverages,Dry Wine,Brand4,1.68,1.14,0.54,0.3214,0.25,217,Fast-Moving,Premium,False
+SKU0085,BEV-0085,Beverages,Liquor,Brand5,64.91,43.05,21.86,0.3368,9.47,309,Fast-Moving,Premium,False
+SKU0086,BEV-0086,Beverages,Dry Wine,Brand6,1.33,0.92,0.41,0.3083,0.2,220,Fast-Moving,Value,False
+SKU0087,BEV-0087,Beverages,Energy Drink,Brand7,114.81,80.17,34.64,0.3017,17.64,212,Seasonal,Premium,True
+SKU0088,BEV-0088,Beverages,Dry Wine,Brand8,1.45,0.96,0.49,0.3379,0.21,354,Fast-Moving,Value,False
+SKU0089,BEV-0089,Beverages,Imported Wine,Brand1,70.41,47.48,22.93,0.3257,10.45,140,Fast-Moving,Premium,False
+SKU0090,BEV-0090,Beverages,Liquor,Brand2,60.52,40.79,19.73,0.326,8.97,202,Fast-Moving,Premium,False
+SKU0091,BEV-0091,Beverages,Liquor,Brand3,10.49,7.22,3.27,0.3117,1.59,343,Fast-Moving,Value,False
+SKU0092,BEV-0092,Beverages,Dry Wine,Brand4,1.79,1.25,0.54,0.3017,0.28,276,Seasonal,Premium,True
+SKU0093,BEV-0093,Beverages,Red Wine,Brand5,5.68,3.86,1.82,0.3204,0.85,153,Intermediate,Premium,False
+SKU0094,BEV-0094,Beverages,Red Wine,Brand6,6.92,4.64,2.28,0.3295,1.02,288,Fast-Moving,Premium,False
+SKU0095,BEV-0095,Beverages,Liquor,Brand7,51.86,35.42,16.44,0.317,7.79,209,Fast-Moving,Premium,False
+SKU0096,BEV-0096,Beverages,Liquor,Brand8,35.64,24.6,11.04,0.3098,5.41,363,Fast-Moving,Premium,False
+SKU0097,BEV-0097,Beverages,Liquor,Brand1,68.71,46.01,22.7,0.3304,10.12,215,Intermediate,Premium,False
+SKU0098,BEV-0098,Beverages,Imported Wine,Brand2,85.55,58.33,27.22,0.3182,12.83,333,Fast-Moving,Premium,False
+SKU0099,BEV-0099,Beverages,Dry Wine,Brand3,1.81,1.26,0.55,0.3039,0.28,205,Fast-Moving,Premium,False
+SKU0100,BEV-0100,Beverages,Dry Wine,Brand4,1.93,1.34,0.59,0.3057,0.29,144,Intermediate,Premium,False
+SKU0101,SNA-0101,Snacks & Confectionery,Popcorn,Brand1,2.67,1.8,0.87,0.3258,0.38,223,Seasonal,Value,True
+SKU0102,SNA-0102,Snacks & Confectionery,Candy,Brand2,27.56,18.51,9.05,0.3284,3.89,97,Seasonal,Premium,True
+SKU0103,SNA-0103,Snacks & Confectionery,Candy,Brand3,46.78,31.3,15.48,0.3309,6.57,279,Fast-Moving,Premium,False
+SKU0104,SNA-0104,Snacks & Confectionery,Candy,Brand4,32.34,21.04,11.3,0.3494,4.42,101,Seasonal,Premium,True
+SKU0105,SNA-0105,Snacks & Confectionery,Candy,Brand5,13.9,8.93,4.97,0.3576,1.88,243,Intermediate,Value,False
+SKU0106,SNA-0106,Snacks & Confectionery,Canned Sweet,Brand6,2.79,1.85,0.94,0.3369,0.39,182,Intermediate,Value,False
+SKU0107,SNA-0107,Snacks & Confectionery,Canned Sweet,Brand7,2.0,1.3,0.7,0.35,0.27,123,Intermediate,Value,False
+SKU0108,SNA-0108,Snacks & Confectionery,Candy,Brand8,25.84,17.06,8.78,0.3398,3.58,175,Intermediate,Value,False
+SKU0109,SNA-0109,Snacks & Confectionery,Canned Sweet,Brand1,4.41,2.85,1.56,0.3537,0.6,136,Intermediate,Premium,False
+SKU0110,SNA-0110,Snacks & Confectionery,Candy,Brand2,21.56,13.84,7.72,0.3581,2.91,276,Fast-Moving,Value,False
+SKU0111,SNA-0111,Snacks & Confectionery,Candy,Brand3,46.78,31.62,15.16,0.3241,6.64,300,Fast-Moving,Premium,False
+SKU0112,SNA-0112,Snacks & Confectionery,Canned Sweet,Brand4,4.41,2.9,1.51,0.3424,0.61,94,Fast-Moving,Premium,False
+SKU0113,SNA-0113,Snacks & Confectionery,Candy,Brand5,24.43,16.25,8.18,0.3348,3.41,104,Fast-Moving,Value,False
+SKU0114,SNA-0114,Snacks & Confectionery,Candy,Brand6,42.96,29.06,13.9,0.3236,6.1,194,Fast-Moving,Premium,False
+SKU0115,SNA-0115,Snacks & Confectionery,Popcorn,Brand7,3.81,2.49,1.32,0.3465,0.52,266,Fast-Moving,Premium,False
+SKU0116,SNA-0116,Snacks & Confectionery,Candy,Brand8,14.05,9.15,4.9,0.3488,1.92,120,Intermediate,Value,False
+SKU0117,SNA-0117,Snacks & Confectionery,Candy,Brand1,23.4,15.31,8.09,0.3457,3.22,280,Fast-Moving,Value,False
+SKU0118,SNA-0118,Snacks & Confectionery,Popcorn,Brand2,3.09,1.98,1.11,0.3592,0.42,134,Seasonal,Premium,True
+SKU0119,SNA-0119,Snacks & Confectionery,Candy,Brand3,22.01,14.64,7.37,0.3348,3.07,257,Seasonal,Value,True
+SKU0120,SNA-0120,Snacks & Confectionery,Canned Sweet,Brand4,4.41,2.87,1.54,0.3492,0.6,150,Seasonal,Premium,True
+SKU0121,SNA-0121,Snacks & Confectionery,Canned Sweet,Brand5,3.81,2.53,1.28,0.336,0.53,115,Fast-Moving,Premium,False
+SKU0122,SNA-0122,Snacks & Confectionery,Candy,Brand6,32.38,20.99,11.39,0.3518,4.41,266,Seasonal,Premium,True
+SKU0123,SNA-0123,Snacks & Confectionery,Popcorn,Brand7,3.14,2.12,1.02,0.3248,0.45,181,Intermediate,Premium,False
+SKU0124,SNA-0124,Snacks & Confectionery,Canned Sweet,Brand8,3.0,1.94,1.06,0.3533,0.41,116,Fast-Moving,Value,False
+SKU0125,SNA-0125,Snacks & Confectionery,Candy,Brand1,39.27,26.12,13.15,0.3349,5.49,168,Seasonal,Premium,True
+SKU0126,SNA-0126,Snacks & Confectionery,Popcorn,Brand2,2.71,1.79,0.92,0.3395,0.38,211,Seasonal,Value,True
+SKU0127,SNA-0127,Snacks & Confectionery,Canned Sweet,Brand3,3.85,2.58,1.27,0.3299,0.54,184,Fast-Moving,Premium,False
+SKU0128,SNA-0128,Snacks & Confectionery,Candy,Brand4,38.93,25.09,13.84,0.3555,5.27,277,Fast-Moving,Premium,False
+SKU0129,SNA-0129,Snacks & Confectionery,Canned Sweet,Brand5,3.17,2.1,1.07,0.3375,0.44,118,Fast-Moving,Value,False
+SKU0130,SNA-0130,Snacks & Confectionery,Canned Sweet,Brand6,3.82,2.57,1.25,0.3272,0.54,161,Seasonal,Premium,True
+SKU0131,SNA-0131,Snacks & Confectionery,Popcorn,Brand7,3.13,2.05,1.08,0.345,0.43,141,Seasonal,Premium,True
+SKU0132,SNA-0132,Snacks & Confectionery,Popcorn,Brand8,3.43,2.26,1.17,0.3411,0.47,164,Fast-Moving,Premium,False
+SKU0133,SNA-0133,Snacks & Confectionery,Candy,Brand1,39.41,25.59,13.82,0.3507,5.37,134,Fast-Moving,Premium,False
+SKU0134,SNA-0134,Snacks & Confectionery,Canned Sweet,Brand2,2.72,1.83,0.89,0.3272,0.38,107,Intermediate,Value,False
+SKU0135,SNA-0135,Snacks & Confectionery,Popcorn,Brand3,3.14,2.1,1.04,0.3312,0.44,221,Seasonal,Premium,True
+SKU0136,SNA-0136,Snacks & Confectionery,Canned Sweet,Brand4,2.05,1.35,0.7,0.3415,0.28,192,Fast-Moving,Value,False
+SKU0137,SNA-0137,Snacks & Confectionery,Candy,Brand5,34.41,23.28,11.13,0.3235,4.89,272,Seasonal,Premium,True
+SKU0138,SNA-0138,Snacks & Confectionery,Candy,Brand6,13.9,9.44,4.46,0.3209,1.98,256,Seasonal,Value,True
+SKU0139,SNA-0139,Snacks & Confectionery,Popcorn,Brand7,4.07,2.65,1.42,0.3489,0.56,180,Seasonal,Premium,True
+SKU0140,SNA-0140,Snacks & Confectionery,Popcorn,Brand8,2.46,1.64,0.82,0.3333,0.34,178,Fast-Moving,Value,False
+SKU0141,SNA-0141,Snacks & Confectionery,Candy,Brand1,41.88,28.44,13.44,0.3209,5.97,109,Seasonal,Premium,True
+SKU0142,SNA-0142,Snacks & Confectionery,Candy,Brand2,20.66,13.7,6.96,0.3369,2.88,208,Fast-Moving,Value,False
+SKU0143,SNA-0143,Snacks & Confectionery,Popcorn,Brand3,2.84,1.89,0.95,0.3345,0.4,146,Seasonal,Premium,True
+SKU0144,SNA-0144,Snacks & Confectionery,Canned Sweet,Brand4,4.03,2.58,1.45,0.3598,0.54,296,Seasonal,Premium,True
+SKU0145,SNA-0145,Snacks & Confectionery,Candy,Brand5,38.76,25.43,13.33,0.3439,5.34,151,Fast-Moving,Premium,False
+SKU0146,SNA-0146,Snacks & Confectionery,Popcorn,Brand6,2.97,2.02,0.95,0.3199,0.42,149,Seasonal,Premium,True
+SKU0147,SNA-0147,Snacks & Confectionery,Candy,Brand7,18.21,12.37,5.84,0.3207,2.6,107,Fast-Moving,Value,False
+SKU0148,SNA-0148,Snacks & Confectionery,Popcorn,Brand8,3.41,2.2,1.21,0.3548,0.46,282,Fast-Moving,Premium,False
+SKU0149,SNA-0149,Snacks & Confectionery,Candy,Brand1,42.63,28.75,13.88,0.3256,6.04,171,Fast-Moving,Premium,False
+SKU0150,SNA-0150,Snacks & Confectionery,Popcorn,Brand2,3.54,2.39,1.15,0.3249,0.5,287,Seasonal,Premium,True
+SKU0151,SNA-0151,Snacks & Confectionery,Popcorn,Brand3,2.31,1.49,0.82,0.355,0.31,264,Fast-Moving,Value,False
+SKU0152,SNA-0152,Snacks & Confectionery,Popcorn,Brand4,2.31,1.52,0.79,0.342,0.32,202,Fast-Moving,Value,False
+SKU0153,SNA-0153,Snacks & Confectionery,Popcorn,Brand5,2.6,1.75,0.85,0.3269,0.37,223,Fast-Moving,Value,False
+SKU0154,SNA-0154,Snacks & Confectionery,Candy,Brand6,34.17,22.58,11.59,0.3392,4.74,238,Fast-Moving,Premium,False
+SKU0155,SNA-0155,Snacks & Confectionery,Candy,Brand7,31.32,20.07,11.25,0.3592,4.21,276,Fast-Moving,Premium,False
+SKU0156,SNA-0156,Snacks & Confectionery,Candy,Brand8,39.42,25.31,14.11,0.3579,5.32,108,Seasonal,Premium,True
+SKU0157,SNA-0157,Snacks & Confectionery,Candy,Brand1,36.12,24.3,11.82,0.3272,5.1,254,Fast-Moving,Premium,False
+SKU0158,SNA-0158,Snacks & Confectionery,Candy,Brand2,19.7,12.71,6.99,0.3548,2.67,128,Fast-Moving,Value,False
+SKU0159,SNA-0159,Snacks & Confectionery,Popcorn,Brand3,3.02,2.05,0.97,0.3212,0.43,220,Fast-Moving,Premium,False
+SKU0160,SNA-0160,Snacks & Confectionery,Candy,Brand4,27.51,17.72,9.79,0.3559,3.72,117,Seasonal,Premium,True
+SKU0161,SNA-0161,Snacks & Confectionery,Canned Sweet,Brand5,4.41,2.97,1.44,0.3265,0.62,137,Fast-Moving,Premium,False
+SKU0162,SNA-0162,Snacks & Confectionery,Popcorn,Brand6,2.74,1.82,0.92,0.3358,0.38,102,Fast-Moving,Value,False
+SKU0163,SNA-0163,Snacks & Confectionery,Candy,Brand7,29.12,19.3,9.82,0.3372,4.05,158,Intermediate,Premium,False
+SKU0164,SNA-0164,Snacks & Confectionery,Popcorn,Brand8,4.07,2.74,1.33,0.3268,0.58,103,Seasonal,Premium,True
+SKU0165,SNA-0165,Snacks & Confectionery,Candy,Brand1,33.68,22.84,10.84,0.3219,4.8,104,Fast-Moving,Premium,False
+SKU0166,SNA-0166,Snacks & Confectionery,Canned Sweet,Brand2,3.64,2.38,1.26,0.3462,0.5,274,Intermediate,Premium,False
+SKU0167,SNA-0167,Snacks & Confectionery,Popcorn,Brand3,2.31,1.54,0.77,0.3333,0.32,201,Fast-Moving,Value,False
+SKU0168,SNA-0168,Snacks & Confectionery,Candy,Brand4,32.88,22.32,10.56,0.3212,4.69,110,Intermediate,Premium,False
+SKU0169,SNA-0169,Snacks & Confectionery,Popcorn,Brand5,3.2,2.15,1.05,0.3281,0.45,107,Fast-Moving,Premium,False
+SKU0170,SNA-0170,Snacks & Confectionery,Popcorn,Brand6,2.38,1.61,0.77,0.3235,0.34,265,Seasonal,Value,True
+SKU0171,SNA-0171,Snacks & Confectionery,Popcorn,Brand7,2.6,1.69,0.91,0.35,0.35,274,Fast-Moving,Value,False
+SKU0172,SNA-0172,Snacks & Confectionery,Candy,Brand8,41.15,26.95,14.2,0.3451,5.66,294,Intermediate,Premium,False
+SKU0173,SNA-0173,Snacks & Confectionery,Popcorn,Brand1,3.88,2.56,1.32,0.3402,0.54,246,Intermediate,Premium,False
+SKU0174,SNA-0174,Snacks & Confectionery,Popcorn,Brand2,3.02,1.97,1.05,0.3477,0.41,109,Intermediate,Premium,False
+SKU0175,SNA-0175,Snacks & Confectionery,Canned Sweet,Brand3,2.94,1.95,0.99,0.3367,0.41,154,Fast-Moving,Value,False
+SKU0176,SNA-0176,Snacks & Confectionery,Popcorn,Brand4,2.69,1.73,0.96,0.3569,0.36,96,Seasonal,Value,True
+SKU0177,SNA-0177,Snacks & Confectionery,Canned Sweet,Brand5,2.52,1.62,0.9,0.3571,0.34,244,Fast-Moving,Value,False
+SKU0178,SNA-0178,Snacks & Confectionery,Popcorn,Brand6,2.73,1.82,0.91,0.3333,0.38,210,Intermediate,Value,False
+SKU0179,SNA-0179,Snacks & Confectionery,Candy,Brand7,46.78,30.84,15.94,0.3407,6.48,280,Fast-Moving,Premium,False
+SKU0180,SNA-0180,Snacks & Confectionery,Canned Sweet,Brand8,2.5,1.69,0.81,0.324,0.35,166,Fast-Moving,Value,False
+SKU0181,SNA-0181,Snacks & Confectionery,Candy,Brand1,13.9,8.94,4.96,0.3568,1.88,144,Fast-Moving,Value,False
+SKU0182,SNA-0182,Snacks & Confectionery,Popcorn,Brand2,2.76,1.78,0.98,0.3551,0.37,140,Fast-Moving,Value,False
+SKU0183,SNA-0183,Snacks & Confectionery,Popcorn,Brand3,2.96,2.0,0.96,0.3243,0.42,173,Seasonal,Premium,True
+SKU0184,SNA-0184,Snacks & Confectionery,Popcorn,Brand4,2.77,1.79,0.98,0.3538,0.38,142,Intermediate,Value,False
+SKU0185,SNA-0185,Snacks & Confectionery,Candy,Brand5,18.99,12.24,6.75,0.3555,2.57,278,Fast-Moving,Value,False
+SKU0186,SNA-0186,Snacks & Confectionery,Canned Sweet,Brand6,4.41,2.95,1.46,0.3311,0.62,135,Seasonal,Premium,True
+SKU0187,SNA-0187,Snacks & Confectionery,Candy,Brand7,46.78,30.43,16.35,0.3495,6.39,213,Fast-Moving,Premium,False
+SKU0188,SNA-0188,Snacks & Confectionery,Popcorn,Brand8,3.13,2.06,1.07,0.3419,0.43,151,Intermediate,Premium,False
+SKU0189,SNA-0189,Snacks & Confectionery,Candy,Brand1,27.26,17.92,9.34,0.3426,3.76,188,Intermediate,Premium,False
+SKU0190,SNA-0190,Snacks & Confectionery,Canned Sweet,Brand2,2.96,1.9,1.06,0.3581,0.4,191,Intermediate,Value,False
+SKU0191,SNA-0191,Snacks & Confectionery,Popcorn,Brand3,3.06,2.08,0.98,0.3203,0.44,240,Fast-Moving,Premium,False
+SKU0192,SNA-0192,Snacks & Confectionery,Canned Sweet,Brand4,3.0,1.97,1.03,0.3433,0.41,294,Fast-Moving,Value,False
+SKU0193,SNA-0193,Snacks & Confectionery,Popcorn,Brand5,2.91,1.88,1.03,0.354,0.39,101,Fast-Moving,Premium,False
+SKU0194,SNA-0194,Snacks & Confectionery,Candy,Brand6,34.57,23.28,11.29,0.3266,4.89,259,Intermediate,Premium,False
+SKU0195,SNA-0195,Snacks & Confectionery,Popcorn,Brand7,2.54,1.68,0.86,0.3386,0.35,223,Seasonal,Value,True
+SKU0196,SNA-0196,Snacks & Confectionery,Candy,Brand8,24.25,15.64,8.61,0.3551,3.28,255,Fast-Moving,Value,False
+SKU0197,SNA-0197,Snacks & Confectionery,Popcorn,Brand1,3.85,2.53,1.32,0.3429,0.53,293,Fast-Moving,Premium,False
+SKU0198,SNA-0198,Snacks & Confectionery,Popcorn,Brand2,2.4,1.55,0.85,0.3542,0.33,129,Seasonal,Value,True
+SKU0199,SNA-0199,Snacks & Confectionery,Popcorn,Brand3,3.23,2.18,1.05,0.3251,0.46,102,Seasonal,Premium,True
+SKU0200,SNA-0200,Snacks & Confectionery,Candy,Brand4,14.12,9.48,4.64,0.3286,1.99,227,Fast-Moving,Value,False
+SKU0201,DAI-0201,Dairy & Bakery,Yeasts,Brand1,0.86,0.6,0.26,0.3023,0.2,6,Seasonal,Value,True
+SKU0202,DAI-0202,Dairy & Bakery,Wheat Flour,Brand2,6.84,4.71,2.13,0.3114,1.6,14,Fast-Moving,Premium,False
+SKU0203,DAI-0203,Dairy & Bakery,Yeasts,Brand3,1.51,1.05,0.46,0.3046,0.36,17,Fast-Moving,Value,False
+SKU0204,DAI-0204,Dairy & Bakery,Wheat Flour,Brand4,14.98,10.47,4.51,0.3011,3.56,7,Intermediate,Premium,False
+SKU0205,DAI-0205,Dairy & Bakery,Wheat Flour,Brand5,4.79,3.37,1.42,0.2965,1.15,18,Fast-Moving,Premium,False
+SKU0206,DAI-0206,Dairy & Bakery,Yeasts,Brand6,2.99,2.04,0.95,0.3177,0.69,12,Fast-Moving,Premium,False
+SKU0207,DAI-0207,Dairy & Bakery,Wheat Flour,Brand7,14.35,10.14,4.21,0.2934,3.45,11,Seasonal,Premium,True
+SKU0208,DAI-0208,Dairy & Bakery,Wheat Flour,Brand8,1.27,0.88,0.39,0.3071,0.3,19,Seasonal,Value,True
+SKU0209,DAI-0209,Dairy & Bakery,Wheat Flour,Brand1,0.89,0.61,0.28,0.3146,0.21,5,Seasonal,Value,True
+SKU0210,DAI-0210,Dairy & Bakery,Yeasts,Brand2,3.62,2.57,1.05,0.2901,0.87,6,Seasonal,Premium,True
+SKU0211,DAI-0211,Dairy & Bakery,Yeasts,Brand3,0.79,0.55,0.24,0.3038,0.19,5,Seasonal,Value,True
+SKU0212,DAI-0212,Dairy & Bakery,Wheat Flour,Brand4,6.89,4.89,2.0,0.2903,1.66,20,Fast-Moving,Premium,False
+SKU0213,DAI-0213,Dairy & Bakery,Yeasts,Brand5,1.19,0.82,0.37,0.3109,0.28,7,Intermediate,Value,False
+SKU0214,DAI-0214,Dairy & Bakery,Flour,Brand6,3.39,2.39,1.0,0.295,0.81,14,Seasonal,Value,True
+SKU0215,DAI-0215,Dairy & Bakery,Wheat Flour,Brand7,15.12,10.72,4.4,0.291,3.64,5,Intermediate,Premium,False
+SKU0216,DAI-0216,Dairy & Bakery,Wheat Flour,Brand8,2.11,1.43,0.68,0.3223,0.49,11,Seasonal,Value,True
+SKU0217,DAI-0217,Dairy & Bakery,Wheat Flour,Brand1,7.38,5.27,2.11,0.2859,1.79,9,Intermediate,Premium,False
+SKU0218,DAI-0218,Dairy & Bakery,Yeasts,Brand2,0.77,0.53,0.24,0.3117,0.18,14,Fast-Moving,Value,False
+SKU0219,DAI-0219,Dairy & Bakery,Flour,Brand3,8.79,6.05,2.74,0.3117,2.06,20,Fast-Moving,Premium,False
+SKU0220,DAI-0220,Dairy & Bakery,Yeasts,Brand4,1.45,1.03,0.42,0.2897,0.35,17,Fast-Moving,Value,False
+SKU0221,DAI-0221,Dairy & Bakery,Wheat Flour,Brand5,8.24,5.88,2.36,0.2864,2.0,13,Fast-Moving,Premium,False
+SKU0222,DAI-0222,Dairy & Bakery,Yeasts,Brand6,3.7,2.65,1.05,0.2838,0.9,20,Seasonal,Premium,True
+SKU0223,DAI-0223,Dairy & Bakery,Wheat Flour,Brand7,5.58,3.82,1.76,0.3154,1.3,21,Seasonal,Premium,True
+SKU0224,DAI-0224,Dairy & Bakery,Wheat Flour,Brand8,3.94,2.74,1.2,0.3046,0.93,5,Seasonal,Value,True
+SKU0225,DAI-0225,Dairy & Bakery,Wheat Flour,Brand1,24.16,16.41,7.75,0.3208,5.58,18,Intermediate,Premium,False
+SKU0226,DAI-0226,Dairy & Bakery,Wheat Flour,Brand2,1.19,0.85,0.34,0.2857,0.29,19,Fast-Moving,Value,False
+SKU0227,DAI-0227,Dairy & Bakery,Yeasts,Brand3,0.41,0.29,0.12,0.2927,0.1,20,Intermediate,Value,False
+SKU0228,DAI-0228,Dairy & Bakery,Wheat Flour,Brand4,6.48,4.49,1.99,0.3071,1.53,13,Seasonal,Premium,True
+SKU0229,DAI-0229,Dairy & Bakery,Wheat Flour,Brand5,5.17,3.69,1.48,0.2863,1.25,11,Fast-Moving,Premium,False
+SKU0230,DAI-0230,Dairy & Bakery,Wheat Flour,Brand6,4.4,3.16,1.24,0.2818,1.07,10,Fast-Moving,Value,False
+SKU0231,DAI-0231,Dairy & Bakery,Yeasts,Brand7,0.77,0.55,0.22,0.2857,0.19,13,Intermediate,Value,False
+SKU0232,DAI-0232,Dairy & Bakery,Wheat Flour,Brand8,27.29,18.93,8.36,0.3063,6.44,12,Fast-Moving,Premium,False
+SKU0233,DAI-0233,Dairy & Bakery,Yeasts,Brand1,1.49,1.03,0.46,0.3087,0.35,8,Intermediate,Value,False
+SKU0234,DAI-0234,Dairy & Bakery,Wheat Flour,Brand2,5.54,3.97,1.57,0.2834,1.35,21,Seasonal,Premium,True
+SKU0235,DAI-0235,Dairy & Bakery,Flour,Brand3,10.06,7.24,2.82,0.2803,2.46,13,Seasonal,Premium,True
+SKU0236,DAI-0236,Dairy & Bakery,Wheat Flour,Brand4,0.89,0.61,0.28,0.3146,0.21,11,Seasonal,Value,True
+SKU0237,DAI-0237,Dairy & Bakery,Wheat Flour,Brand5,1.63,1.17,0.46,0.2822,0.4,6,Intermediate,Value,False
+SKU0238,DAI-0238,Dairy & Bakery,Yeasts,Brand6,3.84,2.72,1.12,0.2917,0.92,14,Fast-Moving,Premium,False
+SKU0239,DAI-0239,Dairy & Bakery,Wheat Flour,Brand7,4.87,3.38,1.49,0.306,1.15,13,Fast-Moving,Premium,False
+SKU0240,DAI-0240,Dairy & Bakery,Wheat Flour,Brand8,7.5,5.16,2.34,0.312,1.75,21,Intermediate,Premium,False
+SKU0241,DAI-0241,Dairy & Bakery,Wheat Flour,Brand1,2.23,1.52,0.71,0.3184,0.52,10,Fast-Moving,Value,False
+SKU0242,DAI-0242,Dairy & Bakery,Wheat Flour,Brand2,2.49,1.74,0.75,0.3012,0.59,11,Seasonal,Value,True
+SKU0243,DAI-0243,Dairy & Bakery,Wheat Flour,Brand3,2.86,2.0,0.86,0.3007,0.68,7,Seasonal,Value,True
+SKU0244,DAI-0244,Dairy & Bakery,Wheat Flour,Brand4,3.47,2.5,0.97,0.2795,0.85,11,Fast-Moving,Value,False
+SKU0245,DAI-0245,Dairy & Bakery,Yeasts,Brand5,0.41,0.28,0.13,0.3171,0.1,10,Seasonal,Value,True
+SKU0246,DAI-0246,Dairy & Bakery,Yeasts,Brand6,4.81,3.38,1.43,0.2973,1.15,10,Fast-Moving,Premium,False
+SKU0247,DAI-0247,Dairy & Bakery,Powdered Milk,Brand7,5.73,4.11,1.62,0.2827,1.4,20,Intermediate,Premium,False
+SKU0248,DAI-0248,Dairy & Bakery,Wheat Flour,Brand8,7.19,5.04,2.15,0.299,1.71,19,Fast-Moving,Premium,False
+SKU0249,DAI-0249,Dairy & Bakery,Wheat Flour,Brand1,32.97,23.07,9.9,0.3003,7.84,6,Fast-Moving,Premium,False
+SKU0250,DAI-0250,Dairy & Bakery,Wheat Flour,Brand2,0.89,0.62,0.27,0.3034,0.21,12,Intermediate,Value,False
+SKU0251,DAI-0251,Dairy & Bakery,Wheat Flour,Brand3,22.36,15.9,6.46,0.2889,5.41,21,Intermediate,Premium,False
+SKU0252,DAI-0252,Dairy & Bakery,Wheat Flour,Brand4,25.74,18.45,7.29,0.2832,6.27,7,Seasonal,Premium,True
+SKU0253,DAI-0253,Dairy & Bakery,Wheat Flour,Brand5,21.76,14.79,6.97,0.3203,5.03,7,Fast-Moving,Premium,False
+SKU0254,DAI-0254,Dairy & Bakery,Wheat Flour,Brand6,5.28,3.71,1.57,0.2973,1.26,6,Seasonal,Premium,True
+SKU0255,DAI-0255,Dairy & Bakery,Yeasts,Brand7,4.81,3.29,1.52,0.316,1.12,7,Fast-Moving,Premium,False
+SKU0256,DAI-0256,Dairy & Bakery,Flour,Brand8,10.06,6.89,3.17,0.3151,2.34,8,Fast-Moving,Premium,False
+SKU0257,DAI-0257,Dairy & Bakery,Wheat Flour,Brand1,60.11,42.24,17.87,0.2973,14.36,7,Intermediate,Premium,False
+SKU0258,DAI-0258,Dairy & Bakery,Wheat Flour,Brand2,16.68,11.86,4.82,0.289,4.03,16,Fast-Moving,Premium,False
+SKU0259,DAI-0259,Dairy & Bakery,Wheat Flour,Brand3,2.2,1.57,0.63,0.2864,0.53,14,Seasonal,Value,True
+SKU0260,DAI-0260,Dairy & Bakery,Powdered Milk,Brand4,5.29,3.63,1.66,0.3138,1.23,6,Fast-Moving,Premium,False
+SKU0261,DAI-0261,Dairy & Bakery,Powdered Milk,Brand5,4.32,2.95,1.37,0.3171,1.0,21,Fast-Moving,Value,False
+SKU0262,DAI-0262,Dairy & Bakery,Flour,Brand6,10.06,6.84,3.22,0.3201,2.33,14,Fast-Moving,Premium,False
+SKU0263,DAI-0263,Dairy & Bakery,Yeasts,Brand7,3.7,2.6,1.1,0.2973,0.88,16,Fast-Moving,Premium,False
+SKU0264,DAI-0264,Dairy & Bakery,Powdered Milk,Brand8,4.8,3.37,1.43,0.2979,1.15,16,Fast-Moving,Premium,False
+SKU0265,DAI-0265,Dairy & Bakery,Yeasts,Brand1,1.65,1.13,0.52,0.3152,0.38,5,Intermediate,Value,False
+SKU0266,DAI-0266,Dairy & Bakery,Yeasts,Brand2,3.54,2.43,1.11,0.3136,0.83,17,Seasonal,Premium,True
+SKU0267,DAI-0267,Dairy & Bakery,Yeasts,Brand3,1.53,1.1,0.43,0.281,0.37,17,Fast-Moving,Value,False
+SKU0268,DAI-0268,Dairy & Bakery,Wheat Flour,Brand4,6.03,4.23,1.8,0.2985,1.44,11,Seasonal,Premium,True
+SKU0269,DAI-0269,Dairy & Bakery,Wheat Flour,Brand5,0.91,0.64,0.27,0.2967,0.22,5,Fast-Moving,Value,False
+SKU0270,DAI-0270,Dairy & Bakery,Powdered Milk,Brand6,3.36,2.41,0.95,0.2827,0.82,16,Seasonal,Value,True
+SKU0271,DAI-0271,Dairy & Bakery,Wheat Flour,Brand7,2.54,1.76,0.78,0.3071,0.6,6,Intermediate,Value,False
+SKU0272,DAI-0272,Dairy & Bakery,Wheat Flour,Brand8,12.73,8.83,3.9,0.3064,3.0,13,Fast-Moving,Premium,False
+SKU0273,DAI-0273,Dairy & Bakery,Yeasts,Brand1,1.49,1.02,0.47,0.3154,0.35,7,Fast-Moving,Value,False
+SKU0274,DAI-0274,Dairy & Bakery,Yeasts,Brand2,2.15,1.49,0.66,0.307,0.51,7,Fast-Moving,Premium,False
+SKU0275,DAI-0275,Dairy & Bakery,Wheat Flour,Brand3,0.94,0.66,0.28,0.2979,0.22,21,Intermediate,Value,False
+SKU0276,DAI-0276,Dairy & Bakery,Wheat Flour,Brand4,1.02,0.72,0.3,0.2941,0.24,16,Fast-Moving,Value,False
+SKU0277,DAI-0277,Dairy & Bakery,Wheat Flour,Brand5,1.22,0.88,0.34,0.2787,0.3,5,Intermediate,Value,False
+SKU0278,DAI-0278,Dairy & Bakery,Yeasts,Brand6,0.97,0.68,0.29,0.299,0.23,11,Fast-Moving,Value,False
+SKU0279,DAI-0279,Dairy & Bakery,Yeasts,Brand7,3.36,2.29,1.07,0.3185,0.78,6,Seasonal,Premium,True
+SKU0280,DAI-0280,Dairy & Bakery,Wheat Flour,Brand8,26.79,18.54,8.25,0.308,6.3,11,Seasonal,Premium,True
+SKU0281,DAI-0281,Dairy & Bakery,Yeasts,Brand1,1.06,0.73,0.33,0.3113,0.25,7,Fast-Moving,Value,False
+SKU0282,DAI-0282,Dairy & Bakery,Yeasts,Brand2,1.82,1.27,0.55,0.3022,0.43,12,Fast-Moving,Premium,False
+SKU0283,DAI-0283,Dairy & Bakery,Yeasts,Brand3,4.81,3.44,1.37,0.2848,1.17,19,Seasonal,Premium,True
+SKU0284,DAI-0284,Dairy & Bakery,Yeasts,Brand4,0.93,0.66,0.27,0.2903,0.22,5,Seasonal,Value,True
+SKU0285,DAI-0285,Dairy & Bakery,Yeasts,Brand5,3.28,2.24,1.04,0.3171,0.76,21,Fast-Moving,Premium,False
+SKU0286,DAI-0286,Dairy & Bakery,Wheat Flour,Brand6,3.07,2.16,0.91,0.2964,0.73,8,Fast-Moving,Value,False
+SKU0287,DAI-0287,Dairy & Bakery,Wheat Flour,Brand7,3.98,2.83,1.15,0.2889,0.96,13,Fast-Moving,Value,False
+SKU0288,DAI-0288,Dairy & Bakery,Wheat Flour,Brand8,4.51,3.07,1.44,0.3193,1.04,14,Fast-Moving,Premium,False
+SKU0289,DAI-0289,Dairy & Bakery,Wheat Flour,Brand1,5.04,3.49,1.55,0.3075,1.19,11,Seasonal,Premium,True
+SKU0290,DAI-0290,Dairy & Bakery,Wheat Flour,Brand2,1.57,1.07,0.5,0.3185,0.36,9,Intermediate,Value,False
+SKU0291,DAI-0291,Dairy & Bakery,Wheat Flour,Brand3,11.0,7.54,3.46,0.3145,2.56,16,Fast-Moving,Premium,False
+SKU0292,DAI-0292,Dairy & Bakery,Flour,Brand4,8.21,5.69,2.52,0.3069,1.93,7,Fast-Moving,Premium,False
+SKU0293,DAI-0293,Dairy & Bakery,Wheat Flour,Brand5,1.07,0.73,0.34,0.3178,0.25,15,Intermediate,Value,False
+SKU0294,DAI-0294,Dairy & Bakery,Wheat Flour,Brand6,5.05,3.43,1.62,0.3208,1.17,11,Fast-Moving,Premium,False
+SKU0295,DAI-0295,Dairy & Bakery,Wheat Flour,Brand7,8.09,5.55,2.54,0.314,1.89,20,Fast-Moving,Premium,False
+SKU0296,DAI-0296,Dairy & Bakery,Yeasts,Brand8,1.91,1.35,0.56,0.2932,0.46,15,Fast-Moving,Premium,False
+SKU0297,DAI-0297,Dairy & Bakery,Yeasts,Brand1,2.11,1.51,0.6,0.2844,0.51,21,Fast-Moving,Premium,False
+SKU0298,DAI-0298,Dairy & Bakery,Yeasts,Brand2,4.81,3.45,1.36,0.2827,1.17,6,Fast-Moving,Premium,False
+SKU0299,DAI-0299,Dairy & Bakery,Yeasts,Brand3,1.19,0.85,0.34,0.2857,0.29,7,Fast-Moving,Value,False
+SKU0300,DAI-0300,Dairy & Bakery,Yeasts,Brand4,2.01,1.38,0.63,0.3134,0.47,18,Seasonal,Premium,True
+SKU0301,FRO-0301,Frozen Foods,Vegetable,Brand1,10.3,6.91,3.39,0.3291,2.28,479,Fast-Moving,Premium,False
+SKU0302,FRO-0302,Frozen Foods,Canned Sweet,Brand2,4.23,2.93,1.3,0.3073,0.97,354,Fast-Moving,Premium,False
+SKU0303,FRO-0303,Frozen Foods,Vegetable,Brand3,4.09,2.86,1.23,0.3007,0.94,375,Seasonal,Value,True
+SKU0304,FRO-0304,Frozen Foods,Vegetable,Brand4,13.79,9.63,4.16,0.3017,3.18,444,Fast-Moving,Premium,False
+SKU0305,FRO-0305,Frozen Foods,Vegetable,Brand5,3.78,2.6,1.18,0.3122,0.86,272,Fast-Moving,Value,False
+SKU0306,FRO-0306,Frozen Foods,Vegetable,Brand6,6.97,4.86,2.11,0.3027,1.6,374,Seasonal,Premium,True
+SKU0307,FRO-0307,Frozen Foods,Vegetable,Brand7,3.7,2.61,1.09,0.2946,0.86,439,Intermediate,Value,False
+SKU0308,FRO-0308,Frozen Foods,Vegetable,Brand8,6.04,4.18,1.86,0.3079,1.38,282,Seasonal,Value,True
+SKU0309,FRO-0309,Frozen Foods,Vegetable,Brand1,4.69,3.22,1.47,0.3134,1.06,419,Intermediate,Value,False
+SKU0310,FRO-0310,Frozen Foods,Vegetable,Brand2,4.86,3.29,1.57,0.323,1.09,237,Fast-Moving,Value,False
+SKU0311,FRO-0311,Frozen Foods,Vegetable,Brand3,5.98,4.09,1.89,0.3161,1.35,517,Fast-Moving,Value,False
+SKU0312,FRO-0312,Frozen Foods,Vegetable,Brand4,6.68,4.67,2.01,0.3009,1.54,406,Intermediate,Value,False
+SKU0313,FRO-0313,Frozen Foods,Vegetable,Brand5,3.75,2.52,1.23,0.328,0.83,483,Fast-Moving,Value,False
+SKU0314,FRO-0314,Frozen Foods,Vegetable,Brand6,4.62,3.16,1.46,0.316,1.04,217,Intermediate,Value,False
+SKU0315,FRO-0315,Frozen Foods,Vegetable,Brand7,5.53,3.81,1.72,0.311,1.26,309,Fast-Moving,Value,False
+SKU0316,FRO-0316,Frozen Foods,Canned Sweet,Brand8,4.41,2.96,1.45,0.3288,0.98,355,Intermediate,Premium,False
+SKU0317,FRO-0317,Frozen Foods,Vegetable,Brand1,8.09,5.45,2.64,0.3263,1.8,391,Intermediate,Premium,False
+SKU0318,FRO-0318,Frozen Foods,Vegetable,Brand2,6.37,4.5,1.87,0.2936,1.49,425,Seasonal,Value,True
+SKU0319,FRO-0319,Frozen Foods,Vegetable,Brand3,4.14,2.91,1.23,0.2971,0.96,264,Fast-Moving,Value,False
+SKU0320,FRO-0320,Frozen Foods,Vegetable,Brand4,11.22,7.56,3.66,0.3262,2.49,399,Fast-Moving,Premium,False
+SKU0321,FRO-0321,Frozen Foods,Vegetable,Brand5,7.65,5.24,2.41,0.315,1.73,494,Seasonal,Premium,True
+SKU0322,FRO-0322,Frozen Foods,Vegetable,Brand6,10.7,7.26,3.44,0.3215,2.4,433,Intermediate,Premium,False
+SKU0323,FRO-0323,Frozen Foods,Vegetable,Brand7,3.86,2.71,1.15,0.2979,0.89,444,Fast-Moving,Value,False
+SKU0324,FRO-0324,Frozen Foods,Vegetable,Brand8,7.1,4.76,2.34,0.3296,1.57,318,Fast-Moving,Premium,False
+SKU0325,FRO-0325,Frozen Foods,Vegetable,Brand1,11.89,7.98,3.91,0.3288,2.63,349,Seasonal,Premium,True
+SKU0326,FRO-0326,Frozen Foods,Canned Sweet,Brand2,4.41,3.0,1.41,0.3197,0.99,184,Seasonal,Premium,True
+SKU0327,FRO-0327,Frozen Foods,Vegetable,Brand3,4.47,3.16,1.31,0.2931,1.04,244,Fast-Moving,Value,False
+SKU0328,FRO-0328,Frozen Foods,Vegetable,Brand4,6.18,4.27,1.91,0.3091,1.41,422,Intermediate,Value,False
+SKU0329,FRO-0329,Frozen Foods,Vegetable,Brand5,16.42,11.23,5.19,0.3161,3.71,409,Seasonal,Premium,True
+SKU0330,FRO-0330,Frozen Foods,Canned Sweet,Brand6,2.09,1.47,0.62,0.2967,0.49,423,Intermediate,Value,False
+SKU0331,FRO-0331,Frozen Foods,Vegetable,Brand7,11.61,8.24,3.37,0.2903,2.72,423,Seasonal,Premium,True
+SKU0332,FRO-0332,Frozen Foods,Vegetable,Brand8,8.59,5.78,2.81,0.3271,1.91,311,Intermediate,Premium,False
+SKU0333,FRO-0333,Frozen Foods,Vegetable,Brand1,6.65,4.65,2.0,0.3008,1.53,520,Seasonal,Value,True
+SKU0334,FRO-0334,Frozen Foods,Canned Sweet,Brand2,3.32,2.3,1.02,0.3072,0.76,256,Fast-Moving,Value,False
+SKU0335,FRO-0335,Frozen Foods,Vegetable,Brand3,12.59,8.61,3.98,0.3161,2.84,271,Intermediate,Premium,False
+SKU0336,FRO-0336,Frozen Foods,Vegetable,Brand4,5.19,3.57,1.62,0.3121,1.18,192,Fast-Moving,Value,False
+SKU0337,FRO-0337,Frozen Foods,Vegetable,Brand5,5.1,3.52,1.58,0.3098,1.16,324,Fast-Moving,Value,False
+SKU0338,FRO-0338,Frozen Foods,Vegetable,Brand6,3.43,2.43,1.0,0.2915,0.8,450,Intermediate,Value,False
+SKU0339,FRO-0339,Frozen Foods,Vegetable,Brand7,3.81,2.56,1.25,0.3281,0.84,457,Fast-Moving,Value,False
+SKU0340,FRO-0340,Frozen Foods,Vegetable,Brand8,5.96,4.1,1.86,0.3121,1.35,202,Fast-Moving,Value,False
+SKU0341,FRO-0341,Frozen Foods,Vegetable,Brand1,4.3,2.96,1.34,0.3116,0.98,211,Seasonal,Value,True
+SKU0342,FRO-0342,Frozen Foods,Vegetable,Brand2,13.35,9.15,4.2,0.3146,3.02,510,Fast-Moving,Premium,False
+SKU0343,FRO-0343,Frozen Foods,Vegetable,Brand3,5.34,3.74,1.6,0.2996,1.23,401,Fast-Moving,Value,False
+SKU0344,FRO-0344,Frozen Foods,Vegetable,Brand4,9.33,6.36,2.97,0.3183,2.1,198,Seasonal,Premium,True
+SKU0345,FRO-0345,Frozen Foods,Vegetable,Brand5,5.55,3.87,1.68,0.3027,1.28,288,Seasonal,Value,True
+SKU0346,FRO-0346,Frozen Foods,Vegetable,Brand6,7.49,5.11,2.38,0.3178,1.69,422,Fast-Moving,Premium,False
+SKU0347,FRO-0347,Frozen Foods,Vegetable,Brand7,9.4,6.32,3.08,0.3277,2.09,312,Fast-Moving,Premium,False
+SKU0348,FRO-0348,Frozen Foods,Vegetable,Brand8,6.96,4.89,2.07,0.2974,1.61,278,Fast-Moving,Value,False
+SKU0349,FRO-0349,Frozen Foods,Vegetable,Brand1,3.14,2.2,0.94,0.2994,0.73,189,Fast-Moving,Value,False
+SKU0350,FRO-0350,Frozen Foods,Vegetable,Brand2,6.96,4.75,2.21,0.3175,1.57,240,Seasonal,Value,True
+SKU0351,FRO-0351,Frozen Foods,Vegetable,Brand3,4.11,2.9,1.21,0.2944,0.96,374,Fast-Moving,Value,False
+SKU0352,FRO-0352,Frozen Foods,Vegetable,Brand4,12.05,8.37,3.68,0.3054,2.76,320,Fast-Moving,Premium,False
+SKU0353,FRO-0353,Frozen Foods,Vegetable,Brand5,4.7,3.17,1.53,0.3255,1.05,523,Intermediate,Value,False
+SKU0354,FRO-0354,Frozen Foods,Vegetable,Brand6,7.31,5.02,2.29,0.3133,1.66,527,Fast-Moving,Premium,False
+SKU0355,FRO-0355,Frozen Foods,Vegetable,Brand7,8.76,5.98,2.78,0.3174,1.97,472,Seasonal,Premium,True
+SKU0356,FRO-0356,Frozen Foods,Vegetable,Brand8,17.38,11.76,5.62,0.3234,3.88,495,Intermediate,Premium,False
+SKU0357,FRO-0357,Frozen Foods,Vegetable,Brand1,4.99,3.5,1.49,0.2986,1.16,248,Seasonal,Value,True
+SKU0358,FRO-0358,Frozen Foods,Canned Sweet,Brand2,3.11,2.14,0.97,0.3119,0.71,291,Intermediate,Value,False
+SKU0359,FRO-0359,Frozen Foods,Vegetable,Brand3,5.05,3.54,1.51,0.299,1.17,502,Intermediate,Value,False
+SKU0360,FRO-0360,Frozen Foods,Vegetable,Brand4,16.87,11.72,5.15,0.3053,3.87,374,Fast-Moving,Premium,False
+SKU0361,FRO-0361,Frozen Foods,Canned Sweet,Brand5,2.45,1.7,0.75,0.3061,0.56,208,Fast-Moving,Value,False
+SKU0362,FRO-0362,Frozen Foods,Vegetable,Brand6,4.6,3.25,1.35,0.2935,1.07,295,Fast-Moving,Value,False
+SKU0363,FRO-0363,Frozen Foods,Vegetable,Brand7,3.6,2.52,1.08,0.3,0.83,457,Fast-Moving,Value,False
+SKU0364,FRO-0364,Frozen Foods,Vegetable,Brand8,17.38,12.14,5.24,0.3015,4.01,259,Fast-Moving,Premium,False
+SKU0365,FRO-0365,Frozen Foods,Vegetable,Brand1,5.31,3.67,1.64,0.3089,1.21,386,Fast-Moving,Value,False
+SKU0366,FRO-0366,Frozen Foods,Vegetable,Brand2,10.4,7.09,3.31,0.3183,2.34,503,Fast-Moving,Premium,False
+SKU0367,FRO-0367,Frozen Foods,Canned Sweet,Brand3,3.04,2.09,0.95,0.3125,0.69,210,Fast-Moving,Value,False
+SKU0368,FRO-0368,Frozen Foods,Vegetable,Brand4,6.13,4.36,1.77,0.2887,1.44,408,Fast-Moving,Value,False
+SKU0369,FRO-0369,Frozen Foods,Vegetable,Brand5,8.25,5.85,2.4,0.2909,1.93,537,Seasonal,Premium,True
+SKU0370,FRO-0370,Frozen Foods,Vegetable,Brand6,4.14,2.93,1.21,0.2923,0.97,408,Fast-Moving,Value,False
+SKU0371,FRO-0371,Frozen Foods,Vegetable,Brand7,4.09,2.86,1.23,0.3007,0.94,345,Fast-Moving,Value,False
+SKU0372,FRO-0372,Frozen Foods,Vegetable,Brand8,7.22,5.04,2.18,0.3019,1.66,498,Seasonal,Premium,True
+SKU0373,FRO-0373,Frozen Foods,Canned Sweet,Brand1,4.41,3.08,1.33,0.3016,1.02,404,Fast-Moving,Premium,False
+SKU0374,FRO-0374,Frozen Foods,Vegetable,Brand2,15.52,10.7,4.82,0.3106,3.53,247,Intermediate,Premium,False
+SKU0375,FRO-0375,Frozen Foods,Vegetable,Brand3,5.43,3.7,1.73,0.3186,1.22,512,Intermediate,Value,False
+SKU0376,FRO-0376,Frozen Foods,Vegetable,Brand4,12.47,8.75,3.72,0.2983,2.89,484,Fast-Moving,Premium,False
+SKU0377,FRO-0377,Frozen Foods,Vegetable,Brand5,6.11,4.14,1.97,0.3224,1.37,462,Seasonal,Value,True
+SKU0378,FRO-0378,Frozen Foods,Vegetable,Brand6,7.4,5.17,2.23,0.3014,1.71,330,Fast-Moving,Premium,False
+SKU0379,FRO-0379,Frozen Foods,Vegetable,Brand7,8.69,6.09,2.6,0.2992,2.01,240,Intermediate,Premium,False
+SKU0380,FRO-0380,Frozen Foods,Vegetable,Brand8,3.45,2.42,1.03,0.2986,0.8,347,Seasonal,Value,True
+SKU0381,FRO-0381,Frozen Foods,Vegetable,Brand1,8.52,5.93,2.59,0.304,1.96,513,Seasonal,Premium,True
+SKU0382,FRO-0382,Frozen Foods,Vegetable,Brand2,4.33,2.99,1.34,0.3095,0.99,334,Fast-Moving,Value,False
+SKU0383,FRO-0383,Frozen Foods,Vegetable,Brand3,8.39,5.91,2.48,0.2956,1.95,369,Seasonal,Premium,True
+SKU0384,FRO-0384,Frozen Foods,Vegetable,Brand4,7.0,4.93,2.07,0.2957,1.63,519,Seasonal,Premium,True
+SKU0385,FRO-0385,Frozen Foods,Vegetable,Brand5,9.61,6.79,2.82,0.2934,2.24,206,Fast-Moving,Premium,False
+SKU0386,FRO-0386,Frozen Foods,Vegetable,Brand6,8.47,5.71,2.76,0.3259,1.88,216,Seasonal,Premium,True
+SKU0387,FRO-0387,Frozen Foods,Vegetable,Brand7,5.77,4.05,1.72,0.2981,1.34,309,Seasonal,Value,True
+SKU0388,FRO-0388,Frozen Foods,Vegetable,Brand8,10.07,7.04,3.03,0.3009,2.32,357,Fast-Moving,Premium,False
+SKU0389,FRO-0389,Frozen Foods,Vegetable,Brand1,6.07,4.11,1.96,0.3229,1.36,322,Fast-Moving,Value,False
+SKU0390,FRO-0390,Frozen Foods,Vegetable,Brand2,5.29,3.75,1.54,0.2911,1.24,229,Seasonal,Value,True
+SKU0391,FRO-0391,Frozen Foods,Vegetable,Brand3,6.06,4.18,1.88,0.3102,1.38,471,Fast-Moving,Value,False
+SKU0392,FRO-0392,Frozen Foods,Vegetable,Brand4,14.11,9.48,4.63,0.3281,3.13,493,Seasonal,Premium,True
+SKU0393,FRO-0393,Frozen Foods,Vegetable,Brand5,7.67,5.19,2.48,0.3233,1.71,225,Fast-Moving,Premium,False
+SKU0394,FRO-0394,Frozen Foods,Vegetable,Brand6,9.8,6.87,2.93,0.299,2.27,518,Fast-Moving,Premium,False
+SKU0395,FRO-0395,Frozen Foods,Vegetable,Brand7,5.43,3.78,1.65,0.3039,1.25,316,Seasonal,Value,True
+SKU0396,FRO-0396,Frozen Foods,Vegetable,Brand8,7.1,4.93,2.17,0.3056,1.63,496,Intermediate,Premium,False
+SKU0397,FRO-0397,Frozen Foods,Vegetable,Brand1,12.42,8.38,4.04,0.3253,2.77,213,Seasonal,Premium,True
+SKU0398,FRO-0398,Frozen Foods,Vegetable,Brand2,17.38,12.1,5.28,0.3038,3.99,462,Seasonal,Premium,True
+SKU0399,FRO-0399,Frozen Foods,Vegetable,Brand3,4.7,3.19,1.51,0.3213,1.05,340,Fast-Moving,Value,False
+SKU0400,FRO-0400,Frozen Foods,Vegetable,Brand4,7.72,5.23,2.49,0.3225,1.73,453,Fast-Moving,Premium,False
+SKU0401,GRO-0401,Grocery,Coffee in Capsules,Brand1,5.58,3.83,1.75,0.3136,0.77,352,Intermediate,Value,False
+SKU0402,GRO-0402,Grocery,Sugar,Brand2,5.64,3.82,1.82,0.3227,0.76,510,Fast-Moving,Premium,False
+SKU0403,GRO-0403,Grocery,Cassava starch,Brand3,16.01,10.6,5.41,0.3379,2.12,499,Seasonal,Value,True
+SKU0404,GRO-0404,Grocery,Sugar,Brand4,4.91,3.35,1.56,0.3177,0.67,331,Seasonal,Value,True
+SKU0405,GRO-0405,Grocery,Manioc Flour,Brand5,22.73,15.36,7.37,0.3242,3.07,263,Fast-Moving,Value,False
+SKU0406,GRO-0406,Grocery,Manioc Flour,Brand6,39.31,26.18,13.13,0.334,5.24,434,Fast-Moving,Premium,False
+SKU0407,GRO-0407,Grocery,Oil,Brand7,4.76,3.13,1.63,0.3424,0.63,341,Seasonal,Premium,True
+SKU0408,GRO-0408,Grocery,Oil,Brand8,10.93,7.31,3.62,0.3312,1.46,340,Fast-Moving,Premium,False
+SKU0409,GRO-0409,Grocery,Cassava starch,Brand1,13.47,9.02,4.45,0.3304,1.8,429,Fast-Moving,Value,False
+SKU0410,GRO-0410,Grocery,Oil,Brand2,4.79,3.13,1.66,0.3466,0.63,500,Seasonal,Premium,True
+SKU0411,GRO-0411,Grocery,Oil,Brand3,2.59,1.76,0.83,0.3205,0.35,308,Fast-Moving,Value,False
+SKU0412,GRO-0412,Grocery,Oil,Brand4,1.8,1.22,0.58,0.3222,0.24,220,Fast-Moving,Value,False
+SKU0413,GRO-0413,Grocery,Oil,Brand5,0.33,0.22,0.11,0.3333,0.04,209,Fast-Moving,Value,False
+SKU0414,GRO-0414,Grocery,Ground Coffee,Brand6,18.72,12.26,6.46,0.3451,2.45,418,Fast-Moving,Value,False
+SKU0415,GRO-0415,Grocery,Ground Coffee,Brand7,10.91,7.41,3.5,0.3208,1.48,372,Fast-Moving,Value,False
+SKU0416,GRO-0416,Grocery,Sugar,Brand8,6.24,4.14,2.1,0.3365,0.83,522,Seasonal,Premium,True
+SKU0417,GRO-0417,Grocery,Sugar,Brand1,3.49,2.36,1.13,0.3238,0.47,482,Fast-Moving,Value,False
+SKU0418,GRO-0418,Grocery,Sugar,Brand2,4.07,2.66,1.41,0.3464,0.53,297,Intermediate,Value,False
+SKU0419,GRO-0419,Grocery,Oil,Brand3,0.75,0.51,0.24,0.32,0.1,537,Seasonal,Value,True
+SKU0420,GRO-0420,Grocery,Spices,Brand4,13.67,9.11,4.56,0.3336,1.82,488,Fast-Moving,Premium,False
+SKU0421,GRO-0421,Grocery,Oil,Brand5,7.63,5.24,2.39,0.3132,1.05,421,Fast-Moving,Premium,False
+SKU0422,GRO-0422,Grocery,Spices,Brand6,2.84,1.87,0.97,0.3415,0.37,377,Fast-Moving,Value,False
+SKU0423,GRO-0423,Grocery,Manioc Flour,Brand7,38.68,25.39,13.29,0.3436,5.08,404,Fast-Moving,Premium,False
+SKU0424,GRO-0424,Grocery,Spices,Brand8,8.53,5.87,2.66,0.3118,1.17,322,Intermediate,Value,False
+SKU0425,GRO-0425,Grocery,Oil,Brand1,1.44,0.96,0.48,0.3333,0.19,426,Intermediate,Value,False
+SKU0426,GRO-0426,Grocery,Spices,Brand2,14.79,9.78,5.01,0.3387,1.96,243,Intermediate,Premium,False
+SKU0427,GRO-0427,Grocery,Oil,Brand3,3.43,2.36,1.07,0.312,0.47,455,Fast-Moving,Premium,False
+SKU0428,GRO-0428,Grocery,Oil,Brand4,4.72,3.12,1.6,0.339,0.62,457,Seasonal,Premium,True
+SKU0429,GRO-0429,Grocery,Oil,Brand5,7.6,5.03,2.57,0.3382,1.01,339,Intermediate,Premium,False
+SKU0430,GRO-0430,Grocery,Oil,Brand6,18.97,12.45,6.52,0.3437,2.49,212,Fast-Moving,Premium,False
+SKU0431,GRO-0431,Grocery,Oil,Brand7,13.19,8.68,4.51,0.3419,1.74,358,Fast-Moving,Premium,False
+SKU0432,GRO-0432,Grocery,Spices,Brand8,4.22,2.85,1.37,0.3246,0.57,271,Intermediate,Value,False
+SKU0433,GRO-0433,Grocery,Cassava starch,Brand1,16.37,11.12,5.25,0.3207,2.22,493,Seasonal,Value,True
+SKU0434,GRO-0434,Grocery,Oil,Brand2,5.91,3.89,2.02,0.3418,0.78,243,Fast-Moving,Premium,False
+SKU0435,GRO-0435,Grocery,Oil,Brand3,2.49,1.71,0.78,0.3133,0.34,404,Fast-Moving,Value,False
+SKU0436,GRO-0436,Grocery,Oil,Brand4,18.97,12.42,6.55,0.3453,2.48,390,Intermediate,Premium,False
+SKU0437,GRO-0437,Grocery,Oil,Brand5,3.5,2.35,1.15,0.3286,0.47,407,Fast-Moving,Premium,False
+SKU0438,GRO-0438,Grocery,Sugar,Brand6,5.74,3.73,2.01,0.3502,0.75,393,Fast-Moving,Premium,False
+SKU0439,GRO-0439,Grocery,Oil,Brand7,7.92,5.24,2.68,0.3384,1.05,298,Fast-Moving,Premium,False
+SKU0440,GRO-0440,Grocery,Oil,Brand8,0.49,0.33,0.16,0.3265,0.07,510,Intermediate,Value,False
+SKU0441,GRO-0441,Grocery,Ground Coffee,Brand1,21.43,14.43,7.0,0.3266,2.89,249,Intermediate,Value,False
+SKU0442,GRO-0442,Grocery,Ground Coffee,Brand2,29.39,19.68,9.71,0.3304,3.94,401,Seasonal,Value,True
+SKU0443,GRO-0443,Grocery,Sugar,Brand3,4.88,3.25,1.63,0.334,0.65,237,Seasonal,Value,True
+SKU0444,GRO-0444,Grocery,Oil,Brand4,11.8,8.11,3.69,0.3127,1.62,193,Fast-Moving,Premium,False
+SKU0445,GRO-0445,Grocery,Oil,Brand5,7.69,5.22,2.47,0.3212,1.04,520,Seasonal,Premium,True
+SKU0446,GRO-0446,Grocery,Tomato Sauce,Brand6,3.45,2.36,1.09,0.3159,0.47,232,Seasonal,Value,True
+SKU0447,GRO-0447,Grocery,Ground Coffee,Brand7,118.09,78.26,39.83,0.3373,15.65,347,Intermediate,Premium,False
+SKU0448,GRO-0448,Grocery,Ground Coffee,Brand8,22.17,15.01,7.16,0.323,3.0,352,Fast-Moving,Value,False
+SKU0449,GRO-0449,Grocery,Spices,Brand1,15.01,10.24,4.77,0.3178,2.05,486,Fast-Moving,Premium,False
+SKU0450,GRO-0450,Grocery,Oil,Brand2,3.29,2.23,1.06,0.3222,0.45,522,Seasonal,Premium,True
+SKU0451,GRO-0451,Grocery,Spices,Brand3,3.1,2.02,1.08,0.3484,0.4,192,Seasonal,Value,True
+SKU0452,GRO-0452,Grocery,Oil,Brand4,3.42,2.33,1.09,0.3187,0.47,467,Seasonal,Premium,True
+SKU0453,GRO-0453,Grocery,Oil,Brand5,4.21,2.84,1.37,0.3254,0.57,350,Fast-Moving,Premium,False
+SKU0454,GRO-0454,Grocery,Sugar,Brand6,3.8,2.52,1.28,0.3368,0.5,516,Fast-Moving,Value,False
+SKU0455,GRO-0455,Grocery,Coffee in Capsules,Brand7,8.76,5.98,2.78,0.3174,1.2,206,Fast-Moving,Premium,False
+SKU0456,GRO-0456,Grocery,Manioc Flour,Brand8,36.85,24.55,12.3,0.3338,4.91,235,Seasonal,Premium,True
+SKU0457,GRO-0457,Grocery,Coffee in Capsules,Brand1,2.47,1.7,0.77,0.3117,0.34,389,Intermediate,Value,False
+SKU0458,GRO-0458,Grocery,Spices,Brand2,8.27,5.69,2.58,0.312,1.14,204,Fast-Moving,Value,False
+SKU0459,GRO-0459,Grocery,Sugar,Brand3,5.53,3.78,1.75,0.3165,0.76,516,Fast-Moving,Premium,False
+SKU0460,GRO-0460,Grocery,Coffee in Capsules,Brand4,5.1,3.42,1.68,0.3294,0.68,230,Intermediate,Value,False
+SKU0461,GRO-0461,Grocery,Sugar,Brand5,8.04,5.5,2.54,0.3159,1.1,454,Fast-Moving,Premium,False
+SKU0462,GRO-0462,Grocery,Spices,Brand6,16.24,10.61,5.63,0.3467,2.12,491,Seasonal,Premium,True
+SKU0463,GRO-0463,Grocery,Oil,Brand7,1.77,1.15,0.62,0.3503,0.23,306,Seasonal,Value,True
+SKU0464,GRO-0464,Grocery,Manioc Flour,Brand8,38.92,26.24,12.68,0.3258,5.25,298,Fast-Moving,Premium,False
+SKU0465,GRO-0465,Grocery,Sugar,Brand1,2.55,1.7,0.85,0.3333,0.34,437,Fast-Moving,Value,False
+SKU0466,GRO-0466,Grocery,Cassava starch,Brand2,15.23,10.51,4.72,0.3099,2.1,535,Intermediate,Value,False
+SKU0467,GRO-0467,Grocery,Oil,Brand3,0.45,0.31,0.14,0.3111,0.06,533,Seasonal,Value,True
+SKU0468,GRO-0468,Grocery,Cassava starch,Brand4,13.05,8.51,4.54,0.3479,1.7,244,Seasonal,Value,True
+SKU0469,GRO-0469,Grocery,Ground Coffee,Brand5,15.84,10.59,5.25,0.3314,2.12,378,Seasonal,Value,True
+SKU0470,GRO-0470,Grocery,Coffee in Capsules,Brand6,4.94,3.38,1.56,0.3158,0.68,302,Fast-Moving,Value,False
+SKU0471,GRO-0471,Grocery,Oil,Brand7,6.77,4.6,2.17,0.3205,0.92,498,Seasonal,Premium,True
+SKU0472,GRO-0472,Grocery,Oil,Brand8,1.59,1.03,0.56,0.3522,0.21,455,Seasonal,Value,True
+SKU0473,GRO-0473,Grocery,Oil,Brand1,13.49,9.19,4.3,0.3188,1.84,277,Fast-Moving,Premium,False
+SKU0474,GRO-0474,Grocery,Sugar,Brand2,8.46,5.66,2.8,0.331,1.13,290,Seasonal,Premium,True
+SKU0475,GRO-0475,Grocery,Manioc Flour,Brand3,25.6,17.29,8.31,0.3246,3.46,186,Fast-Moving,Value,False
+SKU0476,GRO-0476,Grocery,Sugar,Brand4,7.19,4.87,2.32,0.3227,0.97,402,Intermediate,Premium,False
+SKU0477,GRO-0477,Grocery,Oil,Brand5,1.02,0.69,0.33,0.3235,0.14,519,Fast-Moving,Value,False
+SKU0478,GRO-0478,Grocery,Cassava starch,Brand6,15.7,10.56,5.14,0.3274,2.11,236,Fast-Moving,Value,False
+SKU0479,GRO-0479,Grocery,Tomato Sauce,Brand7,3.45,2.31,1.14,0.3304,0.46,538,Intermediate,Value,False
+SKU0480,GRO-0480,Grocery,Manioc Flour,Brand8,27.99,18.91,9.08,0.3244,3.78,513,Seasonal,Value,True
+SKU0481,GRO-0481,Grocery,Oil,Brand1,2.57,1.72,0.85,0.3307,0.34,273,Intermediate,Value,False
+SKU0482,GRO-0482,Grocery,Spices,Brand2,4.0,2.62,1.38,0.345,0.52,354,Fast-Moving,Value,False
+SKU0483,GRO-0483,Grocery,Manioc Flour,Brand3,41.11,27.78,13.33,0.3243,5.56,444,Seasonal,Premium,True
+SKU0484,GRO-0484,Grocery,Oil,Brand4,2.08,1.44,0.64,0.3077,0.29,216,Fast-Moving,Value,False
+SKU0485,GRO-0485,Grocery,Sugar,Brand5,5.67,3.7,1.97,0.3474,0.74,210,Intermediate,Premium,False
+SKU0486,GRO-0486,Grocery,Oil,Brand6,7.3,5.01,2.29,0.3137,1.0,471,Fast-Moving,Premium,False
+SKU0487,GRO-0487,Grocery,Sugar,Brand7,1.95,1.33,0.62,0.3179,0.27,304,Seasonal,Value,True
+SKU0488,GRO-0488,Grocery,Oil,Brand8,2.5,1.65,0.85,0.34,0.33,365,Fast-Moving,Value,False
+SKU0489,GRO-0489,Grocery,Oil,Brand1,0.33,0.23,0.1,0.303,0.05,441,Intermediate,Value,False
+SKU0490,GRO-0490,Grocery,Spices,Brand2,6.76,4.5,2.26,0.3343,0.9,382,Intermediate,Value,False
+SKU0491,GRO-0491,Grocery,Sugar,Brand3,14.3,9.58,4.72,0.3301,1.92,221,Fast-Moving,Premium,False
+SKU0492,GRO-0492,Grocery,Oil,Brand4,0.88,0.57,0.31,0.3523,0.11,242,Fast-Moving,Value,False
+SKU0493,GRO-0493,Grocery,Oil,Brand5,1.82,1.23,0.59,0.3242,0.25,393,Fast-Moving,Value,False
+SKU0494,GRO-0494,Grocery,Sugar,Brand6,3.48,2.28,1.2,0.3448,0.46,189,Fast-Moving,Value,False
+SKU0495,GRO-0495,Grocery,Sugar,Brand7,7.33,4.89,2.44,0.3329,0.98,243,Seasonal,Premium,True
+SKU0496,GRO-0496,Grocery,Tomato Sauce,Brand8,4.2,2.75,1.45,0.3452,0.55,254,Fast-Moving,Value,False
+SKU0497,GRO-0497,Grocery,Sugar,Brand1,11.41,7.82,3.59,0.3146,1.56,415,Fast-Moving,Premium,False
+SKU0498,GRO-0498,Grocery,Cassava starch,Brand2,20.22,13.22,7.0,0.3462,2.64,294,Seasonal,Premium,True
+SKU0499,GRO-0499,Grocery,Oil,Brand3,0.97,0.66,0.31,0.3196,0.13,449,Fast-Moving,Value,False
+SKU0500,GRO-0500,Grocery,Oil,Brand4,3.58,2.45,1.13,0.3156,0.49,410,Seasonal,Premium,True

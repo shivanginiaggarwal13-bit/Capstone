@@ -1,7 +1,0 @@
-regional_dc_id,dc_name,city,state,region,storage_capacity_units
-RDC01,Southeast RDC,Charlotte, NC,Southeast,271472
-RDC02,Southwest RDC,Houston, TX,Southwest,326441
-RDC03,Midwest RDC,Kansas City, MO,Midwest,261409
-RDC04,West RDC,Denver, CO,West,582146
-RDC05,Northeast RDC,Newark, NJ,Northeast,547478
-RDC06,Florida RDC,Tampa, FL,Southeast,592267

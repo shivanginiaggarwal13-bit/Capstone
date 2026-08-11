@@ -71,7 +71,7 @@ DEMAND_MODEL = ("log(qty) = log(base * customer_scale * dc_share) "
 # PATHS
 # ============================================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "input datasets"))
 REPORT_PATH = os.environ.get("SUPPLY_BRAIN_REPORT", os.path.join(DATA_DIR, "EDA_REPORT.md"))
 ASSETS_DIR = os.path.join(os.path.dirname(REPORT_PATH), "report_assets")
 
@@ -123,9 +123,11 @@ def load_all():
               "customer_dc_master", "network_lanes", "b2b_customer_master", "customer_serving_dc",
               "cost_parameters", "orders", "demand_forecast", "production", "inventory"]:
         d[t] = load(t)
-    # parse week dates for correct time ordering
+    # parse dates for correct time ordering; orders uses order_date, others use week_start_date
+    date_col = {"orders": "order_date", "demand_forecast": "week_start_date",
+                "production": "week_start_date", "inventory": "week_start_date"}
     for t in ["orders", "demand_forecast", "production", "inventory"]:
-        d[t]["_dt"] = pd.to_datetime(d[t]["week_start_date"], errors="coerce")
+        d[t]["_dt"] = pd.to_datetime(d[t][date_col[t]], errors="coerce")
     return d
 
 # ============================================================================
@@ -478,7 +480,7 @@ def part2(d, md):
     md.append("\n**Lead time by lane tier (origin node type):**\n" + md_table(lt) + "\n")
 
     md.append("\n---\n*End of report. Regenerate any time with "
-              "`python supply_brain_eda_report.py` after re-running the data generator.*\n")
+              "`python eda.py` after re-running the data generator.*\n")
 
 # ============================================================================
 # MAIN
@@ -492,7 +494,7 @@ def main():
     part1(d, md)
     part2(d, md)
     os.makedirs(os.path.dirname(REPORT_PATH) or ".", exist_ok=True)
-    with open(REPORT_PATH, "w") as f:
+    with open(REPORT_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(md) + "\n")
     print(f"Wrote report: {REPORT_PATH}")
     print(f"Charts: {'enabled -> ' + ASSETS_DIR if HAVE_MPL else 'disabled (matplotlib not installed; tables only)'}")

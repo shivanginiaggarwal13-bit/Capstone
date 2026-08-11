@@ -1,0 +1,13 @@
+customer_dc_id,dc_name,city,state,region,storage_capacity_units
+CDC01,Nashville Sales DC,Nashville,TN,Southeast,132420
+CDC02,Miami Sales DC,Miami,FL,Southeast,127306
+CDC03,Phoenix Sales DC,Phoenix,AZ,West,89986
+CDC04,Seattle Sales DC,Seattle,WA,West,67402
+CDC05,Boston Sales DC,Boston,MA,Northeast,111601
+CDC06,Philadelphia Sales DC,Philadelphia,PA,Northeast,119974
+CDC07,Minneapolis Sales DC,Minneapolis,MN,Midwest,108408
+CDC08,St. Louis Sales DC,St. Louis,MO,Midwest,108637
+CDC09,Houston Sales DC,Houston,TX,Southwest,104237
+CDC10,Dallas Sales DC,Dallas,TX,Southwest,104415
+CDC11,Denver Sales DC,Denver,CO,West,71887
+CDC12,Atlanta Sales DC,Atlanta,GA,Southeast,86845

@@ -1,0 +1,596 @@
+<title>Supply Brain — Data Foundation</title>
+<style>
+  :root {
+    --ink: #1b1a17;
+    --ink-soft: #55524a;
+    --paper: #ecead2;
+    --paper-card: #fbfaf7;
+    --line: #d8d4c4;
+    --accent: #b4530a;
+    --accent-soft: #ecdac2;
+    --flow: #2f6a6d;
+    --flow-soft: #d2e4e2;
+    --good: #3f7d4f;
+
+    --display: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #ece9e1;
+      --ink-soft: #b7b2a4;
+      --paper: #14171a;
+      --paper-card: #1d2124;
+      --line: #2b2f32;
+      --accent: #e2883f;
+      --accent-soft: #3a2a1a;
+      --flow: #6fb0ac;
+      --flow-soft: #1c2f2e;
+      --good: #6fbe7e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #ece9e1;
+    --ink-soft: #b7b2a4;
+    --paper: #14171a;
+    --paper-card: #1d2124;
+    --line: #2b2f32;
+    --accent: #e2883f;
+    --accent-soft: #3a2a1a;
+    --flow: #6fb0ac;
+    --flow-soft: #1c2f2e;
+    --good: #6fbe7e;
+  }
+  :root[data-theme="light"] {
+    --ink: #1b1a17;
+    --ink-soft: #55524a;
+    --paper: #ecead2;
+    --paper-card: #fbfaf7;
+    --line: #d8d4c4;
+    --accent: #b4530a;
+    --accent-soft: #ecdac2;
+    --flow: #2f6a6d;
+    --flow-soft: #d2e4e2;
+    --good: #3f7d4f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 3rem 1.75rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  /* ---------- Header / manifest strip ---------- */
+
+  header.head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 1.5rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(2rem, 4.2vw, 2.9rem);
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .head p.sub {
+    margin: 0;
+    max-width: 44rem;
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    text-wrap: balance;
+  }
+
+  .head .meta {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-top: 0.4rem;
+  }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+
+  .stat {
+    background: var(--paper-card);
+    padding: 1.1rem 1.1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .stat .n {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.01em;
+  }
+
+  .stat .l {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- Section scaffolding ---------- */
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .section-head .tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--flow);
+    font-weight: 600;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  .section-head p {
+    margin: 0;
+    color: var(--ink-soft);
+    max-width: 42rem;
+    font-size: 0.96rem;
+  }
+
+  /* ---------- Network flow diagram ---------- */
+
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.4rem;
+    background: var(--paper-card);
+    border: 1px solid var(--line);
+    padding: 1.5rem;
+  }
+
+  .node {
+    flex: 1 1 150px;
+    min-width: 130px;
+    background: var(--flow-soft);
+    border: 1px solid var(--line);
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    justify-content: center;
+  }
+
+  .node .count {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--flow);
+  }
+
+  .node .name {
+    font-size: 0.86rem;
+    font-weight: 600;
+  }
+
+  .node .note {
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+  }
+
+  .arrow {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-soft);
+    font-size: 1.3rem;
+    padding: 0 0.1rem;
+  }
+
+  .flow-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line);
+    padding-top: 0.9rem;
+    margin-top: 0.2rem;
+  }
+  .flow-foot span strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Table grid ---------- */
+
+  .table-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+  }
+
+  .tcard {
+    background: var(--paper-card);
+    padding: 1rem 1.1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .tcard .name {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--accent);
+  }
+
+  .tcard .grain {
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+    font-family: var(--mono);
+  }
+
+  .tcard .rows {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .tcard .desc {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- Grounding section ---------- */
+
+  .ground-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 1.25rem;
+  }
+  @media (max-width: 720px) { .ground-grid { grid-template-columns: 1fr; } }
+
+  .ground-card {
+    background: var(--paper-card);
+    border: 1px solid var(--line);
+    padding: 1.1rem 1.25rem;
+  }
+  .ground-card h3 {
+    font-family: var(--body);
+    font-size: 0.95rem;
+    margin: 0 0 0.5rem;
+    font-weight: 700;
+  }
+  .ground-card ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .ground-card ul li strong { color: var(--ink); font-weight: 600; }
+
+  .pass-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--good);
+    font-weight: 600;
+  }
+  .pass-pill::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--good);
+    display: inline-block;
+  }
+
+  /* ---------- Elasticity table ---------- */
+
+  .elastic-wrap { overflow-x: auto; }
+  table.elastic {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 480px;
+    background: var(--paper-card);
+    border: 1px solid var(--line);
+  }
+  table.elastic caption {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink-soft);
+    padding: 0.6rem 0.9rem 0.4rem;
+  }
+  table.elastic th, table.elastic td {
+    padding: 0.55rem 0.9rem;
+    text-align: left;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--line);
+  }
+  table.elastic th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+  table.elastic td.num, table.elastic th.num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  table.elastic tr:last-child td { border-bottom: none; }
+
+  /* ---------- Gap callouts ---------- */
+
+  .gap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .gap {
+    display: flex;
+    gap: 0.9rem;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 0.85rem 1.1rem;
+  }
+  .gap .mark {
+    font-family: var(--mono);
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 0.8rem;
+    flex: 0 0 auto;
+    padding-top: 0.1rem;
+  }
+  .gap p { margin: 0; font-size: 0.9rem; }
+  .gap p strong { font-weight: 700; }
+
+  /* ---------- Footer ---------- */
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--ink-soft);
+  }
+
+  a { color: inherit; }
+</style>
+
+<div class="wrap">
+
+  <header class="head">
+    <div class="eyebrow">Supply Brain — Data Foundation Overview</div>
+    <h1>What we've built before any optimization model touches it</h1>
+    <p class="sub">A fully-synthetic, referentially-consistent CPG supply chain dataset — sized, structured, and economically grounded to behave like a real client extract, generated so every workstream could start on day one without waiting on client data.</p>
+    <p class="meta">Prepared for Accenture Supply Chain &amp; Engineering — AI and Data · ISB AMPBA &amp; AI, Capstone 2026S · Supply Brain</p>
+  </header>
+
+  <div class="stat-strip">
+    <div class="stat"><div class="n">500</div><div class="l">SKUs · 5 categories, 3 demand segments</div></div>
+    <div class="stat"><div class="n">14</div><div class="l">linked tables · all integrity checks pass</div></div>
+    <div class="stat"><div class="n">104</div><div class="l">weeks · 52 wk 2025 actuals + 52 wk 2026 forward</div></div>
+    <div class="stat"><div class="n">$128M</div><div class="l">simulated historical revenue (2025)</div></div>
+    <div class="stat"><div class="n">8.08M</div><div class="l">units across 260,770 order lines</div></div>
+    <div class="stat"><div class="n">84.7%</div><div class="l">of revenue from top 20% of SKUs</div></div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <div class="tag">Network</div>
+      <h2>One synthetic US network, four stock-holding echelons</h2>
+      <p>Modelled on the Coca-Cola bottling system's plant-to-DC ratio. Plants hold no inventory — the Plant DC is the first stocking echelon. Two real delivery patterns coexist: bulk national accounts via Regional DCs, direct-store-delivery banners via local Customer DCs.</p>
+    </div>
+    <div class="flow">
+      <div class="node"><div class="count">4</div><div class="name">Production Plants</div><div class="note">no inventory held</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="count">4</div><div class="name">Plant DCs</div><div class="note">first stocking echelon</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="count">6</div><div class="name">Regional DCs</div><div class="note">serves BULK banners</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="count">12</div><div class="name">Customer DCs</div><div class="note">serves DSD banners</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="count">10</div><div class="name">B2B Banners</div><div class="note">retail / distributor accounts</div></div>
+    </div>
+    <div class="flow-foot">
+      <span><strong>28</strong> lanes</span>
+      <span><strong>Truck + Train</strong> transport modes</span>
+      <span><strong>1 : 5.5</strong> plant-to-DC ratio</span>
+      <span><strong>BULK / DSD</strong> delivery modes</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="tag">Structure</div>
+      <h2>Thirteen fact &amp; master tables, one consistent key structure</h2>
+      <p>Every foreign key resolves against its master at generation time. Orders and demand forecasts share the same SKU × DC × Customer grain, so downstream MEIO and elasticity work can join freely.</p>
+    </div>
+    <div class="table-grid">
+      <div class="tcard">
+        <div class="name">sku_master</div>
+        <div class="grain">grain: SKU</div>
+        <div class="rows">500 rows</div>
+        <div class="desc">USD economics, margin, shelf life, segment, price tier, seasonal flag</div>
+      </div>
+      <div class="tcard">
+        <div class="name">orders</div>
+        <div class="grain">grain: SKU × DC × Customer × Day</div>
+        <div class="rows">260,770 rows</div>
+        <div class="desc">Day-level order lines, basket-grouped, promo-linked pricing</div>
+      </div>
+      <div class="tcard">
+        <div class="name">demand_forecast</div>
+        <div class="grain">grain: SKU × DC × Customer × Week</div>
+        <div class="rows">659,506 rows</div>
+        <div class="desc">in_sample (2025, w/ actuals + error) and forward (2026, execution horizon)</div>
+      </div>
+      <div class="tcard">
+        <div class="name">production</div>
+        <div class="grain">grain: SKU × Plant × Week</div>
+        <div class="rows">24,725 rows</div>
+        <div class="desc">Planned vs. actual output, schedule adherence %</div>
+      </div>
+      <div class="tcard">
+        <div class="name">inventory</div>
+        <div class="grain">grain: SKU × DC × Week</div>
+        <div class="rows">295,256 rows</div>
+        <div class="desc">Opening / receipts / shipments / closing / safety stock / reorder point</div>
+      </div>
+      <div class="tcard">
+        <div class="name">promotions</div>
+        <div class="grain">grain: promo event</div>
+        <div class="rows">customer-specific</div>
+        <div class="desc">Trade-promo calendar — the source of every discount seen in orders</div>
+      </div>
+      <div class="tcard">
+        <div class="name">network_lanes</div>
+        <div class="grain">grain: lane</div>
+        <div class="rows">28 rows</div>
+        <div class="desc">Lead-time mean + std, distance, USD logistics cost per unit</div>
+      </div>
+      <div class="tcard">
+        <div class="name">cost_parameters</div>
+        <div class="grain">grain: category</div>
+        <div class="rows">5 rows</div>
+        <div class="desc">Holding cost %, cost of capital %, stockout cost multiplier</div>
+      </div>
+      <div class="tcard">
+        <div class="name">network &amp; customer masters</div>
+        <div class="grain">plant / plant DC / regional DC / customer DC / banner / serving-DC</div>
+        <div class="rows">6 tables</div>
+        <div class="desc">Node attributes + banner-to-serving-DC demand share</div>
+      </div>
+    </div>
+    <span class="pass-pill">referential integrity — 9/9 checks pass</span>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="tag">Grounding</div>
+      <h2>Synthetic, but not arbitrary</h2>
+      <p>Demand-side parameters are calibrated against a real Food &amp; Beverage Sales dataset. Supply-side parameters are researched CPG benchmarks, not fabricated numbers — flagged clearly so nothing is mistaken for a client fact.</p>
+    </div>
+    <div class="ground-grid">
+      <div class="ground-card">
+        <h3>Anchored to real demand data</h3>
+        <ul>
+          <li><strong>Prices</strong> drawn from each SKU's mapped real product group</li>
+          <li><strong>Two elasticities</strong> per SKU — base (shelf) and promotional (deal, ~1.75× base) — carried into price response, not shipped as a column</li>
+          <li><strong>Seasonality shape</strong> from a mature real year (2020, COVID spike stripped; 2019 excluded as a ramp-up trend)</li>
+          <li><strong>Revenue concentration</strong> matches real ~80/20 — realized here: top 20% of SKUs drive 84.7% of revenue</li>
+        </ul>
+      </div>
+      <div class="ground-card">
+        <h3>Modelled assumption, not a client fact</h3>
+        <ul>
+          <li>Unit cost, margin, holding cost — category-differentiated, benchmark-calibrated</li>
+          <li>Logistics cost, lead time, network structure — Coca-Cola-modelled, no real source</li>
+          <li>Production adherence — 93.3% mean, fat left tail for disruption events</li>
+          <li>Forecast accuracy (MAPE) — 6.2% Fast-Moving, 11.6% Intermediate, 21.3% Seasonal</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="tag">By design, not by omission</div>
+      <h2>What isn't shipped — and has to be derived</h2>
+      <p>Price elasticity is deliberately withheld as a ready-made column, exactly as it would be on a real client extract. It's recovered from <span style="font-family:var(--mono)">orders.csv</span> via a two-way (SKU + week) fixed-effects regression on shelf price and discount depth.</p>
+    </div>
+    <div class="elastic-wrap">
+      <table class="elastic">
+        <caption>Measured vs. internally-targeted elasticity, by category (EDA report, current data instance)</caption>
+        <thead>
+          <tr><th>Category</th><th class="num">Measured</th><th class="num">Internal target</th><th class="num">n obs</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Beverages</td><td class="num">−1.26</td><td class="num">−2.00</td><td class="num">52,480</td></tr>
+          <tr><td>Snacks &amp; Confectionery</td><td class="num">−3.43</td><td class="num">−2.10</td><td class="num">54,014</td></tr>
+          <tr><td>Dairy &amp; Bakery</td><td class="num">−2.08</td><td class="num">−0.55</td><td class="num">52,125</td></tr>
+          <tr><td>Frozen Foods</td><td class="num">−3.38</td><td class="num">−1.30</td><td class="num">47,797</td></tr>
+          <tr><td>Grocery</td><td class="num">−1.95</td><td class="num">−0.60</td><td class="num">54,354</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="gap-list">
+      <div class="gap">
+        <div class="mark">GAP</div>
+        <p><strong>Feedback / recalibration-loop data</strong> — actual-vs-forecast drift tracking over time isn't covered by any table yet. This is the one open dependency for the project's core "closed-loop, self-recalibrating" promise.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Synthetic-first — de-risks delivery, lets every workstream start in parallel. Optional validation against anonymized Accenture data in the final phase.</span>
+    <span>supply_brain_generator_v3.py · regenerable via python eda.py</span>
+  </footer>
+
+</div>

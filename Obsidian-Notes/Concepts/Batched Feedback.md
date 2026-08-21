@@ -1,0 +1,9 @@
+**Batched (Delayed) Feedback** describes a [[Multi-Armed Bandit]] setting where the reward for a chosen arm isn't observed immediately after the decision, but only after some delay — and often as an aggregate over many decisions at once, rather than one clean signal per pull.
+
+**Why the textbook bandit formulation assumes this away.** The classic slot-machine framing implies instant feedback: pull the lever, see the payout immediately, update, pull again. Most real bandit tutorials build their intuition (and their update math) on that assumption.
+
+**Why [[Supply Brain]] can't use that assumption.** A chosen policy — a buffer mix, a service-level target, an echelon positioning — only produces an observable outcome after a full simulated **replenishment cycle** runs through the **[[Digital Twin]]**, which is roughly weekly, not per micro-decision. That means the bandit engine needs a **batch-update** variant: accumulate a policy's outcomes over the cycle, then update the relevant belief once, rather than updating after every individual transaction or every individual SKU-level event.
+
+**The practical consequence for the build.** This is explicitly one of the reasons the naive, "update after every pull" formulation taught in introductory bandit material isn't directly usable here — the engine built in Phase 3 of the **[[Multi-Armed Bandits — Supply Brain Strategy|deployment pipeline]]** has to be designed around weekly batch updates from the start, not retrofitted onto a per-pull design later. It's also part of why the **Feedback-loop / actual-vs-forecast drift-tracking data gap** flagged in `Docs/MEIO in FnB.md` is a shared dependency between the core MEIO build and the bandit track — both need the same class of "observed outcome, arriving on a delay, tied back to the decision that produced it" data.
+
+Related: [[Multi-Armed Bandit]], [[Reward Function (Bandit)]], [[Multi-Armed Bandits — Supply Brain Strategy]]

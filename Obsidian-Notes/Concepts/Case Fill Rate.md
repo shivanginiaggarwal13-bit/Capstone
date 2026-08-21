@@ -1,0 +1,11 @@
+**Case Fill Rate (CFR)** measures the percentage of ordered cases/units actually delivered on time and in full — distinct from the general **[[Service-Level Target]]** (the probability of not stocking out during a cycle), though the two are closely related and often confused in casual usage.
+
+**Why this project treats them as distinct.** Service level is typically a *forward-looking policy target* set by planners; case fill rate is a *backward-looking achieved outcome* measured against real orders. A system can set an aggressive service-level target and still achieve a mediocre fill rate if the underlying safety stock, lead-time modeling, or manufacturing adherence isn't good enough to actually deliver on that target.
+
+**The benchmark that reshapes the whole target-setting exercise.** A GMA/BCG benchmarking study of 30+ US CPG manufacturers found a median *achieved* on-time case fill rate of only **89.7%** — well below the 95–99% figures commonly cited as aspirational targets in grocery/CPG literature. This is the specific number that justifies [[Supply Brain]]'s decision to set its current-state baseline at ~88–91% rather than 99%: using 99% as the starting assumption would be modeling an aspiration, not reality, and every downstream cost/benefit calculation built on top of that baseline would be wrong in the same direction.
+
+**Where it shows up in the schema.** `sku_customer_service_targets.case_fill_rate_target_pct` is explicitly documented with the note "Real-world achieved CPG median is ~89.7% (GMA/BCG study) — use as current-state baseline, not target," a direct guardrail against the more optimistic default that would otherwise creep in.
+
+**A related but separate metric worth not confusing with CFR.** `manufacturing_adherence.adherence_pct` (actual vs. planned production, modeled at ~92–97% typical with a fat left tail for disruption events) tracks whether the *plant* executed its own plan — a supply-side metric — and is deliberately tracked separately from CFR, since schedule adherence and customer-facing fill rate can diverge: a plant can hit its own production plan perfectly and still contribute to a fill-rate miss further downstream if positioning or lead time is the actual bottleneck.
+
+Related: [[Service-Level Target]], [[Synthetic-First Data Strategy]]

@@ -1,0 +1,11 @@
+A **Combinatorial Action Space** is what a decision problem has when the true set of possible choices is continuous and multi-dimensional rather than a small, discrete list — which is a direct mismatch with how a [[Multi-Armed Bandit]] is formulated, since a bandit needs a fixed, enumerable set of "arms" to choose between.
+
+**Where this bites in [[Supply Brain]].** True **[[Multi-Echelon Inventory Optimization (MEIO)|MEIO]]** positioning is a continuous, multi-node allocation problem — in principle, buffer could be split across Plant DC, Regional DC, and Customer DC in effectively infinite proportions, for every SKU segment independently. A bandit can't search that space directly; it needs a small, fixed menu of options to sample from.
+
+**The fix: discretize into templates.** Rather than solving MEIO as a continuous allocation problem inside the bandit, the **[[Multi-Armed Bandits — Supply Brain Strategy|bandit track]]** reduces it to a handful of predefined positioning templates — `hold at Plant DC / pool at Regional DC / push to Customer DC / split Regional+Customer` — and treats each template as one arm. The same simplification applies to the price/inventory buffer-mix decision, discretized into five templates (`100% inventory / 75-25 / 50-50 / 25-75 / 100% price`) rather than a continuous mix ratio.
+
+**Why this is flagged as a caveat, not hidden.** Discretization is a real simplification of the underlying problem, and the strategy documentation is explicit that this needs to be called out in the final technical report rather than glossed over — the bandit is choosing the best *template*, not the true continuous optimum, and the gap between those two is itself worth acknowledging as a limitation of the approach.
+
+**The general principle this illustrates.** It's a recurring pattern whenever a bandit is applied to a real operational decision that wasn't originally discrete: someone has to design a small, sensible set of arms that meaningfully covers the space of real options, and that design choice — not just the algorithm — determines how good the bandit's eventual answer can possibly be.
+
+Related: [[Multi-Armed Bandit]], [[Multi-Echelon Inventory Optimization (MEIO)]], [[Multi-Armed Bandits — Supply Brain Strategy]]

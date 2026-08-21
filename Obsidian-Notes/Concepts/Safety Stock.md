@@ -1,0 +1,9 @@
+**Safety Stock** is the buffer inventory held above expected demand to absorb variability — in demand, in lead time, or both — so a stockout doesn't happen just because reality came in slightly worse than the forecast. In [[Supply Brain]] it's calculated dynamically, with demand-side and supply-side variability modeled explicitly, rather than folded into one static formula applied everywhere.
+
+**Why "averaged away" variability is the actual bug.** Most legacy planning treats lead time as a single mean number. This project instead assigns lead-time mean *and* standard deviation per lane and category: domestic/regional lanes run ~3–7 day mean with a coefficient of variation (CV = SD/mean) of 0.2–0.4; longer or imported lanes run ~10–20 day mean with CV 0.4–0.6. That distinction matters because two lanes with the same mean lead time but different variability need very different safety-stock buffers — averaging them into one number erases exactly the information safety-stock math needs.
+
+**Where it sits in the network.** The plant itself is production-only and holds zero inventory; the **Plant DC is the first stock-holding echelon** (Plant → Plant DC → Regional DC → Customer DC). Today, in the real dataset, the *only* echelon with a real current-state safety-stock baseline is the store level (`inventory_snapshot.safety_stock`) — everything upstream of the store is a synthetic baseline built specifically to enable a before/after comparison, since no such buffer exists upstream today.
+
+**Connection to positioning.** Safety stock answers *how much* buffer to hold; **[[Multi-Echelon Inventory Optimization (MEIO)]]** answers *where* in the network to hold it. The two are inseparable in practice — the same total buffer, positioned at the wrong echelon, still produces the working-capital-vs-service tension the project is sponsored to fix.
+
+Related: [[Supply Brain]], [[Service-Level Target]], [[Multi-Armed Bandits — Supply Brain Strategy]]

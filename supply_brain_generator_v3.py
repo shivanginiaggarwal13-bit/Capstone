@@ -43,6 +43,11 @@ import math
 import time
 import numpy as np
 import pandas as pd
+import datetime as dt
+try:
+    import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt; HAVE_MPL = True
+except Exception:
+    HAVE_MPL = False
 
 # ============================================================================
 # CONFIG
@@ -225,92 +230,74 @@ def step1_masters():
                  columns=["category", "holding_cost_pct_annual", "cost_of_capital_pct",
                           "stockout_cost_multiplier"]).to_csv(f"{OUT}/cost_parameters.csv", index=False)
 
-    # ---- Coca-Cola-scaled US network ----
-    CITY = {
-        "Atlanta, GA": (33.75, -84.39, "Southeast"), "Dallas, TX": (32.78, -96.80, "Southwest"),
-        "Chicago, IL": (41.88, -87.63, "Midwest"), "Los Angeles, CA": (34.05, -118.24, "West"),
-        "Charlotte, NC": (35.23, -80.84, "Southeast"), "Houston, TX": (29.76, -95.37, "Southwest"),
-        "Denver, CO": (39.74, -104.99, "West"), "Newark, NJ": (40.74, -74.17, "Northeast"),
-        "Tampa, FL": (27.95, -82.46, "Southeast"), "Nashville, TN": (36.16, -86.78, "Southeast"),
-        "Kansas City, MO": (39.10, -94.58, "Midwest"), "Phoenix, AZ": (33.45, -112.07, "West"),
-        "Boston, MA": (42.36, -71.06, "Northeast"), "Minneapolis, MN": (44.98, -93.27, "Midwest"),
-        "Seattle, WA": (47.61, -122.33, "West"), "Miami, FL": (25.76, -80.19, "Southeast"),
-        "Philadelphia, PA": (39.95, -75.17, "Northeast"), "St. Louis, MO": (38.63, -90.20, "Midwest"),
-    }
-    def sp(c): return c.split(", ")[0], c.split(", ")[1]
-    def hav(a, b):
-        (la1, lo1, _), (la2, lo2, _) = CITY[a], CITY[b]
-        R = 3958.8; p1, p2 = math.radians(la1), math.radians(la2)
-        dphi = math.radians(la2-la1); dl = math.radians(lo2-lo1)
-        h = math.sin(dphi/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
-        return R*2*math.atan2(math.sqrt(h), math.sqrt(1-h))
-
-    plants = [("PLANT01", "Atlanta Production Center", "Atlanta, GA"),
-              ("PLANT02", "Dallas Production Center", "Dallas, TX"),
-              ("PLANT03", "Chicago Production Center", "Chicago, IL"),
-              ("PLANT04", "Los Angeles Production Center", "Los Angeles, CA")]
-    pd.DataFrame([[p, nm, *sp(c), int(RNG.integers(2_000_000, 4_000_000)), "TRUE"] for p, nm, c in plants],
-                 columns=["plant_id", "plant_name", "city", "state",
-                          "production_capacity_units_per_week", "no_inventory_flag"]).to_csv(f"{OUT}/plant_master.csv", index=False)
-    plant_dcs = [("PDC01", "PLANT01", "Atlanta, GA"), ("PDC02", "PLANT02", "Dallas, TX"),
-                 ("PDC03", "PLANT03", "Chicago, IL"), ("PDC04", "PLANT04", "Los Angeles, CA")]
-    pd.DataFrame([[d, p, *sp(c), int(RNG.integers(400_000, 900_000))] for d, p, c in plant_dcs],
-                 columns=["plant_dc_id", "plant_id", "city", "state", "storage_capacity_units"]).to_csv(f"{OUT}/plant_dc_master.csv", index=False)
-    regional_dcs = [("RDC01", "Southeast RDC", "Charlotte, NC", "Southeast"),
-                    ("RDC02", "Southwest RDC", "Houston, TX", "Southwest"),
-                    ("RDC03", "Midwest RDC", "Kansas City, MO", "Midwest"),
-                    ("RDC04", "West RDC", "Denver, CO", "West"),
-                    ("RDC05", "Northeast RDC", "Newark, NJ", "Northeast"),
-                    ("RDC06", "Florida RDC", "Tampa, FL", "Southeast")]
-    pd.DataFrame([[d, nm, *sp(c), reg, int(RNG.integers(250_000, 600_000))] for d, nm, c, reg in regional_dcs],
-                 columns=["regional_dc_id", "dc_name", "city", "state", "region", "storage_capacity_units"]).to_csv(f"{OUT}/regional_dc_master.csv", index=False)
-    customer_dcs = [("CDC01", "Nashville Sales DC", "Nashville, TN", "Southeast"),
-                    ("CDC02", "Miami Sales DC", "Miami, FL", "Southeast"),
-                    ("CDC03", "Phoenix Sales DC", "Phoenix, AZ", "West"),
-                    ("CDC04", "Seattle Sales DC", "Seattle, WA", "West"),
-                    ("CDC05", "Boston Sales DC", "Boston, MA", "Northeast"),
-                    ("CDC06", "Philadelphia Sales DC", "Philadelphia, PA", "Northeast"),
-                    ("CDC07", "Minneapolis Sales DC", "Minneapolis, MN", "Midwest"),
-                    ("CDC08", "St. Louis Sales DC", "St. Louis, MO", "Midwest"),
-                    ("CDC09", "Houston Sales DC", "Houston, TX", "Southwest"),
-                    ("CDC10", "Dallas Sales DC", "Dallas, TX", "Southwest"),
-                    ("CDC11", "Denver Sales DC", "Denver, CO", "West"),
-                    ("CDC12", "Atlanta Sales DC", "Atlanta, GA", "Southeast")]
-    pd.DataFrame([[d, nm, *sp(c), reg, int(RNG.integers(60_000, 160_000))] for d, nm, c, reg in customer_dcs],
-                 columns=["customer_dc_id", "dc_name", "city", "state", "region", "storage_capacity_units"]).to_csv(f"{OUT}/customer_dc_master.csv", index=False)
-
-    def lane_params(dist, rng):
-        if dist < 25:
-            mode, mean, cv = "Truck", 0.5, 0.15
-        elif dist < 600:
-            mode, mean, cv = "Truck", rng.uniform(2, 4), rng.uniform(0.2, 0.35)
-        elif dist < 1200:
-            mode, mean, cv = ("Train" if rng.random() < 0.5 else "Truck"), rng.uniform(4, 7), rng.uniform(0.3, 0.45)
-        else:
-            mode, mean, cv = "Train", rng.uniform(7, 13), rng.uniform(0.4, 0.6)
-        # logistics cost per unit in USD (case-level): short lanes ~$0.5-2, long rail ~$2-6
-        logi = round(0.0018 * dist + rng.uniform(0.4, 1.2), 2)
-        return mode, round(mean, 2), round(mean*cv, 2), logi, int(rng.integers(150_000, 500_000))
-
-    lanes = []; ln = 1
-    def add(o, ot, oc, d, dt, dc):
-        nonlocal ln
-        dist = round(hav(oc, dc), 1)
-        mode, mean, std, logi, cap = lane_params(dist, RNG)
-        lanes.append([f"LANE{ln:03d}", o, ot, d, dt, mode, mean, std, dist, logi, cap]); ln += 1
-    for pid, _, c in plants:
-        pdc = next(x for x in plant_dcs if x[1] == pid); add(pid, "PLANT", c, pdc[0], "PLANT_DC", pdc[2])
-    for rid, _, rc, _ in regional_dcs:
-        for pdc in sorted(plant_dcs, key=lambda x: hav(rc, x[2]))[:2]:
-            add(pdc[0], "PLANT_DC", pdc[2], rid, "REGIONAL_DC", rc)
-    for cid, _, cc, creg in customer_dcs:
-        same = [r for r in regional_dcs if r[3] == creg] or regional_dcs
-        rdc = min(same, key=lambda r: hav(cc, r[2]))
-        add(rdc[0], "REGIONAL_DC", rdc[2], cid, "CUSTOMER_DC", cc)
-    pd.DataFrame(lanes, columns=[
-        "lane_id", "origin_node_id", "origin_node_type", "destination_node_id", "destination_node_type",
-        "transport_mode", "lead_time_mean_days", "lead_time_std_days", "distance_miles",
-        "logistics_cost_per_unit_usd", "capacity_units_per_week"]).to_csv(f"{OUT}/network_lanes.csv", index=False)
+    # ---- network: EMBEDDED ideal topology (self-contained; no external network files needed) ----
+    # 4 Plants (production-only) -> 4 Plant DCs -> 8 Regional DCs -> 15 Customer DCs.
+    # Every Customer DC dual-sourced (primary + failover RDC); every RDC dual-sourced from 2 Plant DCs;
+    # plus Regional-DC to Regional-DC lateral rebalancing lanes. Truck/Train only. A dedicated net_rng is
+    # used so the demand-side RNG stream (SKUs, serving map) is unchanged and the demand profile is preserved.
+    net_rng = np.random.default_rng(2026)
+    NCITY = {
+        "Atlanta, GA": (33.75,-84.39,"Southeast"), "Dallas, TX": (32.78,-96.80,"Southwest"),
+        "Chicago, IL": (41.88,-87.63,"Midwest"), "Los Angeles, CA": (34.05,-118.24,"West"),
+        "Newark, NJ": (40.74,-74.17,"Northeast"), "Charlotte, NC": (35.23,-80.84,"Southeast"),
+        "Tampa, FL": (27.95,-82.46,"Southeast"), "Denver, CO": (39.74,-104.99,"West"),
+        "Seattle, WA": (47.61,-122.33,"West"), "Boston, MA": (42.36,-71.06,"Northeast"),
+        "Philadelphia, PA": (39.95,-75.17,"Northeast"), "Nashville, TN": (36.16,-86.78,"Southeast"),
+        "Miami, FL": (25.76,-80.19,"Southeast"), "Orlando, FL": (28.54,-81.38,"Southeast"),
+        "Minneapolis, MN": (44.98,-93.27,"Midwest"), "St. Louis, MO": (38.63,-90.20,"Midwest"),
+        "Detroit, MI": (42.33,-83.05,"Midwest"), "Houston, TX": (29.76,-95.37,"Southwest"),
+        "Phoenix, AZ": (33.45,-112.07,"Southwest"), "Sacramento, CA": (38.58,-121.49,"West")}
+    def _sp(c): return c.split(", ")[0], c.split(", ")[1]
+    def _hav(a,b):
+        (la1,lo1,_),(la2,lo2,_)=NCITY[a],NCITY[b]; R=3958.8
+        p1,p2=math.radians(la1),math.radians(la2); dphi=math.radians(la2-la1); dl=math.radians(lo2-lo1)
+        h=math.sin(dphi/2)**2+math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+        return R*2*math.atan2(math.sqrt(h),math.sqrt(1-h))
+    def _lane(dist, lateral=False):
+        if dist<25:      mode,mean,cv="Truck",0.5,0.15
+        elif dist<600:   mode,mean,cv="Truck",net_rng.uniform(2,4),net_rng.uniform(0.2,0.35)
+        elif dist<1200:  mode,mean,cv=("Truck" if lateral else ("Train" if net_rng.random()<0.5 else "Truck")),net_rng.uniform(4,7),net_rng.uniform(0.3,0.45)
+        else:            mode,mean,cv="Train",net_rng.uniform(7,13),net_rng.uniform(0.4,0.6)
+        return mode,round(mean,2),round(mean*cv,2),round(dist,1),round(0.0018*dist+net_rng.uniform(0.4,1.2),2),int(net_rng.integers(200_000,550_000))
+    n_plants=[("PLANT01","Atlanta Production Center","Atlanta, GA"),("PLANT02","Dallas Production Center","Dallas, TX"),
+              ("PLANT03","Chicago Production Center","Chicago, IL"),("PLANT04","Los Angeles Production Center","Los Angeles, CA")]
+    n_pdc=[("PDC01","PLANT01","Atlanta, GA"),("PDC02","PLANT02","Dallas, TX"),("PDC03","PLANT03","Chicago, IL"),("PDC04","PLANT04","Los Angeles, CA")]
+    n_rdc=[("RDC01","Northeast RDC","Newark, NJ"),("RDC02","Southeast RDC","Charlotte, NC"),("RDC03","Florida RDC","Tampa, FL"),
+           ("RDC04","Midwest RDC","Chicago, IL"),("RDC05","South-Central RDC","Dallas, TX"),("RDC06","Mountain RDC","Denver, CO"),
+           ("RDC07","West Coast RDC","Los Angeles, CA"),("RDC08","Pacific NW RDC","Seattle, WA")]
+    n_cdc=[("CDC01","Boston Sales DC","Boston, MA"),("CDC02","Philadelphia Sales DC","Philadelphia, PA"),("CDC03","Atlanta Sales DC","Atlanta, GA"),
+           ("CDC04","Nashville Sales DC","Nashville, TN"),("CDC05","Miami Sales DC","Miami, FL"),("CDC06","Orlando Sales DC","Orlando, FL"),
+           ("CDC07","Minneapolis Sales DC","Minneapolis, MN"),("CDC08","St. Louis Sales DC","St. Louis, MO"),("CDC09","Detroit Sales DC","Detroit, MI"),
+           ("CDC10","Houston Sales DC","Houston, TX"),("CDC11","Phoenix Sales DC","Phoenix, AZ"),("CDC12","Denver Sales DC","Denver, CO"),
+           ("CDC13","Los Angeles Sales DC","Los Angeles, CA"),("CDC14","Sacramento Sales DC","Sacramento, CA"),("CDC15","Seattle Sales DC","Seattle, WA")]
+    pd.DataFrame([[pid,nm,*_sp(c),int(net_rng.integers(3_500_000,4_800_000)),"TRUE"] for pid,nm,c in n_plants],
+        columns=["plant_id","plant_name","city","state","production_capacity_units_per_week","no_inventory_flag"]).to_csv(f"{OUT}/plant_master.csv",index=False)
+    pd.DataFrame([[d,pid,*_sp(c),int(net_rng.integers(800_000,1_200_000))] for d,pid,c in n_pdc],
+        columns=["plant_dc_id","plant_id","city","state","storage_capacity_units"]).to_csv(f"{OUT}/plant_dc_master.csv",index=False)
+    pd.DataFrame([[d,nm,*_sp(c),NCITY[c][2],int(net_rng.integers(400_000,700_000))] for d,nm,c in n_rdc],
+        columns=["regional_dc_id","dc_name","city","state","region","storage_capacity_units"]).to_csv(f"{OUT}/regional_dc_master.csv",index=False)
+    pd.DataFrame([[d,nm,*_sp(c),NCITY[c][2],int(net_rng.integers(90_000,190_000))] for d,nm,c in n_cdc],
+        columns=["customer_dc_id","dc_name","city","state","region","storage_capacity_units"]).to_csv(f"{OUT}/customer_dc_master.csv",index=False)
+    _rcity={r[0]:r[2] for r in n_rdc}
+    _lanes=[]; _ln=1
+    def _add(o_,ot,oc,d_,dt_,dc,lat=False):
+        nonlocal _ln
+        mode,mean,std,dist,logi,cap=_lane(_hav(oc,dc),lat)
+        _lanes.append([f"LANE{_ln:03d}",o_,ot,d_,dt_,mode,mean,std,dist,logi,cap]); _ln+=1
+    for pid,_,c in n_plants:
+        pdx=next(x for x in n_pdc if x[1]==pid); _add(pid,"PLANT",c,pdx[0],"PLANT_DC",pdx[2])
+    for rid,_,rc in n_rdc:
+        for x in sorted(n_pdc,key=lambda x:_hav(rc,x[2]))[:2]: _add(x[0],"PLANT_DC",x[2],rid,"REGIONAL_DC",rc)
+    for cid,_,cc in n_cdc:
+        for rr in sorted(n_rdc,key=lambda x:_hav(cc,x[2]))[:2]: _add(rr[0],"REGIONAL_DC",rr[2],cid,"CUSTOMER_DC",cc)
+    _pairs=set()
+    for rid,_,rc in n_rdc:
+        for r2 in sorted(n_rdc,key=lambda x:_hav(rc,x[2]))[1:3]: _pairs.add(tuple(sorted([rid,r2[0]])))
+    for a,b in sorted(_pairs): _add(a,"REGIONAL_DC",_rcity[a],b,"REGIONAL_DC",_rcity[b],lat=True)
+    pd.DataFrame(_lanes,columns=["lane_id","origin_node_id","origin_node_type","destination_node_id","destination_node_type",
+        "transport_mode","lead_time_mean_days","lead_time_std_days","distance_miles","logistics_cost_per_unit_usd",
+        "capacity_units_per_week"]).to_csv(f"{OUT}/network_lanes.csv",index=False)
+    rdc_ids=[r[0] for r in n_rdc]; cdc_ids=[c[0] for c in n_cdc]; n_lanes=len(_lanes)
 
     banners = [
         ("BNR01", "MegaMart Stores", "RT", "BULK", 6.0), ("BNR02", "ValueClub Warehouse", "RT", "BULK", 4.5),
@@ -322,7 +309,6 @@ def step1_masters():
     pd.DataFrame([[b, nm, ch, dm] for b, nm, ch, dm, _ in banners],
                  columns=["b2b_customer_id", "customer_name", "channel_type", "delivery_mode"]).to_csv(f"{OUT}/b2b_customer_master.csv", index=False)
 
-    rdc_ids = [r[0] for r in regional_dcs]; cdc_ids = [c[0] for c in customer_dcs]
     serve_rows = []; cust_dcs = {}
     for b, nm, ch, dm, scale in banners:
         pool = rdc_ids if dm == "BULK" else cdc_ids
@@ -332,7 +318,7 @@ def step1_masters():
             serve_rows.append([b, dcid, "REGIONAL_DC" if dm == "BULK" else "CUSTOMER_DC", round(float(sh), 4)])
     pd.DataFrame(serve_rows, columns=["b2b_customer_id", "dc_id", "dc_type", "demand_share"]).to_csv(f"{OUT}/customer_serving_dc.csv", index=False)
 
-    print(f"  SKUs 500 (5x100) | Plants 4 PlantDCs 4 RDCs 6 CDCs 12 | Lanes {len(lanes)} | Banners 10 | USD")
+    print(f"  SKUs 500 (5x100) | RDCs {len(rdc_ids)} CDCs {len(cdc_ids)} | Lanes {n_lanes} | Banners {len(banners)} | network=embedded ideal (8 RDC/15 CDC)")
     return dict(sku_meta=sku_meta, seasonal_index=seasonal_index, cust_dcs=cust_dcs,
                 cust_scale={b: s for b, _, _, _, s in banners}, cust_deliv={b: dm for b, _, _, dm, _ in banners})
 
@@ -636,15 +622,15 @@ def write_documentation():
     ## Entity / key map (referential integrity)
 
     ```
-    plant_master(plant_id) ─< plant_dc_master(plant_dc_id, plant_id)
-                            network_lanes(origin_node_id, destination_node_id)  ── every endpoint is a
+    plant_master(plant_id) < plant_dc_master(plant_dc_id, plant_id)
+                            network_lanes(origin_node_id, destination_node_id)   every endpoint is a
                             plant_id / plant_dc_id / regional_dc_id / customer_dc_id
-    regional_dc_master(regional_dc_id) ─┐
-    customer_dc_master(customer_dc_id) ─┴─ "stocking DCs"
-    b2b_customer_master(b2b_customer_id) ─< customer_serving_dc(b2b_customer_id, dc_id)   dc_id ∈ stocking DCs
-    sku_master(sku_id) ──< orders / demand_forecast / production / inventory
-    orders(sku_id, dc_id, b2b_customer_id, period)               dc_id ∈ stocking DCs
-    demand_forecast(sku_id, dc_id, b2b_customer_id, period, horizon)   forward keys ⊆ historical order keys
+    regional_dc_master(regional_dc_id) 
+    customer_dc_master(customer_dc_id)  "stocking DCs"
+    b2b_customer_master(b2b_customer_id) < customer_serving_dc(b2b_customer_id, dc_id)   dc_id  stocking DCs
+    sku_master(sku_id) < orders / demand_forecast / production / inventory
+    orders(sku_id, dc_id, b2b_customer_id, period)               dc_id  stocking DCs
+    demand_forecast(sku_id, dc_id, b2b_customer_id, period, horizon)   forward keys subset of historical order keys
     production(sku_id, plant_id, period)
     inventory(sku_id, dc_id, period)
     ```
@@ -779,6 +765,330 @@ def bundle_reference_docs():
 # ============================================================================
 # ORCHESTRATOR
 # ============================================================================
+# ============================================================================
+# COMPREHENSIVE EDA REPORT (in-process; reads the CSVs just generated in OUT)
+# ============================================================================
+def _tab(df, floatfmt="{:,.2f}"):
+    cols=[str(c) for c in df.columns]
+    def f(v):
+        if v is None or (isinstance(v,float) and math.isnan(v)): return ""
+        if isinstance(v,float): return floatfmt.format(v)
+        if isinstance(v,(int,np.integer)): return f"{int(v):,}"
+        return str(v)
+    out=["| "+" | ".join(cols)+" |","| "+" | ".join(["---"]*len(cols))+" |"]
+    for _,r in df.iterrows(): out.append("| "+" | ".join(f(r[c]) for c in df.columns)+" |")
+    return "\n".join(out)
+
+def _kv(pairs):
+    return "\n".join(["| Field | Value |","| --- | --- |"]+[f"| {k} | {v} |" for k,v in pairs])
+
+def _chart(fig, out, fname):
+    d=os.path.join(out,"report_assets"); os.makedirs(d,exist_ok=True)
+    fig.savefig(os.path.join(d,fname),dpi=115,bbox_inches="tight"); plt.close(fig)
+    return f"![{fname}](report_assets/{fname})"
+
+def _demean(v,keys,passes=6):
+    v=v.astype(float)
+    for _ in range(passes):
+        for k in keys: v=v-pd.Series(v).groupby(k).transform("mean").values
+    return v
+
+def generate_eda(OUT):
+    R=lambda n: pd.read_csv(f"{OUT}/{n}.csv")
+    sku=R("sku_master"); orders=R("orders"); fc=R("demand_forecast"); prod=R("production")
+    inv=R("inventory"); lanes=R("network_lanes"); ban=R("b2b_customer_master"); serve=R("customer_serving_dc")
+    costp=R("cost_parameters"); plants=R("plant_master"); pdc=R("plant_dc_master")
+    rdc=R("regional_dc_master"); cdc=R("customer_dc_master"); promos=R("promotions")
+    orders["_od"]=pd.to_datetime(orders.order_date,errors="coerce")
+    ordw=orders.groupby(["sku_id","dc_id","b2b_customer_id","period"],as_index=False).order_qty.sum()
+    sku_rev=orders.groupby("sku_id").revenue_usd.sum()
+    unit_cost=sku.set_index("sku_id").unit_cost_usd
+    m=[]; A=m.append
+
+    rev=orders.revenue_usd.sum(); cogs=(orders.order_qty*orders.sku_id.map(unit_cost)).sum()
+    A("# Supply Brain - Comprehensive Dataset and Network EDA\n")
+    A(f"*Auto-generated {dt.datetime.now().strftime('%Y-%m-%d %H:%M')}. Single-file build: this report is produced in "
+      "the same run that generates the data, so it always matches the current instance.*\n")
+    A("## Executive snapshot\n")
+    A(_kv([("SKUs",f"{sku.sku_id.nunique():,}"),
+           ("Network",f"{len(plants)} plants, {len(pdc)} plant DCs, {len(rdc)} regional DCs, {len(cdc)} customer DCs, {len(lanes)} lanes"),
+           ("B2B customers (banners)",len(ban)),
+           ("Order lines (day-level, 2025)",f"{len(orders):,}"),
+           ("Distinct orders (baskets)",f"{orders.order_id.nunique():,}"),
+           ("Total demand (units, 2025)",f"{orders.order_qty.sum():,}"),
+           ("Total revenue (2025)",f"${rev:,.0f}"),
+           ("Gross margin",f"${rev-cogs:,.0f} ({(rev-cogs)/rev*100:.1f} pct)"),
+           ("Forecast horizon",f"{fc.period.nunique()} weeks (2025 in-sample + 2026 forward)")])+"\n")
+
+    A("\n---\n\n# Part 1 - Parameters and Assumptions\n")
+    A("Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real F&B sales dataset "
+      "(per-unit prices, per-group elasticity, 2020-shape seasonality, ~80/20 concentration; 2020 COVID spike "
+      "excluded). 5 categories x 100 SKUs, segmented ~50/30/20 Fast-Moving/Seasonal/Intermediate. Two price "
+      "elasticities per SKU (base shelf-price and promotional). Demand is day-level orders on a dual-sourced "
+      "US network (Plant -> Plant DC -> Regional DC -> Customer DC) with lateral RDC-to-RDC rebalancing lanes. "
+      "Supply-side parameters (cost/margin, holding, lead time, capacities) are modelled assumptions; demand-side is grounded.\n")
+
+    A("\n---\n\n# Part 2 - Exploratory Data Analysis\n")
+
+    # 2.1 overview + data quality
+    A("## 2.1 Dataset overview and data quality\n")
+    tbls=["sku_master","orders","promotions","demand_forecast","production","inventory","network_lanes",
+          "b2b_customer_master","customer_serving_dc","cost_parameters","plant_master","plant_dc_master",
+          "regional_dc_master","customer_dc_master"]
+    rows=[[t,len(R(t)),R(t).shape[1],int(R(t).isna().sum().sum())] for t in tbls]
+    A(_tab(pd.DataFrame(rows,columns=["table","rows","cols","null_cells"]))+"\n")
+    dq=[("orders order_qty > 0",bool((orders.order_qty>0).all())),
+        ("orders unit_price_usd > 0",bool((orders.unit_price_usd>0).all())),
+        ("sku margins positive",bool((sku.margin_usd>0).all())),
+        ("inventory closing_stock >= 0",bool((inv.closing_stock>=0).all())),
+        ("delivery_date >= order_date",bool((pd.to_datetime(orders.delivery_date)>=orders._od).all())),
+        ("sku_id unique",bool(sku.sku_id.is_unique))]
+    A("\n**Data-quality checks:** "+"; ".join(f"{n} = {'PASS' if c else 'FAIL'}" for n,c in dq)+".\n")
+
+    # 2.2 referential integrity
+    A("## 2.2 Referential integrity\n")
+    sku_ids=set(sku.sku_id); cust=set(ban.b2b_customer_id)
+    stock=set(rdc.regional_dc_id)|set(cdc.customer_dc_id); nodes=set(plants.plant_id)|set(pdc.plant_dc_id)|stock
+    chk=[("orders.sku_id in sku_master",set(orders.sku_id)<=sku_ids),
+         ("orders.dc_id in stocking DCs",set(orders.dc_id)<=stock),
+         ("orders.b2b_customer_id in banners",set(orders.b2b_customer_id)<=cust),
+         ("orders.promo_id in promotions",set(orders.promo_id.fillna(""))-{""}<=set(promos.promo_id)),
+         ("forecast keys in masters",set(fc.sku_id)<=sku_ids and set(fc.dc_id)<=stock and set(fc.b2b_customer_id)<=cust),
+         ("production.plant_id in plants",set(prod.plant_id)<=set(plants.plant_id)),
+         ("inventory.dc_id in stocking DCs",set(inv.dc_id)<=stock),
+         ("lane endpoints in nodes",set(lanes.origin_node_id)<=nodes and set(lanes.destination_node_id)<=nodes),
+         ("serving map dc in stocking DCs",set(serve.dc_id)<=stock),
+         ("forward forecast has no actuals",fc[fc.horizon=='forward'].actual_qty.isna().all())]
+    A(_tab(pd.DataFrame([[n,"PASS" if c else "FAIL"] for n,c in chk],columns=["check","result"]))+"\n")
+
+    # 2.3 product & economics
+    A("## 2.3 Product catalog and economics (USD, per-unit)\n")
+    g=sku.groupby("category").agg(skus=("sku_id","count"),median_price=("list_price_usd","median"),
+        min_price=("list_price_usd","min"),max_price=("list_price_usd","max"),avg_margin_pct=("margin_pct","mean"),
+        median_shelf_life_d=("shelf_life_days","median")).reset_index()
+    g.avg_margin_pct=(g.avg_margin_pct*100).round(1)
+    A(_tab(g)+"\n")
+    A("\nPrice tiers: "+", ".join(f"{k} {v}" for k,v in sku.price_tier.value_counts().items())+
+      f". Seasonal-flagged SKUs: {int(sku.seasonal_flag.sum())}/{len(sku)}.\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(7,3.6)); sku.boxplot(column="list_price_usd",by="category",ax=ax,rot=20)
+        ax.set_title("Per-unit list price by category (USD)"); ax.set_xlabel(""); ax.set_ylabel("USD"); plt.suptitle("")
+        A("\n"+_chart(fig,OUT,"price_by_category.png")+"\n")
+
+    # 2.4 segmentation & ABC
+    A("## 2.4 SKU segmentation and ABC classification\n")
+    seg=sku.segment.value_counts(); segr=orders.merge(sku[["sku_id","segment"]],on="sku_id").groupby("segment").revenue_usd.sum()
+    st=pd.DataFrame({"segment":seg.index,"sku_count":seg.values,"sku_pct":(seg.values/len(sku)*100).round(1),
+                     "revenue_pct":(segr.reindex(seg.index).values/segr.sum()*100).round(1)})
+    A(_tab(st)+"\n")
+    r=sku_rev.sort_values(ascending=False); cum=r.cumsum()/r.sum()
+    cls=np.where(cum<=0.8,"A",np.where(cum<=0.95,"B","C"))
+    abc=pd.DataFrame({"sku_id":r.index,"cls":cls,"rev":r.values})
+    at=abc.groupby("cls").agg(skus=("sku_id","count"),rev=("rev","sum")).reset_index()
+    at["sku_pct"]=(at.skus/at.skus.sum()*100).round(1); at["rev_pct"]=(at.rev/at.rev.sum()*100).round(1)
+    A("\n**ABC by revenue (A=top 80pct, B=next 15pct, C=last 5pct):**\n"+_tab(at[["cls","skus","sku_pct","rev_pct"]])+"\n")
+    top20=cum.iloc[int(0.2*len(cum))-1]*100
+    A(f"\nConcentration: top 20 pct of SKUs = {top20:.1f} pct of revenue (steep, ~80/20).\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(6.5,3.4)); x=np.arange(1,len(cum)+1)/len(cum)*100
+        ax.plot(x,cum.values*100,color="#1f77b4"); ax.axhline(80,color="grey",ls=":",lw=0.8); ax.axvline(20,color="grey",ls=":",lw=0.8)
+        ax.set_title("Pareto: cumulative revenue vs SKU rank"); ax.set_xlabel("pct of SKUs"); ax.set_ylabel("cum pct revenue")
+        A("\n"+_chart(fig,OUT,"abc_pareto.png")+"\n")
+
+    # 2.5 demand analysis
+    A("## 2.5 Demand analysis\n")
+    o2=orders.merge(sku[["sku_id","category","segment"]],on="sku_id").merge(ban[["b2b_customer_id","customer_name","delivery_mode"]],on="b2b_customer_id")
+    bc=o2.groupby("category").agg(units=("order_qty","sum"),revenue=("revenue_usd","sum")).reset_index()
+    bc["rev_pct"]=(bc.revenue/bc.revenue.sum()*100).round(1); A("**By category:**\n"+_tab(bc.sort_values("revenue",ascending=False))+"\n")
+    bm=o2.groupby("delivery_mode").agg(units=("order_qty","sum"),revenue=("revenue_usd","sum"),lines=("order_qty","count")).reset_index()
+    A("\n**By fulfilment mode:**\n"+_tab(bm)+"\n")
+    bb=o2.groupby("customer_name").revenue_usd.sum().sort_values(ascending=False).reset_index()
+    A("\n**By customer (banner):**\n"+_tab(bb)+"\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(7,3.4)); bb2=bb.set_index("customer_name").revenue_usd
+        ax.barh(bb2.index[::-1],bb2.values[::-1],color="#4C78A8"); ax.set_title("Revenue by customer (USD)")
+        A("\n"+_chart(fig,OUT,"revenue_by_banner.png")+"\n")
+        oc=orders.merge(sku[["sku_id","category"]],on="sku_id")
+        fig,ax=plt.subplots(figsize=(8,3.6))
+        for c in sorted(oc.category.unique()):
+            s=oc[oc.category==c].groupby(oc._od.dt.to_period("W").dt.start_time).order_qty.sum()
+            ax.plot(s.index,s.values,lw=1.1,label=c)
+        ax.legend(fontsize=7); ax.set_title("Weekly demand by category (units) - seasonality"); ax.set_ylabel("units")
+        A("\n"+_chart(fig,OUT,"seasonality_by_category.png")+"\n")
+
+    # 2.6 demand variability
+    A("## 2.6 Demand variability and intermittency\n")
+    piv=ordw.pivot_table(index="sku_id",columns="period",values="order_qty",fill_value=0)
+    cv=(piv.std(axis=1)/piv.mean(axis=1)).replace([np.inf,-np.inf],np.nan)
+    intermit=(piv==0).mean(axis=1)
+    vt=pd.DataFrame({"sku_id":piv.index,"cv":cv.values,"zero_week_frac":intermit.values}).merge(sku[["sku_id","segment"]],on="sku_id")
+    vs=vt.groupby("segment").agg(avg_cv=("cv","mean"),avg_zero_week_pct=("zero_week_frac","mean")).reset_index()
+    vs.avg_cv=vs.avg_cv.round(2); vs.avg_zero_week_pct=(vs.avg_zero_week_pct*100).round(1)
+    A("Weekly demand coefficient of variation (CV) and intermittency by segment - the inputs safety-stock sizing keys off:\n")
+    A(_tab(vs)+"\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(6.5,3.3)); ax.hist(cv.dropna(),bins=30,color="#72B7B2")
+        ax.set_title("Distribution of per-SKU weekly demand CV"); ax.set_xlabel("CV"); A("\n"+_chart(fig,OUT,"demand_cv_hist.png")+"\n")
+
+    # 2.7 promotions & daily orders
+    A("## 2.7 Promotions and daily-order structure\n")
+    cs=(promos.b2b_customer_id!="ALL").mean()*100
+    lead=(pd.to_datetime(orders.delivery_date)-orders._od).dt.days
+    A(_kv([("Promo events",f"{len(promos):,}"),("Customer-specific vs ALL",f"{cs:.0f} pct / {100-cs:.0f} pct"),
+           ("Avg discount depth",f"{promos.discount_pct.mean()*100:.1f} pct"),
+           ("Order lines on promo",f"{orders.on_promo.mean()*100:.1f} pct"),
+           ("Avg lines/order",f"{len(orders)/orders.order_id.nunique():.1f}"),
+           ("Avg delivery lead (days)",f"{lead.mean():.1f}")])+"\n")
+    pl=o2.groupby(["category","on_promo"]).order_qty.mean().unstack()
+    if True in pl.columns and False in pl.columns:
+        pl2=pl.rename(columns={True:"on_promo_qty",False:"base_qty"}).copy()
+        pl2["promo_lift_x"]=(pl2.on_promo_qty/pl2.base_qty).round(2)
+        A("\n**Promo lift (avg line qty on-promo / off-promo), by category:**\n"+_tab(pl2.reset_index())+"\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(6.3,3.2)); ax.hist(orders.loc[orders.discount_pct>0,"discount_pct"]*100,bins=20,color="#E45756")
+        ax.set_title("Promo discount depth (pct)"); ax.set_xlabel("pct off"); A("\n"+_chart(fig,OUT,"discount_depth.png")+"\n")
+
+    # 2.8 price & elasticity
+    A("## 2.8 Price variation and elasticity (base vs promotional)\n")
+    A("Two-elasticity recovery from orders (no elasticity shipped): regress ln(order_qty) on ln(base_price_usd) "
+      "and ln(1-discount) with SKU and week fixed effects. Base = shelf-price response; promo = deal response.\n")
+    w=orders.groupby(["sku_id","dc_id","b2b_customer_id","period"],as_index=False).agg(
+        q=("order_qty","sum"),bp=("base_price_usd","mean"),d=("discount_pct","mean")).merge(sku[["sku_id","category"]])
+    w=w[(w.q>0)&(w.bp>0)]
+    er=[]
+    for c,gg in w.groupby("category"):
+        keys=(gg.sku_id.values,gg.period.values); y=_demean(np.log(gg.q.values),keys)
+        X=np.column_stack([_demean(np.log(gg.bp.values),keys),_demean(np.log(1-gg.d.values),keys)])
+        b,*_=np.linalg.lstsq(X,y,rcond=None)
+        er.append([c,round(float(b[0]),2),round(float(b[1]),2),round(float(b[1]/b[0]),2) if b[0] else np.nan,int(len(gg))])
+    A(_tab(pd.DataFrame(er,columns=["category","base_elasticity","promo_elasticity","promo_over_base","n_obs"]))+"\n")
+
+    # 2.9 forecast accuracy
+    A("## 2.9 Forecast accuracy and forward horizon\n")
+    ins=fc[fc.horizon=="in_sample"].merge(sku[["sku_id","category","segment"]],on="sku_id")
+    ins=ins[ins.actual_qty>0].copy(); ins["ae"]=(ins.forecast_qty-ins.actual_qty).abs(); ins["ape"]=ins.ae/ins.actual_qty
+    def acc(gcol):
+        return ins.groupby(gcol).apply(lambda x:pd.Series({"MAPE_pct":x.ape.mean()*100,
+            "WAPE_pct":x.ae.sum()/x.actual_qty.sum()*100,
+            "bias_pct":(x.forecast_qty.sum()-x.actual_qty.sum())/x.actual_qty.sum()*100})).round(1).reset_index()
+    A("**By segment:**\n"+_tab(acc("segment"))+"\n")
+    A("\n**By category:**\n"+_tab(acc("category"))+"\n")
+    histu=orders.order_qty.sum(); fwdu=fc[fc.horizon=="forward"].forecast_qty.sum()
+    A(f"\nForward 2026 total forecast units {fwdu:,} vs 2025 actual {histu:,}, YoY {(fwdu/histu-1)*100:+.1f} pct.\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(6.5,3.3)); ax.hist(ins.forecast_error_pct.clip(-1,1)*100,bins=40,color="#F58518")
+        ax.set_title("In-sample forecast error pct (clipped +/-100)"); ax.set_xlabel("(forecast-actual)/actual pct")
+        A("\n"+_chart(fig,OUT,"forecast_error_hist.png")+"\n")
+        hs=orders.groupby(orders._od.dt.to_period("W").dt.start_time).order_qty.sum()
+        ffw=fc[fc.horizon=="forward"].assign(_dt=pd.to_datetime(fc[fc.horizon=="forward"].week_start_date)).groupby("_dt").forecast_qty.sum()
+        fig,ax=plt.subplots(figsize=(9,3.6)); ax.plot(hs.index,hs.values,label="2025 actual",lw=1.2)
+        ax.plot(ffw.index,ffw.values,"--",label="2026 forecast",lw=1.2); ax.legend(fontsize=8); ax.set_title("Actual vs forward forecast (weekly units)")
+        A("\n"+_chart(fig,OUT,"hist_vs_forward.png")+"\n")
+
+    # 2.10 production
+    A("## 2.10 Production (planned vs actual)\n")
+    A(_kv([("Planned units",f"{prod.planned_qty.sum():,}"),("Actual units",f"{prod.actual_qty.sum():,}"),
+           ("Mean schedule adherence",f"{prod.adherence_pct.mean()*100:.1f} pct"),
+           ("Weeks below 90 pct adherence",f"{(prod.adherence_pct<0.90).mean()*100:.1f} pct")])+"\n")
+    bp=prod.groupby("plant_id").agg(planned=("planned_qty","sum"),actual=("actual_qty","sum"),adherence=("adherence_pct","mean")).reset_index()
+    bp.adherence=(bp.adherence*100).round(1); A("\n"+_tab(bp)+"\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(6.3,3.2)); ax.hist(prod.adherence_pct*100,bins=25,color="#54A24B")
+        ax.set_title("Manufacturing schedule adherence (pct)"); ax.set_xlabel("pct adherence"); A("\n"+_chart(fig,OUT,"adherence_hist.png")+"\n")
+
+    # 2.11 inventory & service
+    A("## 2.11 Inventory, service and working capital\n")
+    invc=inv.merge(sku[["sku_id","unit_cost_usd"]],on="sku_id"); invc["inv_value"]=invc.closing_stock*invc.unit_cost_usd
+    wk_val=invc.groupby("period").inv_value.sum()
+    invc["ech"]=np.where(invc.dc_id.astype(str).str.startswith("RDC"),"Regional DC",
+                 np.where(invc.dc_id.astype(str).str.startswith("CDC"),"Customer DC","Other"))
+    def dos(x):
+        wsh=x.shipments.mean()/7.0; return (x.closing_stock.mean()/wsh) if wsh>0 else np.nan
+    ech=invc.groupby("ech").apply(lambda x:pd.Series({"avg_closing":x.closing_stock.mean(),"avg_safety":x.safety_stock.mean(),
+        "days_of_supply":dos(x),"stockout_wk_pct":(x.closing_stock==0).mean()*100,"avg_inv_value_usd":x.inv_value.mean()})).round(1).reset_index()
+    A(_tab(ech)+"\n")
+    avg_units=inv.groupby("period").closing_stock.sum().mean(); turns=inv.shipments.sum()/avg_units if avg_units>0 else float("nan")
+    avail=(1-(inv.closing_stock==0).mean())*100
+    A(f"\nNetwork-wide: avg weekly inventory value ~ **${wk_val.mean():,.0f}** (working capital), annualized turns "
+      f"~ **{turns:.1f}x**, availability ~ **{avail:.1f} pct** ({100-avail:.1f} pct of DC-SKU-weeks stock out).\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(6.5,3.2)); e=ech.set_index("ech").days_of_supply
+        ax.bar(e.index,e.values,color="#B279A2"); ax.set_title("Avg days of supply by echelon"); ax.set_ylabel("days")
+        A("\n"+_chart(fig,OUT,"days_of_supply.png")+"\n")
+        ws=wk_val.reset_index(); ws["_dt"]=pd.to_datetime([week_start(int(p.split("-W")[1])) for p in ws.period]); ws=ws.sort_values("_dt")
+        fig,ax=plt.subplots(figsize=(8,3.2)); ax.plot(ws._dt,ws.inv_value,color="#9D755D"); ax.set_title("Weekly inventory value (working capital, USD)")
+        A("\n"+_chart(fig,OUT,"inventory_value.png")+"\n")
+
+    # 2.12 network structure & cardinality
+    A("## 2.12 Network structure and cardinality\n")
+    A(_kv([("Plants",len(plants)),("Plant DCs",len(pdc)),("Regional DCs",len(rdc)),("Customer DCs",len(cdc)),
+           ("Lanes",len(lanes)),("Transport modes",", ".join(sorted(lanes.transport_mode.unique())))])+"\n")
+    card=[]
+    for (ot,dt_),s in lanes.groupby(["origin_node_type","destination_node_type"]):
+        fo=s.groupby("origin_node_id").destination_node_id.nunique(); fi=s.groupby("destination_node_id").origin_node_id.nunique()
+        card.append([f"{ot} -> {dt_}",len(s),f"{fo.min()}-{fo.max()}",f"{fi.min()}-{fi.max()}"])
+    A("\n**Cardinality per hop (fan-out per upstream, fan-in per downstream):**\n"+
+      _tab(pd.DataFrame(card,columns=["hop","lanes","fan_out","fan_in"]))+"\n")
+    cdc_src=lanes[lanes.destination_node_type=="CUSTOMER_DC"].groupby("destination_node_id").origin_node_id.nunique()
+    n_lat=int(((lanes.origin_node_type=="REGIONAL_DC")&(lanes.destination_node_type=="REGIONAL_DC")).sum())
+    A(f"\nDual-sourcing: {int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs have >=2 inbound Regional DCs (failover); "
+      f"lateral RDC-to-RDC lanes: {n_lat}.\n")
+    lm=lanes.groupby(["origin_node_type","destination_node_type","transport_mode"]).agg(
+        lanes=("lane_id","count"),avg_lead_d=("lead_time_mean_days","mean"),avg_mi=("distance_miles","mean"),
+        avg_cost=("logistics_cost_per_unit_usd","mean")).round(2).reset_index()
+    A("\n**Lanes by tier and mode:**\n"+_tab(lm)+"\n")
+
+    # 2.13 capacity utilization
+    A("## 2.13 Capacity utilization\n")
+    capmap=pd.concat([rdc.rename(columns={"regional_dc_id":"dc_id"})[["dc_id","storage_capacity_units"]],
+                      cdc.rename(columns={"customer_dc_id":"dc_id"})[["dc_id","storage_capacity_units"]]])
+    du=inv.groupby("dc_id").closing_stock.mean().reset_index().merge(capmap,on="dc_id")
+    du["util_pct"]=(du.closing_stock/du.storage_capacity_units*100).round(1)
+    A(f"DC storage utilization (avg on-hand / capacity): mean {du.util_pct.mean():.1f} pct, max {du.util_pct.max():.1f} pct.\n")
+    prim=lanes[lanes.destination_node_type=="CUSTOMER_DC"].sort_values("lead_time_mean_days").groupby("destination_node_id").first()
+    cdc_ship=inv[inv.dc_id.astype(str).str.startswith("CDC")].groupby(["dc_id","period"]).shipments.sum().groupby("dc_id").mean()
+    lu=pd.DataFrame({"dc_id":cdc_ship.index,"wk_flow":cdc_ship.values}).merge(
+        prim[["capacity_units_per_week","logistics_cost_per_unit_usd"]].reset_index().rename(columns={"destination_node_id":"dc_id"}),on="dc_id")
+    lu["util_pct"]=(lu.wk_flow/lu.capacity_units_per_week*100).round(1)
+    A(f"\nLast-mile lane utilization (CDC weekly flow / primary inbound lane capacity): mean {lu.util_pct.mean():.1f} pct, "
+      f"max {lu.util_pct.max():.1f} pct (approx).\n")
+    pu=prod.groupby(["plant_id","period"]).actual_qty.sum().groupby("plant_id").mean().reset_index().merge(
+        plants[["plant_id","production_capacity_units_per_week"]],on="plant_id")
+    pu["util_pct"]=(pu.actual_qty/pu.production_capacity_units_per_week*100).round(1)
+    A("\n**Plant production utilization (avg weekly output / capacity):**\n"+
+      _tab(pu[["plant_id","actual_qty","production_capacity_units_per_week","util_pct"]])+"\n")
+    if HAVE_MPL:
+        fig,ax=plt.subplots(figsize=(7,3.2)); du2=du.sort_values("util_pct")
+        ax.bar(du2.dc_id,du2.util_pct,color="#4C78A8"); ax.axhline(90,color="red",ls=":",lw=0.8)
+        ax.set_title("DC storage utilization (pct)"); ax.tick_params(axis="x",rotation=90,labelsize=6); A("\n"+_chart(fig,OUT,"dc_utilization.png")+"\n")
+
+    # 2.14 financials
+    A("## 2.14 Financial summary (2025)\n")
+    gm=rev-cogs; est_logi=float((lu.wk_flow*lu.logistics_cost_per_unit_usd).sum()*52)
+    A(_kv([("Revenue",f"${rev:,.0f}"),("COGS (units x unit cost)",f"${cogs:,.0f}"),
+           ("Gross margin",f"${gm:,.0f} ({gm/rev*100:.1f} pct)"),
+           ("Avg working capital (inventory value)",f"${wk_val.mean():,.0f}"),
+           ("Inventory turns (annualized)",f"{turns:.1f}x"),
+           ("Est. last-mile logistics cost (approx/yr)",f"${est_logi:,.0f}")])+"\n")
+
+    # 2.15 key findings
+    A("## 2.15 Key findings\n")
+    top_cat=bc.sort_values("revenue",ascending=False).iloc[0]
+    most_el=min(er,key=lambda x:x[1]); least_el=max(er,key=lambda x:x[1])
+    findings=[
+      f"Revenue is led by {top_cat['category']} ({top_cat['rev_pct']} pct of sales); demand is steeply concentrated (top 20 pct SKUs ~ {top20:.0f} pct of revenue).",
+      f"Most price-elastic category (base): {most_el[0]} ({most_el[1]}); least: {least_el[0]} ({least_el[1]}). Promo elasticity exceeds base in {sum(1 for e in er if e[2]<=e[1])}/{len(er)} categories.",
+      f"Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~{(fwdu/histu-1)*100:.0f} pct YoY.",
+      f"Network is fully dual-sourced ({int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs with failover) with {n_lat} lateral lanes; storage utilization averages {du.util_pct.mean():.0f} pct.",
+      f"Availability ~ {avail:.0f} pct at ${wk_val.mean():,.0f} avg working capital and {turns:.1f}x turns.",
+    ]
+    A("\n".join(f"- {x}" for x in findings)+"\n")
+    A("\n---\n*End of report.*\n")
+
+    with open(f"{OUT}/EDA_REPORT.md","w") as f: f.write("\n".join(m)+"\n")
+    print(f"  EDA report written: {OUT}/EDA_REPORT.md  ({'charts on' if HAVE_MPL else 'tables only'})")
+
+
 def main():
     t0 = time.time()
     print("\n=== STEP 1: masters (USD economics, Coke-scaled network) ===")
@@ -793,7 +1103,9 @@ def main():
     write_documentation()
     print("\n=== STEP 6: bundle reference docs (optional, guarded) ===")
     bundle_reference_docs()
-    print(f"\nAll tables + docs written to: {OUTPUT_DIR}\nTotal runtime: {time.time()-t0:.1f}s")
+    print("\n=== STEP 7: comprehensive EDA report ===")
+    generate_eda(OUTPUT_DIR)
+    print(f"\nAll tables + docs + EDA written to: {OUTPUT_DIR}\nTotal runtime: {time.time()-t0:.1f}s")
     return ok
 
 

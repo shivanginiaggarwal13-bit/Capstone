@@ -8,15 +8,15 @@
     ## Entity / key map (referential integrity)
 
     ```
-    plant_master(plant_id) ─< plant_dc_master(plant_dc_id, plant_id)
-                            network_lanes(origin_node_id, destination_node_id)  ── every endpoint is a
+    plant_master(plant_id) < plant_dc_master(plant_dc_id, plant_id)
+                            network_lanes(origin_node_id, destination_node_id)   every endpoint is a
                             plant_id / plant_dc_id / regional_dc_id / customer_dc_id
-    regional_dc_master(regional_dc_id) ─┐
-    customer_dc_master(customer_dc_id) ─┴─ "stocking DCs"
-    b2b_customer_master(b2b_customer_id) ─< customer_serving_dc(b2b_customer_id, dc_id)   dc_id ∈ stocking DCs
-    sku_master(sku_id) ──< orders / demand_forecast / production / inventory
-    orders(sku_id, dc_id, b2b_customer_id, period)               dc_id ∈ stocking DCs
-    demand_forecast(sku_id, dc_id, b2b_customer_id, period, horizon)   forward keys ⊆ historical order keys
+    regional_dc_master(regional_dc_id) 
+    customer_dc_master(customer_dc_id)  "stocking DCs"
+    b2b_customer_master(b2b_customer_id) < customer_serving_dc(b2b_customer_id, dc_id)   dc_id  stocking DCs
+    sku_master(sku_id) < orders / demand_forecast / production / inventory
+    orders(sku_id, dc_id, b2b_customer_id, period)               dc_id  stocking DCs
+    demand_forecast(sku_id, dc_id, b2b_customer_id, period, horizon)   forward keys subset of historical order keys
     production(sku_id, plant_id, period)
     inventory(sku_id, dc_id, period)
     ```

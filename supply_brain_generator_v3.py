@@ -309,13 +309,22 @@ def step1_masters():
     pd.DataFrame([[b, nm, ch, dm] for b, nm, ch, dm, _ in banners],
                  columns=["b2b_customer_id", "customer_name", "channel_type", "delivery_mode"]).to_csv(f"{OUT}/b2b_customer_master.csv", index=False)
 
+    # coverage-constrained assignment: guarantee EVERY RDC and CDC is attached to >=1 banner (no orphan DCs),
+    # then top up each banner to 2-3 DCs. Per-banner demand is unchanged (shares sum to 1) so the demand
+    # PROFILE (totals, seasonality, elasticity, mix, concentration) is preserved -- only the DC split changes.
+    bulk = [x for x in banners if x[3] == "BULK"]; dsd = [x for x in banners if x[3] == "DSD"]
+    assign = {x[0]: set() for x in banners}
+    for i, dcid in enumerate(rdc_ids): assign[bulk[i % len(bulk)][0]].add(dcid)     # cover all RDCs
+    for i, dcid in enumerate(cdc_ids): assign[dsd[i % len(dsd)][0]].add(dcid)       # cover all CDCs
     serve_rows = []; cust_dcs = {}
-    for b, nm, ch, dm, scale in banners:
+    for bid, nm, ch, dm, scale in banners:
         pool = rdc_ids if dm == "BULK" else cdc_ids
-        k = int(RNG.integers(2, 4)); chosen = list(RNG.choice(pool, size=k, replace=False))
-        cust_dcs[b] = chosen
-        for dcid, sh in zip(chosen, RNG.dirichlet(np.ones(k))):
-            serve_rows.append([b, dcid, "REGIONAL_DC" if dm == "BULK" else "CUSTOMER_DC", round(float(sh), 4)])
+        cur = list(assign[bid]); target = max(len(cur), int(RNG.integers(2, 4)))
+        extra = [d for d in pool if d not in assign[bid]]; RNG.shuffle(extra)
+        chosen = cur + extra[:max(0, target - len(cur))]
+        cust_dcs[bid] = chosen
+        for dcid, sh in zip(chosen, RNG.dirichlet(np.ones(len(chosen)))):
+            serve_rows.append([bid, dcid, "REGIONAL_DC" if dm == "BULK" else "CUSTOMER_DC", round(float(sh), 4)])
     pd.DataFrame(serve_rows, columns=["b2b_customer_id", "dc_id", "dc_type", "demand_share"]).to_csv(f"{OUT}/customer_serving_dc.csv", index=False)
 
     print(f"  SKUs 500 (5x100) | RDCs {len(rdc_ids)} CDCs {len(cdc_ids)} | Lanes {n_lanes} | Banners {len(banners)} | network=embedded ideal (8 RDC/15 CDC)")
@@ -511,14 +520,32 @@ def step3_forecast_production_inventory(ctx):
     planned[["period", "week_start_date", "plant_id", "sku_id", "planned_qty", "actual_qty", "adherence_pct"]].to_csv(f"{OUT}/production.csv", index=False)
     print(f"  production rows: {len(planned):,} | mean adherence {planned.adherence_pct.mean():.3f}")
 
-    # ---- inventory (2025): SKU x DC x Week, (s,S) flow sim from each DC's outbound orders ----
-    dcd = orders.groupby(["dc_id", "sku_id", "period"], as_index=False).order_qty.sum()
-    dcd["wk"] = dcd.period.map(idx_of)
+    # ---- inventory (2025): MULTI-ECHELON (s,S) flow sim. Demand cascades UP the network so every echelon
+    #      holds stock: Customer DC outbound = its orders; Regional DC = its direct BULK orders + replenishment
+    #      to the Customer DCs it primarily serves; Plant DC = replenishment to the Regional DCs it serves.
+    #      This gives RDC and Plant-DC nodes real throughput/inventory (no orphan-in-inventory nodes).
+    lanes_df = pd.read_csv(f"{OUT}/network_lanes.csv")
+    rdc_of_cdc = (lanes_df[lanes_df.destination_node_type == "CUSTOMER_DC"]
+                  .sort_values("lead_time_mean_days").groupby("destination_node_id").origin_node_id.first())
+    pdc_of_rdc = (lanes_df[(lanes_df.origin_node_type == "PLANT_DC") & (lanes_df.destination_node_type == "REGIONAL_DC")]
+                  .sort_values("lead_time_mean_days").groupby("destination_node_id").origin_node_id.first())
+    od = orders.groupby(["dc_id", "sku_id", "period"], as_index=False).order_qty.sum()
+    od["wk"] = od.period.map(idx_of)
+    is_cdc = od.dc_id.astype(str).str.startswith("CDC"); is_rdc = od.dc_id.astype(str).str.startswith("RDC")
+    cdc_dem = od[is_cdc][["dc_id", "sku_id", "wk", "order_qty"]].copy()
+    rdc_direct = od[is_rdc][["dc_id", "sku_id", "wk", "order_qty"]].copy()
+    tmp = cdc_dem.copy(); tmp["dc_id"] = tmp.dc_id.map(rdc_of_cdc)          # roll CDC demand up to its primary RDC
+    rdc_all = (pd.concat([rdc_direct, tmp.dropna(subset=["dc_id"])])
+               .groupby(["dc_id", "sku_id", "wk"], as_index=False).order_qty.sum())
+    tmp2 = rdc_all.copy(); tmp2["dc_id"] = tmp2.dc_id.map(pdc_of_rdc)       # roll RDC throughput up to its plant DC
+    pdc_all = tmp2.dropna(subset=["dc_id"]).groupby(["dc_id", "sku_id", "wk"], as_index=False).order_qty.sum()
+    node_dem = pd.concat([cdc_dem, rdc_all, pdc_all], ignore_index=True)
     inv_rows = []
-    for (dcid, sid), g in dcd.groupby(["dc_id", "sku_id"]):
+    for (dcid, sid), g in node_dem.groupby(["dc_id", "sku_id"]):
         wk_qty = np.zeros(HIST_WEEKS + 1)
         for r in g.itertuples():
-            wk_qty[int(r.wk)] = r.order_qty
+            w = int(r.wk)
+            if 1 <= w <= HIST_WEEKS: wk_qty[w] += r.order_qty
         avg = wk_qty[1:].mean(); std = wk_qty[1:].std(); lt = 1
         safety = int(max(avg*0.6, 2.05*std*math.sqrt(lt)))   # ~98% cycle service under promo spikes
         reorder = int(avg*lt + safety); S = int(reorder + 3*avg); on_hand = S; pipe = {}
@@ -534,7 +561,15 @@ def step3_forecast_production_inventory(ctx):
     inv = pd.DataFrame(inv_rows, columns=["period", "week_start_date", "sku_id", "dc_id",
         "opening_stock", "receipts", "shipments", "closing_stock", "safety_stock", "reorder_point"])
     inv.to_csv(f"{OUT}/inventory.csv", index=False)
-    print(f"  inventory rows: {len(inv):,} | zero-closing weeks {(inv.closing_stock==0).mean():.1%}")
+    print(f"  inventory rows: {len(inv):,} | echelons: {inv.dc_id.str[:3].nunique()} node-types | "
+          f"zero-closing weeks {(inv.closing_stock==0).mean():.1%}")
+
+    # ---- service-level targets by segment (Service-Level Optimization objective) ----
+    seg_targets = {"Fast-Moving": (0.98, 0.96), "Seasonal": (0.95, 0.92), "Intermediate": (0.90, 0.88)}
+    pd.DataFrame([[s, sl, cfr] for s, (sl, cfr) in seg_targets.items()],
+                 columns=["segment", "service_level_target_pct", "case_fill_rate_target_pct"]
+                 ).to_csv(f"{OUT}/sku_customer_service_targets.csv", index=False)
+    print(f"  service targets: {len(seg_targets)} segment tiers written")
 
 
 # ============================================================================
@@ -590,7 +625,7 @@ def validate():
     chk("forecast keys -> sku/customer/dc", set(fc.sku_id) <= sku_ids and set(fc.b2b_customer_id) <= cust_ids and set(fc.dc_id) <= stock_dcs)
     chk("production.plant_id -> plants", set(prod.plant_id) <= set(plants.plant_id))
     chk("production.sku_id -> sku_master", set(prod.sku_id) <= sku_ids)
-    chk("inventory.dc_id -> stocking DCs", set(inv.dc_id) <= stock_dcs)
+    chk("inventory.dc_id -> stocking + plant DCs", set(inv.dc_id) <= (stock_dcs | set(pdc.plant_dc_id)))
     chk("lane endpoints -> known nodes", set(lanes.origin_node_id) <= all_nodes and set(lanes.destination_node_id) <= all_nodes)
     chk("serving map dc -> stocking DCs", set(serve.dc_id) <= stock_dcs)
     # forecast horizon structure
@@ -602,6 +637,20 @@ def validate():
     chk("forward forecast reuses historical (sku,dc,customer) keys", fwd_keys <= ord_keys and len(fwd_keys) > 0)
     chk("transport modes Truck/Train only", set(lanes.transport_mode) <= {"Truck", "Train"})
     chk("inventory closing stock non-negative", (inv.closing_stock >= 0).all())
+
+    # ---- no-gap coverage audit (every objective must have complete data) ----
+    served = set(serve.dc_id)
+    feeds_cdc = set(lanes[(lanes.origin_node_type == "REGIONAL_DC") & (lanes.destination_node_type == "CUSTOMER_DC")].origin_node_id)
+    inv_nodes = set(inv.dc_id)
+    all_dc = set(rdc.regional_dc_id) | set(cdc.customer_dc_id) | set(pdc.plant_dc_id)
+    chk("no-gap: every Customer DC has a customer attached", set(cdc.customer_dc_id) <= served)
+    chk("no-gap: every Regional DC serves or feeds demand", set(rdc.regional_dc_id) <= (served | feeds_cdc))
+    chk("no-gap: every stocking + plant DC has inventory flow (multi-echelon)", all_dc <= inv_nodes)
+    chk("no-gap: every criticality tier has a service target", pd.read_csv(f"{OUT}/sku_customer_service_targets.csv").shape[0] >= 3)
+    if os.path.exists(f"{OUT}/scenarios.csv"):
+        scn = pd.read_csv(f"{OUT}/scenarios.csv")
+        need = {"demand_surge","forecast_miss","lane_outage","leadtime_spike","plant_shortfall","geographic_disruption"}
+        chk("no-gap: scenario library covers all disruption classes", need <= set(scn.scenario_type))
 
     print(f"\n{len(errs)} check(s) failed" if errs else "\nAll checks passed.")
     return len(errs) == 0
@@ -766,6 +815,51 @@ def bundle_reference_docs():
 # ORCHESTRATOR
 # ============================================================================
 # ============================================================================
+# LAYER 3: labeled disruption SCENARIO LIBRARY (digital-twin / bandit / agentic input)
+# ============================================================================
+def generate_scenarios(OUT):
+    rng = np.random.default_rng(77)
+    sku = pd.read_csv(f"{OUT}/sku_master.csv"); rdc = pd.read_csv(f"{OUT}/regional_dc_master.csv")
+    cdc = pd.read_csv(f"{OUT}/customer_dc_master.csv"); plants = pd.read_csv(f"{OUT}/plant_master.csv")
+    inv = pd.read_csv(f"{OUT}/inventory.csv")
+    dos = inv.groupby("dc_id").apply(lambda x: (x.closing_stock.mean()/(x.shipments.mean()/7.0)) if x.shipments.mean() > 0 else 7.0)
+    skus = sku.sku_id.tolist(); rdcs = rdc.regional_dc_id.tolist(); cdcs = cdc.customer_dc_id.tolist()
+    plist = plants.plant_id.tolist(); regions = sorted(set(rdc.region) | set(cdc.region))
+    def win(ws, wl): return week_start(ws), (WEEK1_MONDAY + pd.Timedelta(weeks=ws+wl-1) + pd.Timedelta(days=6)).strftime("%Y-%m-%d")
+    rows = []; sid = 1
+    def add(typ, node, ntype, sk, region, ws, wl, mag, ttr, tts, impact, notes):
+        nonlocal sid; sd, ed = win(ws, wl)
+        rows.append([f"SCN{sid:04d}", typ, node, ntype, sk, region, sd, ed, mag, int(ttr), int(tts), impact, notes]); sid += 1
+    for _ in range(6):
+        c = str(rng.choice(cdcs)); mag = int(rng.uniform(50, 150))
+        add("demand_surge", c, "CUSTOMER_DC", str(rng.choice(skus)), "", int(rng.integers(1, 50)), int(rng.integers(1, 4)),
+            f"+{mag}pct", 0, int(dos.get(c, 7)), "service risk at DC", "unplanned market-driven demand spike")
+    for _ in range(5):
+        add("forecast_miss", "", "", str(rng.choice(skus)), "", int(rng.integers(45, 52)), 2,
+            "-20pct under-forecast", 0, 0, "stockout risk at seasonal peak", "seasonal peak under-called")
+    for _ in range(6):
+        c = str(rng.choice(cdcs))
+        add("lane_outage", c, "CUSTOMER_DC", "", "", int(rng.integers(1, 48)), int(rng.integers(1, 3)),
+            "primary inbound lane down", int(rng.integers(3, 8)), int(dos.get(c, 7)), "replenishment cut",
+            "primary lane outage; requires failover RDC or lateral transfer")
+    for _ in range(5):
+        r = str(rng.choice(rdcs))
+        add("leadtime_spike", r, "REGIONAL_DC", "", "", int(rng.integers(1, 48)), int(rng.integers(2, 5)),
+            "lead time x2", 0, int(dos.get(r, 10)), "inbound delay", "carrier / rail delay on inbound lane")
+    for _ in range(4):
+        p = str(rng.choice(plist))
+        add("plant_shortfall", p, "PLANT", "", "", int(rng.integers(1, 48)), int(rng.integers(1, 4)),
+            "output 60-80pct", int(rng.integers(5, 14)), 0, "upstream shortage", "schedule-attainment drop at plant")
+    for _ in range(4):
+        reg = str(rng.choice(regions))
+        add("geographic_disruption", "", reg, "", reg, int(rng.integers(1, 48)), int(rng.integers(2, 6)),
+            "region impaired", int(rng.integers(7, 21)), 0, "regional service loss", "natural disaster / infrastructure / regulatory")
+    pd.DataFrame(rows, columns=["scenario_id","scenario_type","affected_node_id","affected_node_type","affected_sku_id",
+        "region","start_date","end_date","magnitude","ttr_days","tts_days","expected_impact","notes"]).to_csv(f"{OUT}/scenarios.csv", index=False)
+    print(f"  scenarios: {len(rows)} labeled disruptions across {len(set(r[1] for r in rows))} classes (demand + supply side), with TTR/TTS")
+
+
+# ============================================================================
 # COMPREHENSIVE EDA REPORT (in-process; reads the CSVs just generated in OUT)
 # ============================================================================
 def _tab(df, floatfmt="{:,.2f}"):
@@ -832,7 +926,7 @@ def generate_eda(OUT):
 
     # 2.1 overview + data quality
     A("## 2.1 Dataset overview and data quality\n")
-    tbls=["sku_master","orders","promotions","demand_forecast","production","inventory","network_lanes",
+    tbls=["sku_master","orders","promotions","demand_forecast","production","inventory","scenarios","sku_customer_service_targets","network_lanes",
           "b2b_customer_master","customer_serving_dc","cost_parameters","plant_master","plant_dc_master",
           "regional_dc_master","customer_dc_master"]
     rows=[[t,len(R(t)),R(t).shape[1],int(R(t).isna().sum().sum())] for t in tbls]
@@ -855,7 +949,7 @@ def generate_eda(OUT):
          ("orders.promo_id in promotions",set(orders.promo_id.fillna(""))-{""}<=set(promos.promo_id)),
          ("forecast keys in masters",set(fc.sku_id)<=sku_ids and set(fc.dc_id)<=stock and set(fc.b2b_customer_id)<=cust),
          ("production.plant_id in plants",set(prod.plant_id)<=set(plants.plant_id)),
-         ("inventory.dc_id in stocking DCs",set(inv.dc_id)<=stock),
+         ("inventory.dc_id in stocking + plant DCs",set(inv.dc_id)<=(stock|set(pdc.plant_dc_id))),
          ("lane endpoints in nodes",set(lanes.origin_node_id)<=nodes and set(lanes.destination_node_id)<=nodes),
          ("serving map dc in stocking DCs",set(serve.dc_id)<=stock),
          ("forward forecast has no actuals",fc[fc.horizon=='forward'].actual_qty.isna().all())]
@@ -1001,7 +1095,8 @@ def generate_eda(OUT):
     invc=inv.merge(sku[["sku_id","unit_cost_usd"]],on="sku_id"); invc["inv_value"]=invc.closing_stock*invc.unit_cost_usd
     wk_val=invc.groupby("period").inv_value.sum()
     invc["ech"]=np.where(invc.dc_id.astype(str).str.startswith("RDC"),"Regional DC",
-                 np.where(invc.dc_id.astype(str).str.startswith("CDC"),"Customer DC","Other"))
+                 np.where(invc.dc_id.astype(str).str.startswith("CDC"),"Customer DC",
+                 np.where(invc.dc_id.astype(str).str.startswith("PDC"),"Plant DC","Other")))
     def dos(x):
         wsh=x.shipments.mean()/7.0; return (x.closing_stock.mean()/wsh) if wsh>0 else np.nan
     ech=invc.groupby("ech").apply(lambda x:pd.Series({"avg_closing":x.closing_stock.mean(),"avg_safety":x.safety_stock.mean(),
@@ -1071,8 +1166,23 @@ def generate_eda(OUT):
            ("Inventory turns (annualized)",f"{turns:.1f}x"),
            ("Est. last-mile logistics cost (approx/yr)",f"${est_logi:,.0f}")])+"\n")
 
-    # 2.15 key findings
-    A("## 2.15 Key findings\n")
+    # 2.15 disruption scenario library
+    A("## 2.15 Disruption scenario library (digital-twin / bandit input)\n")
+    if os.path.exists(f"{OUT}/scenarios.csv"):
+        scn=pd.read_csv(f"{OUT}/scenarios.csv")
+        A("A labeled library of demand-side and supply-side disruptions with Time-to-Recover (TTR) and "
+          "Time-to-Survive (TTS) estimates - the what-if inputs the digital twin, bandit reward, and agentic "
+          "layer consume. Each row names the affected node/SKU/region and window.\n")
+        sc=scn.groupby("scenario_type").agg(count=("scenario_id","count"),avg_ttr_days=("ttr_days","mean"),
+            avg_tts_days=("tts_days","mean")).round(1).reset_index()
+        A(_tab(sc)+"\n")
+        A(f"\nTotal scenarios: {len(scn)} across {scn.scenario_type.nunique()} classes (supplier, geographic, "
+          "systemic, market-driven).\n")
+    else:
+        A("*scenarios.csv not present.*\n")
+
+    # 2.16 key findings
+    A("## 2.16 Key findings\n")
     top_cat=bc.sort_values("revenue",ascending=False).iloc[0]
     most_el=min(er,key=lambda x:x[1]); least_el=max(er,key=lambda x:x[1])
     findings=[
@@ -1081,6 +1191,7 @@ def generate_eda(OUT):
       f"Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~{(fwdu/histu-1)*100:.0f} pct YoY.",
       f"Network is fully dual-sourced ({int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs with failover) with {n_lat} lateral lanes; storage utilization averages {du.util_pct.mean():.0f} pct.",
       f"Availability ~ {avail:.0f} pct at ${wk_val.mean():,.0f} avg working capital and {turns:.1f}x turns.",
+      f"No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a {len(pd.read_csv(f'{OUT}/scenarios.csv')) if os.path.exists(f'{OUT}/scenarios.csv') else 0}-scenario disruption library covers demand- and supply-side stresses.",
     ]
     A("\n".join(f"- {x}" for x in findings)+"\n")
     A("\n---\n*End of report.*\n")
@@ -1097,7 +1208,9 @@ def main():
     step2_orders(ctx)
     print("\n=== STEP 3: forecast (104wk) + production + inventory ===")
     step3_forecast_production_inventory(ctx)
-    print("\n=== STEP 4: referential-integrity validation ===")
+    print("\n=== STEP 3b: labeled disruption scenario library ===")
+    generate_scenarios(OUTPUT_DIR)
+    print("\n=== STEP 4: referential-integrity + no-gap coverage validation ===")
     ok = validate()
     print("\n=== STEP 5: documentation ===")
     write_documentation()

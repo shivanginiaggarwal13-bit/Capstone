@@ -1,0 +1,11 @@
+A **Digital Twin**, in [[Supply Brain]], is a simulation sandbox that models the network's behavior under stochastic demand and lead time — a safe environment where every candidate strategy (inventory buffer vs. price buffer, single-node vs. multi-echelon positioning) can be tested head-to-head before being trusted with anything real.
+
+**What it's for, concretely.** The twin simulates outcomes and produces **failure signals** — stockouts, write-offs, margin impact, working capital tied up — for any strategy fed into it. Those failure signals are the raw material any learning mechanism sitting on top needs. Without a twin, "testing a new safety-stock policy" means actually running it against live demand and finding out the hard way if it was wrong.
+
+**The 52-week forward horizon.** The synthetic dataset is built with a full 2026 forward horizon so the twin can simulate an entire year of replenishment cycles per SKU segment, generating enough repeated rounds for any downstream learning mechanism to actually converge — rather than being limited to whatever a few months of real client data happens to contain.
+
+**Why it's the load-bearing piece for the bandit track specifically.** A **[[Multi-Armed Bandit]]** needs to *try* different arms — including ones that might turn out to be bad choices — in order to learn which one is best. Trying a bad inventory policy against a real customer is expensive and risky; trying it against the twin costs nothing and risks nothing. This is what removes the standard objection to bandit-style exploration in an operational setting: **[[Digital Twin|the twin]]** lets exploration happen entirely in simulation, never against a live customer. Every reward number in the **[[Multi-Armed Bandits — Supply Brain Strategy|bandit track's worked example]]** — the "$ saved vs. baseline" figures — is a twin output, not a live outcome.
+
+**What it is not.** Not a forecasting model (that's a separate, existing model feeding into the twin as an input) and not the optimization itself — it's the environment those other pieces get evaluated inside.
+
+Related: [[Supply Brain]], [[Multi-Armed Bandits — Supply Brain Strategy]], [[Price-Inventory Exchange Rate]]

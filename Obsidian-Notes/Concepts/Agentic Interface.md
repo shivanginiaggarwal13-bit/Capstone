@@ -1,0 +1,11 @@
+The **Agentic Interface** is the natural-language front door to [[Supply Brain]]: an LLM given a small, fixed toolbox of functions it can call, whose job is to map a planner's plain-English question or instruction to the right tool, call it, turn the structured result back into plain English, and — critically — ask for explicit confirmation before anything gets written or committed.
+
+**What "agentic" deliberately does *not* mean here.** Not a new decision-making algorithm, and not an open-ended conversational system. Every tool the agent can call maps to a function that already exists elsewhere in the system — the **[[Multi-Armed Bandit|bandit engine]]**'s `recommend.py` and `loop.py`, and the **[[Digital Twin]]**'s `twin_interface.py`. No new intelligence is invented at this layer; the "intelligence" a planner perceives is a well-chosen function call into already-scoped, auditable work from earlier phases.
+
+**The toolbox** (full detail in **[[Multi-Armed Bandits — Supply Brain Strategy]] §8**): `get_recommendation` and `explain_recommendation` are read-only; `run_whatif` runs a sandboxed simulation that never touches live state; `trigger_recalculation` updates belief state only; `flag_anomaly` alerts proactively; and `apply_recommendation` — the **only** tool that writes to the real policy table downstream systems actually use.
+
+**The load-bearing design decision.** `apply_recommendation` is gated behind explicit planner confirmation — not as a UX nicety, but as the literal implementation of the charter's stated requirement that the system have "human confirmation before anything is committed." Everything upstream of that single gate is free, unlimited exploration, because it only ever touches the digital twin in sandbox mode or reads existing state.
+
+**Relationship to the two-directional translation layer.** The agentic interface sits directly on top of **[[LLM-Powered Translation]]** — translation handles turning language into structured parameters and back; the agentic layer decides *which* function that translated intent should call, and whether it's allowed to act on the result without asking first.
+
+Related: [[Supply Brain]], [[LLM-Powered Translation]], [[Multi-Armed Bandits — Supply Brain Strategy]]

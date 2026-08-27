@@ -1,0 +1,6 @@
+category,holding_cost_pct_annual,cost_of_capital_pct,stockout_cost_multiplier
+Beverages,0.22,0.091,1.56
+Snacks & Confectionery,0.21,0.081,2.38
+Dairy & Bakery,0.34,0.087,1.61
+Frozen Foods,0.33,0.088,2.2
+Grocery,0.2,0.097,1.69

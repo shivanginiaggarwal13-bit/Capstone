@@ -1,0 +1,9 @@
+**SKU Segmentation** is the practice of clustering SKUs into groups by shared characteristics — demand variability, lead-time variability, price elasticity, shelf life, margin, and criticality — so that every downstream policy decision can be tailored to the segment instead of applied uniformly across the whole portfolio.
+
+**Why it exists.** The business problem [[Supply Brain]] was sponsored to solve is, at root, a segmentation failure: a single safety-stock formula and a single ~99% service-level target get applied to thousands of SKUs that behave nothing alike. A fast-moving, low-margin staple and a slow-moving, high-margin seasonal item shouldn't be managed the same way — segmentation is the mechanism that makes "shouldn't" into "isn't."
+
+**How it's built in this project.** Rather than assigning segments randomly, the tagging is derived from real observed volume and seasonality patterns in the 4-year, ~10M-row POS transaction history — the split settles into roughly **50% Fast-Moving / 30% Seasonal / 20% Intermediate**. A `criticality_tier` field is a composite of margin × volume plus manual override flags, deliberately not left 100% mechanical (e.g. new product launches get overridden into a higher tier even before they've built a sales history).
+
+**Why it matters more than it first appears.** Segmentation isn't just a labeling exercise — it's the *context variable* that everything downstream conditions on. The **[[Service-Level Target]]** a SKU gets, the **[[Multi-Echelon Inventory Optimization (MEIO)|MEIO]]** positioning applied to it, and — critically — which **[[Multi-Armed Bandit|bandit]]** belief bucket it falls into (segment, or segment × seasonal phase for the Seasonal group) all trace back to this layer. Get the segmentation wrong and every layer built on top of it optimizes the wrong thing for the wrong SKU.
+
+Related: [[Supply Brain]], [[Multi-Armed Bandits — Supply Brain Strategy]]

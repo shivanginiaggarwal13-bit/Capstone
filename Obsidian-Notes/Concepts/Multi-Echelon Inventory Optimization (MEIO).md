@@ -1,0 +1,11 @@
+**Multi-Echelon Inventory Optimization (MEIO)** decides not just *how much* buffer stock to hold, but *where* across a multi-node network to hold it — factory, regional DC, local DC — so total inventory is minimized while the service levels that matter most are still protected.
+
+**The network it operates over, in [[Supply Brain]].** Plant → Plant DC → Regional DC → Customer DC. The plant is production-only and holds no inventory at all; the Plant DC is the first stock-holding echelon. Every hop between echelons lives in a single unified `network_lanes` table (rather than one table per echelon pair) — a deliberate schema choice that also lets that same table double as the edge list for the **[[Knowledge Graph (Neo4j)]]**.
+
+**Why positioning matters as much as quantity.** Holding buffer close to the customer (Customer DC) gives fast response but costs more — smaller warehouses, shorter lanes, less pooling benefit. Holding it further upstream (Regional DC, or pooled across multiple Customer DCs) is cheaper because variability partially cancels out across the pooled demand, but response is slower. The same total units of safety stock, positioned differently, produce meaningfully different working-capital and service-level outcomes — which is why MEIO is a distinct optimization problem from **[[Safety Stock]]** sizing, not a restatement of it.
+
+**The committed deliverable.** "Network-level buffer positioning recommendations showing working capital reduction vs. a single-node baseline" — meaning the project has to demonstrate, quantitatively, that multi-echelon positioning beats the naive "hold everything at one node" comparison.
+
+**Connection to the bandit track.** MEIO positioning is one of the three decision points the **[[Multi-Armed Bandits — Supply Brain Strategy|bandit track]]** targets directly — arms are discrete positioning templates (`hold at Plant DC / pool at Regional DC / push to Customer DC / split Regional+Customer`), because the true underlying problem (continuous, multi-node allocation) is too **[[Combinatorial Action Space|combinatorially large]]** to fit a bandit framework without discretizing it first.
+
+Related: [[Supply Brain]], [[Safety Stock]], [[Multi-Armed Bandits — Supply Brain Strategy]]

@@ -1,6 +1,6 @@
 # Supply Brain - Comprehensive Dataset and Network EDA
 
-*Auto-generated 2026-08-25 22:50. Single-file build: this report is produced in the same run that generates the data, so it always matches the current instance.*
+*Auto-generated 2026-08-27 21:46. Single-file build: this report is produced in the same run that generates the data, so it always matches the current instance.*
 
 ## Executive snapshot
 
@@ -9,11 +9,11 @@
 | SKUs | 500 |
 | Network | 4 plants, 4 plant DCs, 8 regional DCs, 15 customer DCs, 60 lanes |
 | B2B customers (banners) | 10 |
-| Order lines (day-level, 2025) | 278,688 |
-| Distinct orders (baskets) | 3,346 |
-| Total demand (units, 2025) | 8,085,496 |
-| Total revenue (2025) | $128,005,003 |
-| Gross margin | $40,330,717 (31.5 pct) |
+| Order lines (day-level, 2025) | 306,945 |
+| Distinct orders (baskets) | 3,796 |
+| Total demand (units, 2025) | 8,078,208 |
+| Total revenue (2025) | $128,098,053 |
+| Gross margin | $40,374,211 (31.5 pct) |
 | Forecast horizon | 104 weeks (2025 in-sample + 2026 forward) |
 
 
@@ -33,14 +33,16 @@ Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real 
 | table | rows | cols | null_cells |
 | --- | --- | --- | --- |
 | sku_master | 500 | 14 | 0 |
-| orders | 278,688 | 15 | 262,839 |
+| orders | 306,945 | 15 | 289,537 |
 | promotions | 1,741 | 7 | 0 |
-| demand_forecast | 704,360 | 9 | 851,344 |
-| production | 24,713 | 7 | 0 |
-| inventory | 303,368 | 10 | 0 |
+| demand_forecast | 772,241 | 9 | 930,592 |
+| production | 24,690 | 7 | 0 |
+| inventory | 512,200 | 10 | 0 |
+| scenarios | 30 | 13 | 59 |
+| sku_customer_service_targets | 3 | 3 | 0 |
 | network_lanes | 60 | 11 | 0 |
 | b2b_customer_master | 10 | 4 | 0 |
-| customer_serving_dc | 26 | 4 | 0 |
+| customer_serving_dc | 28 | 4 | 0 |
 | cost_parameters | 5 | 4 | 0 |
 | plant_master | 4 | 6 | 0 |
 | plant_dc_master | 4 | 5 | 0 |
@@ -60,7 +62,7 @@ Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real 
 | orders.promo_id in promotions | PASS |
 | forecast keys in masters | PASS |
 | production.plant_id in plants | PASS |
-| inventory.dc_id in stocking DCs | PASS |
+| inventory.dc_id in stocking + plant DCs | PASS |
 | lane endpoints in nodes | PASS |
 | serving map dc in stocking DCs | PASS |
 | forward forecast has no actuals | PASS |
@@ -94,7 +96,7 @@ Price tiers: Premium 262, Value 238. Seasonal-flagged SKUs: 150/500.
 | cls | skus | sku_pct | rev_pct |
 | --- | --- | --- | --- |
 | A | 74 | 14.80 | 79.80 |
-| B | 135 | 27.00 | 15.10 |
+| B | 135 | 27.00 | 15.20 |
 | C | 291 | 58.20 | 5.00 |
 
 
@@ -108,33 +110,33 @@ Concentration: top 20 pct of SKUs = 84.7 pct of revenue (steep, ~80/20).
 **By category:**
 | category | units | revenue | rev_pct |
 | --- | --- | --- | --- |
-| Beverages | 2,016,570 | 72,657,458.78 | 56.80 |
-| Snacks & Confectionery | 1,546,113 | 23,620,032.06 | 18.50 |
-| Grocery | 1,541,673 | 14,958,831.68 | 11.70 |
-| Dairy & Bakery | 1,609,895 | 8,606,165.93 | 6.70 |
-| Frozen Foods | 1,371,245 | 8,162,514.64 | 6.40 |
+| Beverages | 2,015,938 | 72,768,633.54 | 56.80 |
+| Snacks & Confectionery | 1,545,822 | 23,612,600.37 | 18.40 |
+| Grocery | 1,541,544 | 14,973,492.44 | 11.70 |
+| Dairy & Bakery | 1,606,423 | 8,588,446.80 | 6.70 |
+| Frozen Foods | 1,368,481 | 8,154,879.64 | 6.40 |
 
 
 **By fulfilment mode:**
 | delivery_mode | units | revenue | lines |
 | --- | --- | --- | --- |
-| BULK | 6,332,628 | 99,069,871.71 | 168,466 |
-| DSD | 1,752,868 | 28,935,131.38 | 110,222 |
+| BULK | 6,323,781 | 99,122,368.15 | 162,035 |
+| DSD | 1,754,427 | 28,975,684.64 | 144,910 |
 
 
 **By customer (banner):**
 | customer_name | revenue_usd |
 | --- | --- |
-| MegaMart Stores | 34,618,269.28 |
-| ValueClub Warehouse | 23,726,126.40 |
-| GreenGrocer National | 21,869,483.58 |
-| BullsEye Retail | 18,855,992.45 |
-| SunBelt Grocers | 6,836,382.09 |
-| FreshFoods Regional | 5,762,173.76 |
-| QuickStop Convenience | 4,826,668.52 |
-| CampusDining Foodservice | 4,107,448.06 |
-| Coastal Marts | 4,084,837.31 |
-| MetroPetro C-Stores | 3,317,621.64 |
+| MegaMart Stores | 34,630,416.39 |
+| ValueClub Warehouse | 23,722,121.61 |
+| GreenGrocer National | 21,862,624.87 |
+| BullsEye Retail | 18,907,205.28 |
+| SunBelt Grocers | 6,900,263.65 |
+| FreshFoods Regional | 5,766,086.81 |
+| QuickStop Convenience | 4,840,606.01 |
+| CampusDining Foodservice | 4,100,306.94 |
+| Coastal Marts | 4,056,694.63 |
+| MetroPetro C-Stores | 3,311,726.60 |
 
 
 ![revenue_by_banner.png](report_assets/revenue_by_banner.png)
@@ -148,9 +150,9 @@ Weekly demand coefficient of variation (CV) and intermittency by segment - the i
 
 | segment | avg_cv | avg_zero_week_pct |
 | --- | --- | --- |
-| Fast-Moving | 0.44 | 2.10 |
-| Intermediate | 0.43 | 5.90 |
-| Seasonal | 0.50 | 3.10 |
+| Fast-Moving | 0.47 | 2.70 |
+| Intermediate | 0.48 | 5.80 |
+| Seasonal | 0.50 | 2.50 |
 
 
 ![demand_cv_hist.png](report_assets/demand_cv_hist.png)
@@ -163,18 +165,18 @@ Weekly demand coefficient of variation (CV) and intermittency by segment - the i
 | Customer-specific vs ALL | 66 pct / 34 pct |
 | Avg discount depth | 19.8 pct |
 | Order lines on promo | 5.7 pct |
-| Avg lines/order | 83.3 |
-| Avg delivery lead (days) | 3.2 |
+| Avg lines/order | 80.9 |
+| Avg delivery lead (days) | 3.0 |
 
 
 **Promo lift (avg line qty on-promo / off-promo), by category:**
 | category | base_qty | on_promo_qty | promo_lift_x |
 | --- | --- | --- | --- |
-| Beverages | 35.35 | 45.80 | 1.30 |
-| Dairy & Bakery | 27.39 | 53.74 | 1.96 |
-| Frozen Foods | 23.10 | 83.72 | 3.62 |
-| Grocery | 24.73 | 54.24 | 2.19 |
-| Snacks & Confectionery | 25.06 | 59.60 | 2.38 |
+| Beverages | 32.05 | 40.80 | 1.27 |
+| Dairy & Bakery | 24.67 | 48.31 | 1.96 |
+| Frozen Foods | 20.77 | 76.88 | 3.70 |
+| Grocery | 22.73 | 49.57 | 2.18 |
+| Snacks & Confectionery | 22.78 | 54.25 | 2.38 |
 
 
 ![discount_depth.png](report_assets/discount_depth.png)
@@ -185,33 +187,33 @@ Two-elasticity recovery from orders (no elasticity shipped): regress ln(order_qt
 
 | category | base_elasticity | promo_elasticity | promo_over_base | n_obs |
 | --- | --- | --- | --- | --- |
-| Beverages | -1.04 | -1.35 | 1.30 | 56,167 |
-| Dairy & Bakery | -1.26 | -2.20 | 1.74 | 55,672 |
-| Frozen Foods | -3.08 | -3.17 | 1.03 | 51,151 |
-| Grocery | -1.56 | -2.12 | 1.36 | 58,437 |
-| Snacks & Confectionery | -3.31 | -3.41 | 1.03 | 57,261 |
+| Beverages | -1.06 | -1.34 | 1.26 | 62,008 |
+| Dairy & Bakery | -1.25 | -2.43 | 1.94 | 61,625 |
+| Frozen Foods | -3.50 | -3.50 | 1.00 | 56,675 |
+| Grocery | -1.83 | -2.23 | 1.22 | 63,632 |
+| Snacks & Confectionery | -3.62 | -3.58 | 0.99 | 63,005 |
 
 ## 2.9 Forecast accuracy and forward horizon
 
 **By segment:**
 | segment | MAPE_pct | WAPE_pct | bias_pct |
 | --- | --- | --- | --- |
-| Fast-Moving | 6.60 | 7.80 | 0.10 |
-| Intermediate | 12.00 | 13.30 | 0.00 |
-| Seasonal | 21.50 | 22.70 | -1.90 |
+| Fast-Moving | 6.60 | 7.80 | -0.00 |
+| Intermediate | 11.90 | 13.50 | 0.10 |
+| Seasonal | 21.50 | 22.40 | -1.80 |
 
 
 **By category:**
 | category | MAPE_pct | WAPE_pct | bias_pct |
 | --- | --- | --- | --- |
-| Beverages | 11.80 | 11.00 | -0.10 |
-| Dairy & Bakery | 12.30 | 13.20 | -0.70 |
-| Frozen Foods | 11.30 | 11.00 | -0.20 |
-| Grocery | 11.90 | 14.30 | -1.00 |
-| Snacks & Confectionery | 12.20 | 13.60 | -0.40 |
+| Beverages | 11.80 | 11.00 | -0.20 |
+| Dairy & Bakery | 12.10 | 13.10 | -0.40 |
+| Frozen Foods | 11.20 | 10.90 | -0.40 |
+| Grocery | 11.90 | 14.40 | -1.30 |
+| Snacks & Confectionery | 12.50 | 13.50 | -0.50 |
 
 
-Forward 2026 total forecast units 8,492,392 vs 2025 actual 8,085,496, YoY +5.0 pct.
+Forward 2026 total forecast units 8,471,279 vs 2025 actual 8,078,208, YoY +4.9 pct.
 
 
 ![forecast_error_hist.png](report_assets/forecast_error_hist.png)
@@ -223,18 +225,18 @@ Forward 2026 total forecast units 8,492,392 vs 2025 actual 8,085,496, YoY +5.0 p
 
 | Field | Value |
 | --- | --- |
-| Planned units | 8,085,496 |
-| Actual units | 7,548,459 |
+| Planned units | 8,078,208 |
+| Actual units | 7,532,221 |
 | Mean schedule adherence | 93.3 pct |
-| Weeks below 90 pct adherence | 11.0 pct |
+| Weeks below 90 pct adherence | 11.3 pct |
 
 
 | plant_id | planned | actual | adherence |
 | --- | --- | --- | --- |
-| PLANT01 | 1,256,456 | 1,174,085 | 93.30 |
-| PLANT02 | 1,938,047 | 1,810,308 | 93.30 |
-| PLANT03 | 3,131,386 | 2,925,928 | 93.30 |
-| PLANT04 | 1,759,607 | 1,638,138 | 93.30 |
+| PLANT01 | 1,256,446 | 1,169,796 | 93.30 |
+| PLANT02 | 1,936,908 | 1,803,674 | 93.20 |
+| PLANT03 | 3,123,748 | 2,913,112 | 93.30 |
+| PLANT04 | 1,761,106 | 1,645,639 | 93.30 |
 
 
 ![adherence_hist.png](report_assets/adherence_hist.png)
@@ -243,11 +245,12 @@ Forward 2026 total forecast units 8,492,392 vs 2025 actual 8,085,496, YoY +5.0 p
 
 | ech | avg_closing | avg_safety | days_of_supply | stockout_wk_pct | avg_inv_value_usd |
 | --- | --- | --- | --- | --- | --- |
-| Customer DC | 35.10 | 13.70 | 20.30 | 7.20 | 367.10 |
-| Regional DC | 114.70 | 43.80 | 20.30 | 4.10 | 1,138.80 |
+| Customer DC | 24.30 | 9.50 | 20.30 | 8.20 | 253.90 |
+| Plant DC | 216.70 | 78.40 | 19.50 | 0.60 | 2,185.40 |
+| Regional DC | 114.60 | 43.00 | 20.00 | 1.30 | 1,153.90 |
 
 
-Network-wide: avg weekly inventory value ~ **$4,502,402** (working capital), annualized turns ~ **18.0x**, availability ~ **94.4 pct** (5.6 pct of DC-SKU-weeks stock out).
+Network-wide: avg weekly inventory value ~ **$9,821,546** (working capital), annualized turns ~ **18.4x**, availability ~ **96.1 pct** (3.9 pct of DC-SKU-weeks stock out).
 
 
 ![days_of_supply.png](report_assets/days_of_supply.png)
@@ -294,16 +297,16 @@ Dual-sourcing: 15/15 Customer DCs have >=2 inbound Regional DCs (failover); late
 DC storage utilization (avg on-hand / capacity): mean 0.0 pct, max 0.0 pct.
 
 
-Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): mean 1.1 pct, max 2.5 pct (approx).
+Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): mean 0.7 pct, max 2.1 pct (approx).
 
 
 **Plant production utilization (avg weekly output / capacity):**
 | plant_id | actual_qty | production_capacity_units_per_week | util_pct |
 | --- | --- | --- | --- |
-| PLANT01 | 23,021.27 | 4,607,407 | 0.50 |
-| PLANT02 | 35,496.24 | 3,732,615 | 1.00 |
-| PLANT03 | 57,371.14 | 3,534,342 | 1.60 |
-| PLANT04 | 32,120.35 | 4,331,887 | 0.70 |
+| PLANT01 | 22,937.18 | 4,607,407 | 0.50 |
+| PLANT02 | 35,366.16 | 3,732,615 | 0.90 |
+| PLANT03 | 57,119.84 | 3,534,342 | 1.60 |
+| PLANT04 | 32,267.43 | 4,331,887 | 0.70 |
 
 
 ![dc_utilization.png](report_assets/dc_utilization.png)
@@ -312,20 +315,37 @@ Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): me
 
 | Field | Value |
 | --- | --- |
-| Revenue | $128,005,003 |
-| COGS (units x unit cost) | $87,674,286 |
-| Gross margin | $40,330,717 (31.5 pct) |
-| Avg working capital (inventory value) | $4,502,402 |
-| Inventory turns (annualized) | 18.0x |
-| Est. last-mile logistics cost (approx/yr) | $2,261,934 |
+| Revenue | $128,098,053 |
+| COGS (units x unit cost) | $87,723,841 |
+| Gross margin | $40,374,211 (31.5 pct) |
+| Avg working capital (inventory value) | $9,821,546 |
+| Inventory turns (annualized) | 18.4x |
+| Est. last-mile logistics cost (approx/yr) | $2,178,364 |
 
-## 2.15 Key findings
+## 2.15 Disruption scenario library (digital-twin / bandit input)
+
+A labeled library of demand-side and supply-side disruptions with Time-to-Recover (TTR) and Time-to-Survive (TTS) estimates - the what-if inputs the digital twin, bandit reward, and agentic layer consume. Each row names the affected node/SKU/region and window.
+
+| scenario_type | count | avg_ttr_days | avg_tts_days |
+| --- | --- | --- | --- |
+| demand_surge | 6 | 0.00 | 18.50 |
+| forecast_miss | 5 | 0.00 | 0.00 |
+| geographic_disruption | 4 | 10.80 | 0.00 |
+| lane_outage | 6 | 4.30 | 18.20 |
+| leadtime_spike | 5 | 0.00 | 19.40 |
+| plant_shortfall | 4 | 8.00 | 0.00 |
+
+
+Total scenarios: 30 across 6 classes (supplier, geographic, systemic, market-driven).
+
+## 2.16 Key findings
 
 - Revenue is led by Beverages (56.8 pct of sales); demand is steeply concentrated (top 20 pct SKUs ~ 85 pct of revenue).
-- Most price-elastic category (base): Snacks & Confectionery (-3.31); least: Beverages (-1.04). Promo elasticity exceeds base in 5/5 categories.
+- Most price-elastic category (base): Snacks & Confectionery (-3.62); least: Beverages (-1.06). Promo elasticity exceeds base in 4/5 categories.
 - Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~5 pct YoY.
 - Network is fully dual-sourced (15/15 Customer DCs with failover) with 10 lateral lanes; storage utilization averages 0 pct.
-- Availability ~ 94 pct at $4,502,402 avg working capital and 18.0x turns.
+- Availability ~ 96 pct at $9,821,546 avg working capital and 18.4x turns.
+- No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a 30-scenario disruption library covers demand- and supply-side stresses.
 
 
 ---

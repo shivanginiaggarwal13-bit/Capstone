@@ -1,0 +1,31 @@
+scenario_id,scenario_type,affected_node_id,affected_node_type,affected_sku_id,region,start_date,end_date,magnitude,ttr_days,tts_days,expected_impact,notes
+SCN0001,demand_surge,CDC01,CUSTOMER_DC,SKU0393,,2025-09-29,2025-10-12,+105pct,0,19,service risk at DC,unplanned market-driven demand spike
+SCN0002,demand_surge,CDC13,CUSTOMER_DC,SKU0168,,2025-05-05,2025-05-25,+81pct,0,20,service risk at DC,unplanned market-driven demand spike
+SCN0003,demand_surge,CDC05,CUSTOMER_DC,SKU0401,,2025-11-10,2025-11-30,+59pct,0,20,service risk at DC,unplanned market-driven demand spike
+SCN0004,demand_surge,CDC04,CUSTOMER_DC,SKU0396,,2025-09-15,2025-10-05,+125pct,0,18,service risk at DC,unplanned market-driven demand spike
+SCN0005,demand_surge,CDC15,CUSTOMER_DC,SKU0066,,2025-08-25,2025-09-21,+85pct,0,15,service risk at DC,unplanned market-driven demand spike
+SCN0006,demand_surge,CDC07,CUSTOMER_DC,SKU0490,,2025-02-17,2025-03-02,+120pct,0,19,service risk at DC,unplanned market-driven demand spike
+SCN0007,forecast_miss,,,SKU0021,,2025-12-22,2026-01-11,-20pct under-forecast,0,0,stockout risk at seasonal peak,seasonal peak under-called
+SCN0008,forecast_miss,,,SKU0092,,2025-11-17,2025-12-07,-20pct under-forecast,0,0,stockout risk at seasonal peak,seasonal peak under-called
+SCN0009,forecast_miss,,,SKU0230,,2025-11-24,2025-12-14,-20pct under-forecast,0,0,stockout risk at seasonal peak,seasonal peak under-called
+SCN0010,forecast_miss,,,SKU0130,,2025-11-24,2025-12-14,-20pct under-forecast,0,0,stockout risk at seasonal peak,seasonal peak under-called
+SCN0011,forecast_miss,,,SKU0167,,2025-11-24,2025-12-14,-20pct under-forecast,0,0,stockout risk at seasonal peak,seasonal peak under-called
+SCN0012,lane_outage,CDC10,CUSTOMER_DC,,,2025-02-10,2025-03-02,primary inbound lane down,3,20,replenishment cut,primary lane outage; requires failover RDC or lateral transfer
+SCN0013,lane_outage,CDC09,CUSTOMER_DC,,,2025-09-08,2025-09-21,primary inbound lane down,3,19,replenishment cut,primary lane outage; requires failover RDC or lateral transfer
+SCN0014,lane_outage,CDC15,CUSTOMER_DC,,,2025-05-12,2025-05-25,primary inbound lane down,3,15,replenishment cut,primary lane outage; requires failover RDC or lateral transfer
+SCN0015,lane_outage,CDC15,CUSTOMER_DC,,,2025-06-02,2025-06-22,primary inbound lane down,3,15,replenishment cut,primary lane outage; requires failover RDC or lateral transfer
+SCN0016,lane_outage,CDC06,CUSTOMER_DC,,,2025-01-13,2025-02-02,primary inbound lane down,7,20,replenishment cut,primary lane outage; requires failover RDC or lateral transfer
+SCN0017,lane_outage,CDC06,CUSTOMER_DC,,,2025-03-10,2025-03-23,primary inbound lane down,7,20,replenishment cut,primary lane outage; requires failover RDC or lateral transfer
+SCN0018,leadtime_spike,RDC08,REGIONAL_DC,,,2025-03-31,2025-04-27,lead time x2,0,20,inbound delay,carrier / rail delay on inbound lane
+SCN0019,leadtime_spike,RDC07,REGIONAL_DC,,,2025-05-19,2025-06-15,lead time x2,0,19,inbound delay,carrier / rail delay on inbound lane
+SCN0020,leadtime_spike,RDC07,REGIONAL_DC,,,2025-08-11,2025-09-14,lead time x2,0,19,inbound delay,carrier / rail delay on inbound lane
+SCN0021,leadtime_spike,RDC08,REGIONAL_DC,,,2025-09-29,2025-10-19,lead time x2,0,20,inbound delay,carrier / rail delay on inbound lane
+SCN0022,leadtime_spike,RDC06,REGIONAL_DC,,,2025-07-28,2025-08-17,lead time x2,0,19,inbound delay,carrier / rail delay on inbound lane
+SCN0023,plant_shortfall,PLANT01,PLANT,,,2025-09-01,2025-09-21,output 60-80pct,13,0,upstream shortage,schedule-attainment drop at plant
+SCN0024,plant_shortfall,PLANT01,PLANT,,,2025-08-11,2025-09-07,output 60-80pct,5,0,upstream shortage,schedule-attainment drop at plant
+SCN0025,plant_shortfall,PLANT01,PLANT,,,2025-04-14,2025-05-04,output 60-80pct,7,0,upstream shortage,schedule-attainment drop at plant
+SCN0026,plant_shortfall,PLANT01,PLANT,,,2025-05-05,2025-05-25,output 60-80pct,7,0,upstream shortage,schedule-attainment drop at plant
+SCN0027,geographic_disruption,,West,,West,2025-11-24,2026-01-04,region impaired,9,0,regional service loss,natural disaster / infrastructure / regulatory
+SCN0028,geographic_disruption,,Southeast,,Southeast,2025-09-15,2025-10-26,region impaired,10,0,regional service loss,natural disaster / infrastructure / regulatory
+SCN0029,geographic_disruption,,Southeast,,Southeast,2025-01-06,2025-02-02,region impaired,9,0,regional service loss,natural disaster / infrastructure / regulatory
+SCN0030,geographic_disruption,,Midwest,,Midwest,2025-06-16,2025-07-27,region impaired,15,0,regional service loss,natural disaster / infrastructure / regulatory

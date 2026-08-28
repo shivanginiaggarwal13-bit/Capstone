@@ -62,7 +62,7 @@ def df_to_md(df):
         lines.append("| " + " | ".join(str(v) for v in r.values) + " |")
     return "\n".join(lines)
 
-DATA = "../input datasets"
+DATA = "../../input datasets"
 OUT = "output"
 
 REVIEW_PERIOD_WEEKS = 1.0     # weekly review/replenishment cycle

@@ -26,16 +26,15 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ---- EDIT THESE TWO PATHS FOR YOUR MACHINE ----
-# DATA_DIR points to the "input datasets" folder that lives one level up, alongside
-# this "segmentation" folder, inside your Capstone workspace -- so this script reads
-# directly from your existing dataset instead of keeping a separate copy.
-DATA_DIR = "../input datasets"
-OUTPUT_DIR = "./outputs"
-SEGMENTATION_OUTPUT_DIR = f"{OUTPUT_DIR}/segmentation_output"
+# DATA_DIR points to the "input datasets" folder at the Capstone workspace root.
+# From this script's location (Capstone/Clustering & Segmentation/Segmentation_v2/),
+# that means going up two levels, then into "input datasets".
+# OUTPUT_DIR creates an "Output" folder right inside this same Segmentation_v2 folder.
+DATA_DIR = "../../input datasets"
+OUTPUT_DIR = "./Output"
 # ------------------------------------------------
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(SEGMENTATION_OUTPUT_DIR, exist_ok=True)
-FE_DIR_ANNUAL = f"{SEGMENTATION_OUTPUT_DIR}/feature_engineering"
+FE_DIR_ANNUAL = f"{OUTPUT_DIR}/feature_engineering"
 os.makedirs(FE_DIR_ANNUAL, exist_ok=True)
 
 CLUSTER_COLS = [
@@ -341,8 +340,8 @@ feat_annual["elasticity_promo"] = feat_annual["category"].map(lambda c: category
 
 # Checkpoint: the fully combined feature matrix, BEFORE clustering runs -- every SKU
 # attribute and engineered feature in one table, with no cluster assignment yet.
-feat_annual.to_csv(f"{SEGMENTATION_OUTPUT_DIR}/sku_feature_matrix_annual.csv", index=False)
-print(f"Saved: {OUTPUT_DIR}/annual/sku_feature_matrix_annual.csv (pre-clustering feature matrix)")
+feat_annual.to_csv(f"{OUTPUT_DIR}/sku_feature_matrix_annual.csv", index=False)
+print(f"Saved: {OUTPUT_DIR}/sku_feature_matrix_annual.csv (pre-clustering feature matrix)")
 
 X_annual = feat_annual[CLUSTER_COLS].fillna(feat_annual[CLUSTER_COLS].median())
 X_annual_scaled = StandardScaler().fit_transform(X_annual)
@@ -350,7 +349,7 @@ X_annual_scaled = StandardScaler().fit_transform(X_annual)
 print("\nChoosing k:")
 K_annual, silhouette_table_annual = pick_k(X_annual_scaled)
 print(f"Selected k = {K_annual}")
-silhouette_table_annual.to_csv(f"{SEGMENTATION_OUTPUT_DIR}/cluster_silhouette_scores_annual.csv", index=False)
+silhouette_table_annual.to_csv(f"{OUTPUT_DIR}/cluster_silhouette_scores_annual.csv", index=False)
 
 km_annual = KMeans(n_clusters=K_annual, random_state=42, n_init=10)
 feat_annual["cluster"] = km_annual.fit_predict(X_annual_scaled)
@@ -358,14 +357,14 @@ feat_annual["cluster"] = km_annual.fit_predict(X_annual_scaled)
 centroid_dist_annual = cluster_centroid_distances(X_annual_scaled, feat_annual["cluster"].values)
 print("\nCentroid distances (how different each pair of clusters is, in standardized feature space):")
 print(centroid_dist_annual.to_string(index=False))
-centroid_dist_annual.to_csv(f"{SEGMENTATION_OUTPUT_DIR}/cluster_centroid_distances_annual.csv", index=False)
+centroid_dist_annual.to_csv(f"{OUTPUT_DIR}/cluster_centroid_distances_annual.csv", index=False)
 
 anova_annual = run_anova(feat_annual, "cluster", CLUSTER_COLS)
 print("\nANOVA significance:")
 print(anova_annual.to_string(index=False))
 
 pca_var_annual = save_pca_plot(X_annual_scaled, feat_annual["cluster"],
-                                f"{SEGMENTATION_OUTPUT_DIR}/cluster_pca_annual.png",
+                                f"{OUTPUT_DIR}/cluster_pca_annual.png",
                                 "Annual SKU clusters (2D via PCA)")
 print(f"\nPCA variance explained: {pca_var_annual*100:.1f}%")
 
@@ -378,10 +377,10 @@ print(profile_annual[["cluster", "cluster_name", "n_skus", "pct_of_catalog", "pc
                        "pct_of_total_margin", "avg_stockout_rate", "total_stockout_exposure_usd",
                        "pct_of_total_stockout_exposure"]].to_string(index=False))
 
-feat_annual.to_csv(f"{SEGMENTATION_OUTPUT_DIR}/sku_clusters_annual.csv", index=False)
-profile_annual.to_csv(f"{SEGMENTATION_OUTPUT_DIR}/cluster_business_profile_annual.csv", index=False)
-anova_annual.to_csv(f"{SEGMENTATION_OUTPUT_DIR}/cluster_anova_annual.csv", index=False)
-print(f"\nSaved Output 1 files to: {OUTPUT_DIR}/annual/")
+feat_annual.to_csv(f"{OUTPUT_DIR}/sku_clusters_annual.csv", index=False)
+profile_annual.to_csv(f"{OUTPUT_DIR}/cluster_business_profile_annual.csv", index=False)
+anova_annual.to_csv(f"{OUTPUT_DIR}/cluster_anova_annual.csv", index=False)
+print(f"\nSaved Output 1 files to: {OUTPUT_DIR}/")
 
 
 # =========================================================================
@@ -390,5 +389,5 @@ print(f"\nSaved Output 1 files to: {OUTPUT_DIR}/annual/")
 print("\n" + "=" * 70)
 print("ANNUAL SKU SEGMENTATION COMPLETE")
 print("=" * 70)
-print(f"All annual outputs saved to: {OUTPUT_DIR}/annual/")
+print(f"All annual outputs saved to: {OUTPUT_DIR}/")
 print("\nDone.")

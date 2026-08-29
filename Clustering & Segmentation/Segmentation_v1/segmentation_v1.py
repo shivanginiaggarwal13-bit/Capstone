@@ -28,11 +28,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ---- EDIT THESE TWO PATHS FOR YOUR MACHINE ----
-# DATA_DIR points to the "input datasets" folder that lives one level up, alongside
-# this "segmentation" folder, inside your Capstone workspace -- so this script reads
-# directly from your existing dataset instead of keeping a separate copy.
-DATA_DIR = "../input datasets"
-OUTPUT_DIR = "./outputs"
+# DATA_DIR points to the "input datasets" folder at the Capstone workspace root.
+# From this script's location (Capstone/Clustering & Segmentation/Segmentation_v1/),
+# that means going up two levels, then into "input datasets".
+# OUTPUT_DIR creates an "Output" folder right inside this same Segmentation_v1 folder.
+DATA_DIR = "../../input datasets"
+OUTPUT_DIR = "./Output"
 # ------------------------------------------------
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(f"{OUTPUT_DIR}/annual", exist_ok=True)

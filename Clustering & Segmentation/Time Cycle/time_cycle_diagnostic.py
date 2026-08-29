@@ -34,8 +34,12 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ---- EDIT THESE TWO PATHS FOR YOUR MACHINE ----
-DATA_DIR = "./data"
-OUTPUT_DIR = "./time_cycle_outputs"
+# DATA_DIR points to the "input datasets" folder at the Capstone workspace root.
+# From this script's location (Capstone/Clustering & Segmentation/Time Cycle/),
+# that means going up two levels, then into "input datasets".
+# OUTPUT_DIR creates an "Output" folder right inside this same Time Cycle folder.
+DATA_DIR = "../../input datasets"
+OUTPUT_DIR = "./Output"
 # ------------------------------------------------
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

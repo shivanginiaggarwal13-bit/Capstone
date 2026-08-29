@@ -1,0 +1,501 @@
+sku_id,1,2,3,4,n_distinct_names_across_year
+SKU0001,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0002,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0003,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0004,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0005,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0006,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0007,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0008,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0009,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0010,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0011,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0012,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0013,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0014,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0015,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0016,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0017,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0018,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0019,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0020,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0021,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0022,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,Long-Tail / Stockout-Risk / Stable-Demand,3
+SKU0023,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0024,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0025,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0026,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0027,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0028,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0029,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0030,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0031,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0032,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0033,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0034,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0035,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0036,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0037,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0038,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0039,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0040,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0041,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0042,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0043,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0044,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0045,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0046,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0047,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0048,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0049,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0050,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0051,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0052,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0053,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0054,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0055,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0056,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0057,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0058,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0059,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0060,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0061,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0062,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0063,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0064,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0065,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0066,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0067,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,Volatile,3
+SKU0068,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0069,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0070,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0071,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0072,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0073,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0074,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0075,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0076,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0077,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0078,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0079,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0080,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0081,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0082,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0083,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0084,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0085,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0086,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0087,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0088,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0089,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0090,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0091,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0092,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0093,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0094,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0095,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0096,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0097,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0098,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0099,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0100,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0101,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0102,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0103,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0104,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0105,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0106,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0107,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0108,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0109,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0110,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0111,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0112,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0113,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0114,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0115,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0116,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0117,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0118,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0119,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0120,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0121,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0122,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0123,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0124,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0125,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0126,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0127,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0128,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0129,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0130,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0131,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0132,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0133,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0134,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0135,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0136,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0137,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0138,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,Long-Tail / Stockout-Risk / Stable-Demand,3
+SKU0139,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0140,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0141,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0142,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0143,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0144,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0145,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0146,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0147,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0148,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0149,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0150,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0151,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0152,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0153,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0154,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0155,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0156,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0157,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0158,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0159,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0160,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0161,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0162,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0163,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0164,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0165,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0166,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0167,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0168,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0169,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0170,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0171,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0172,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0173,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0174,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0175,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0176,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0177,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0178,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0179,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0180,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0181,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0182,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0183,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0184,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0185,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0186,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0187,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0188,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0189,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0190,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0191,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0192,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0193,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0194,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0195,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0196,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0197,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0198,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0199,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0200,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0201,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0202,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0203,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0204,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0205,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0206,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0207,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0208,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0209,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0210,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0211,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0212,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0213,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0214,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0215,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0216,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0217,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0218,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0219,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0220,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0221,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0222,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0223,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0224,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0225,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0226,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0227,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0228,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0229,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0230,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0231,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0232,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0233,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0234,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0235,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0236,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0237,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0238,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0239,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0240,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0241,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0242,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0243,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0244,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0245,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0246,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0247,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0248,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0249,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0250,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0251,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0252,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0253,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0254,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0255,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0256,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0257,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0258,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0259,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0260,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0261,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0262,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0263,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0264,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0265,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0266,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0267,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0268,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0269,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0270,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0271,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0272,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0273,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0274,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0275,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0276,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0277,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0278,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0279,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0280,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0281,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0282,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0283,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0284,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0285,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0286,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0287,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0288,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0289,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0290,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0291,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0292,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0293,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0294,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0295,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0296,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0297,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0298,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0299,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0300,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0301,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0302,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0303,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0304,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0305,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0306,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0307,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0308,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0309,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0310,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0311,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0312,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0313,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0314,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0315,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0316,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0317,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0318,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0319,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0320,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0321,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0322,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0323,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0324,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0325,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0326,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0327,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0328,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0329,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0330,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0331,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0332,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0333,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0334,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0335,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0336,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0337,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0338,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0339,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0340,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0341,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0342,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0343,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0344,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0345,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0346,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,Long-Tail / Stockout-Risk / Stable-Demand,3
+SKU0347,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0348,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0349,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0350,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0351,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0352,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0353,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0354,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0355,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0356,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0357,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0358,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0359,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0360,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0361,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0362,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0363,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0364,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0365,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0366,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0367,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0368,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0369,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0370,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0371,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0372,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0373,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0374,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0375,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0376,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0377,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0378,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0379,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0380,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0381,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0382,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0383,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0384,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0385,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0386,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0387,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0388,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0389,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0390,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0391,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0392,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0393,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0394,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0395,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0396,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0397,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0398,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0399,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0400,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0401,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0402,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0403,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0404,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0405,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0406,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0407,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0408,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0409,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0410,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0411,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0412,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0413,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0414,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0415,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0416,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0417,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0418,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0419,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0420,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0421,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0422,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0423,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0424,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0425,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0426,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0427,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0428,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0429,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0430,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0431,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0432,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0433,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0434,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0435,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0436,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0437,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0438,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0439,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0440,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0441,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0442,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0443,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0444,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0445,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0446,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0447,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,High-Revenue / Low-Margin / Stable-Demand,High-Revenue / Low-Margin,2
+SKU0448,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0449,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0450,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0451,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0452,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0453,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0454,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0455,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0456,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0457,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0458,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0459,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0460,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0461,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0462,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0463,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0464,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0465,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0466,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0467,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0468,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0469,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0470,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0471,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0472,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0473,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0474,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0475,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0476,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0477,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0478,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0479,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Long-Tail / Stockout-Risk / Stable-Demand,4
+SKU0480,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0481,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0482,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0483,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0484,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0485,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0486,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0487,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0488,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0489,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0490,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0491,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0492,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0493,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0494,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0495,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0496,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0497,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0498,High-Margin / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,High-Margin / Volatile / Slow-Replenish,2
+SKU0499,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4
+SKU0500,Stockout-Risk / Volatile,Stockout-Risk / Stable-Demand,Stockout-Risk,Volatile,4

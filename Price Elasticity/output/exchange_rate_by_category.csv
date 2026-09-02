@@ -1,0 +1,6 @@
+category,elasticity_base,optimized_ss_usd,current_ss_usd,carrying_rate,inv_annual_cost_usd,ss_units,Q0_units,discount_needed_pct,price_buffer_cost_usd,exchange_rate,routing
+Frozen Foods,-3.495,123748,213350,0.418,51727,24695,1357003,0.52,42056,1.23,Balanced blend (~50/50)
+Snacks & Confectionery,-3.597,258026,395775,0.291,75086,27138,1529688,0.49,115215,0.65,Inventory-dominant (≥75% inventory)
+Dairy & Bakery,-1.245,93939,175300,0.427,40112,21231,1587580,1.07,91086,0.44,Inventory-dominant (≥75% inventory)
+Grocery,-1.832,144098,218078,0.297,42797,20170,1526666,0.72,106963,0.4,Inventory-dominant (≥75% inventory)
+Beverages,-1.057,530929,822392,0.311,165119,22947,1998417,1.09,783558,0.21,Inventory-dominant (≥75% inventory)

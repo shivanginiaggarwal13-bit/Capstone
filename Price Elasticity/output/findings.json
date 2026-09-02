@@ -1,0 +1,343 @@
+{
+  "meta": {
+    "commit": "8301f25",
+    "pulled": "2026-09-01",
+    "data_window": [
+      "2025-01-06",
+      "2025-12-31"
+    ],
+    "n_orders_2025": 303359,
+    "n_skus": 500,
+    "promo_share": 0.057
+  },
+  "category_elasticity": [
+    {
+      "label": "Beverages",
+      "n_obs": 61320,
+      "elasticity_base": -1.0569699426,
+      "se_base": 0.1349246343,
+      "p_base": 0.0,
+      "ci_base_lo": -1.3214173666,
+      "ci_base_hi": -0.7925225187,
+      "elasticity_promo": -1.3536951752,
+      "se_promo": 0.0746025179,
+      "p_promo": 1.395248712e-73,
+      "r2": 0.0075284675
+    },
+    {
+      "label": "Dairy & Bakery",
+      "n_obs": 60820,
+      "elasticity_base": -1.245043897,
+      "se_base": 0.137629892,
+      "p_base": 1.478691207e-19,
+      "ci_base_lo": -1.5147935284,
+      "ci_base_hi": -0.9752942656,
+      "elasticity_promo": -2.4259629674,
+      "se_promo": 0.0724752843,
+      "p_promo": 1.192545885e-245,
+      "r2": 0.0260556423
+    },
+    {
+      "label": "Frozen Foods",
+      "n_obs": 55970,
+      "elasticity_base": -3.4953859643,
+      "se_base": 0.1319160938,
+      "p_base": 1.048442937e-154,
+      "ci_base_lo": -3.7539367571,
+      "ci_base_hi": -3.2368351715,
+      "elasticity_promo": -3.4989279955,
+      "se_promo": 0.0750275271,
+      "p_promo": 0.0,
+      "r2": 0.0623927858
+    },
+    {
+      "label": "Grocery",
+      "n_obs": 62963,
+      "elasticity_base": -1.832437289,
+      "se_base": 0.130274534,
+      "p_base": 6.147679234e-45,
+      "ci_base_lo": -2.0877706838,
+      "ci_base_hi": -1.5771038942,
+      "elasticity_promo": -2.234000318,
+      "se_promo": 0.0783386076,
+      "p_promo": 7.162934497e-179,
+      "r2": 0.0203534237
+    },
+    {
+      "label": "Snacks & Confectionery",
+      "n_obs": 62286,
+      "elasticity_base": -3.5971292205,
+      "se_base": 0.1298337237,
+      "p_base": 5.967392285e-169,
+      "ci_base_lo": -3.8515986429,
+      "ci_base_hi": -3.3426597981,
+      "elasticity_promo": -3.5724892544,
+      "se_promo": 0.0725907015,
+      "p_promo": 0.0,
+      "r2": 0.059790883
+    }
+  ],
+  "tier_elasticity": [
+    {
+      "label": "Beverages \u00b7 Premium",
+      "n_obs": 35557,
+      "elasticity_base": -0.8551311865,
+      "se_base": 0.2015550998,
+      "p_base": 2.20879e-05,
+      "ci_base_lo": -1.250171923,
+      "ci_base_hi": -0.4600904501,
+      "elasticity_promo": -1.2218185995,
+      "se_promo": 0.1045557581,
+      "p_promo": 1.506387047e-31,
+      "r2": 0.0051829097,
+      "category": "Beverages",
+      "price_tier": "Premium"
+    },
+    {
+      "label": "Beverages \u00b7 Value",
+      "n_obs": 25763,
+      "elasticity_base": -1.2122487399,
+      "se_base": 0.1823815522,
+      "p_base": 0.0,
+      "ci_base_lo": -1.5697100136,
+      "ci_base_hi": -0.8547874661,
+      "elasticity_promo": -1.4804836266,
+      "se_promo": 0.1069375787,
+      "p_promo": 1.375777369e-43,
+      "r2": 0.0106754971,
+      "category": "Beverages",
+      "price_tier": "Value"
+    },
+    {
+      "label": "Dairy & Bakery \u00b7 Premium",
+      "n_obs": 36646,
+      "elasticity_base": -1.6881210889,
+      "se_base": 0.17287204,
+      "p_base": 1.588795632e-22,
+      "ci_base_lo": -2.0269440613,
+      "ci_base_hi": -1.3492981165,
+      "elasticity_promo": -2.4933294051,
+      "se_promo": 0.0945468453,
+      "p_promo": 2.919930594e-153,
+      "r2": 0.0279449226,
+      "category": "Dairy & Bakery",
+      "price_tier": "Premium"
+    },
+    {
+      "label": "Dairy & Bakery \u00b7 Value",
+      "n_obs": 24174,
+      "elasticity_base": -0.2869636694,
+      "se_base": 0.2300151645,
+      "p_base": 0.2121827552,
+      "ci_base_lo": -0.7377851077,
+      "ci_base_hi": 0.1638577689,
+      "elasticity_promo": -2.339131699,
+      "se_promo": 0.1130184656,
+      "p_promo": 3.693912163e-95,
+      "r2": 0.0230813037,
+      "category": "Dairy & Bakery",
+      "price_tier": "Value"
+    },
+    {
+      "label": "Frozen Foods \u00b7 Premium",
+      "n_obs": 24657,
+      "elasticity_base": -3.7875363086,
+      "se_base": 0.1958643006,
+      "p_base": 2.594999433e-83,
+      "ci_base_lo": -4.1714232836,
+      "ci_base_hi": -3.4036493336,
+      "elasticity_promo": -3.2371680269,
+      "se_promo": 0.1139148131,
+      "p_promo": 1.231114011e-177,
+      "r2": 0.0570128582,
+      "category": "Frozen Foods",
+      "price_tier": "Premium"
+    },
+    {
+      "label": "Frozen Foods \u00b7 Value",
+      "n_obs": 31313,
+      "elasticity_base": -3.2102138434,
+      "se_base": 0.1794386862,
+      "p_base": 1.403238177e-71,
+      "ci_base_lo": -3.5619072058,
+      "ci_base_hi": -2.8585204811,
+      "elasticity_promo": -3.691053893,
+      "se_promo": 0.1005041546,
+      "p_promo": 2.873718409e-295,
+      "r2": 0.0653001502,
+      "category": "Frozen Foods",
+      "price_tier": "Value"
+    },
+    {
+      "label": "Grocery \u00b7 Premium",
+      "n_obs": 31098,
+      "elasticity_base": -1.6868992869,
+      "se_base": 0.2105148247,
+      "p_base": 0.0,
+      "ci_base_lo": -2.0995007614,
+      "ci_base_hi": -1.2742978123,
+      "elasticity_promo": -2.2357028187,
+      "se_promo": 0.1133458902,
+      "p_promo": 1.325912785e-86,
+      "r2": 0.0179875805,
+      "category": "Grocery",
+      "price_tier": "Premium"
+    },
+    {
+      "label": "Grocery \u00b7 Value",
+      "n_obs": 31865,
+      "elasticity_base": -1.9073530776,
+      "se_base": 0.1662306457,
+      "p_base": 1.779456766e-30,
+      "ci_base_lo": -2.2331591563,
+      "ci_base_hi": -1.581546999,
+      "elasticity_promo": -2.251976719,
+      "se_promo": 0.1087076434,
+      "p_promo": 2.490063912e-95,
+      "r2": 0.0224853244,
+      "category": "Grocery",
+      "price_tier": "Value"
+    },
+    {
+      "label": "Snacks & Confectionery \u00b7 Premium",
+      "n_obs": 37172,
+      "elasticity_base": -3.5806986153,
+      "se_base": 0.1625786686,
+      "p_base": 1.680985052e-107,
+      "ci_base_lo": -3.8993469503,
+      "ci_base_hi": -3.2620502802,
+      "elasticity_promo": -3.623304096,
+      "se_promo": 0.0922768933,
+      "p_promo": 0.0,
+      "r2": 0.0627690181,
+      "category": "Snacks & Confectionery",
+      "price_tier": "Premium"
+    },
+    {
+      "label": "Snacks & Confectionery \u00b7 Value",
+      "n_obs": 25114,
+      "elasticity_base": -3.6113412562,
+      "se_base": 0.2163999984,
+      "p_base": 1.595310277e-62,
+      "ci_base_lo": -4.0354774594,
+      "ci_base_hi": -3.1872050531,
+      "elasticity_promo": -3.4875708714,
+      "se_promo": 0.118423054,
+      "p_promo": 1.25522181e-190,
+      "r2": 0.0539536736,
+      "category": "Snacks & Confectionery",
+      "price_tier": "Value"
+    }
+  ],
+  "benchmark_check": [
+    {
+      "label": "Beverages",
+      "elasticity_base": -1.0569699426,
+      "nearest benchmark tier": "Premium / differentiated",
+      "within a published range?": true
+    },
+    {
+      "label": "Dairy & Bakery",
+      "elasticity_base": -1.245043897,
+      "nearest benchmark tier": "Premium / differentiated",
+      "within a published range?": true
+    },
+    {
+      "label": "Frozen Foods",
+      "elasticity_base": -3.4953859643,
+      "nearest benchmark tier": "Value tier / private label",
+      "within a published range?": true
+    },
+    {
+      "label": "Grocery",
+      "elasticity_base": -1.832437289,
+      "nearest benchmark tier": "Mainstream FMCG",
+      "within a published range?": true
+    },
+    {
+      "label": "Snacks & Confectionery",
+      "elasticity_base": -3.5971292205,
+      "nearest benchmark tier": "more elastic than value-tier band",
+      "within a published range?": true
+    }
+  ],
+  "exchange_rate": [
+    {
+      "category": "Frozen Foods",
+      "elasticity_base": -3.495,
+      "optimized_ss_usd": 123748,
+      "current_ss_usd": 213350,
+      "carrying_rate": 0.418,
+      "inv_annual_cost_usd": 51727,
+      "ss_units": 24695,
+      "Q0_units": 1357003,
+      "discount_needed_pct": 0.52,
+      "price_buffer_cost_usd": 42056,
+      "exchange_rate": 1.23,
+      "routing": "Balanced blend (~50/50)"
+    },
+    {
+      "category": "Snacks & Confectionery",
+      "elasticity_base": -3.597,
+      "optimized_ss_usd": 258026,
+      "current_ss_usd": 395775,
+      "carrying_rate": 0.291,
+      "inv_annual_cost_usd": 75086,
+      "ss_units": 27138,
+      "Q0_units": 1529688,
+      "discount_needed_pct": 0.49,
+      "price_buffer_cost_usd": 115215,
+      "exchange_rate": 0.65,
+      "routing": "Inventory-dominant (\u226575% inventory)"
+    },
+    {
+      "category": "Dairy & Bakery",
+      "elasticity_base": -1.245,
+      "optimized_ss_usd": 93939,
+      "current_ss_usd": 175300,
+      "carrying_rate": 0.427,
+      "inv_annual_cost_usd": 40112,
+      "ss_units": 21231,
+      "Q0_units": 1587580,
+      "discount_needed_pct": 1.07,
+      "price_buffer_cost_usd": 91086,
+      "exchange_rate": 0.44,
+      "routing": "Inventory-dominant (\u226575% inventory)"
+    },
+    {
+      "category": "Grocery",
+      "elasticity_base": -1.832,
+      "optimized_ss_usd": 144098,
+      "current_ss_usd": 218078,
+      "carrying_rate": 0.297,
+      "inv_annual_cost_usd": 42797,
+      "ss_units": 20170,
+      "Q0_units": 1526666,
+      "discount_needed_pct": 0.72,
+      "price_buffer_cost_usd": 106963,
+      "exchange_rate": 0.4,
+      "routing": "Inventory-dominant (\u226575% inventory)"
+    },
+    {
+      "category": "Beverages",
+      "elasticity_base": -1.057,
+      "optimized_ss_usd": 530929,
+      "current_ss_usd": 822392,
+      "carrying_rate": 0.311,
+      "inv_annual_cost_usd": 165119,
+      "ss_units": 22947,
+      "Q0_units": 1998417,
+      "discount_needed_pct": 1.09,
+      "price_buffer_cost_usd": 783558,
+      "exchange_rate": 0.21,
+      "routing": "Inventory-dominant (\u226575% inventory)"
+    }
+  ],
+  "portfolio": {
+    "inv_annual_cost_usd": 374841,
+    "price_buffer_cost_usd": 1138878,
+    "exchange_rate": 0.329,
+    "total_current_ss_usd": 1824895,
+    "total_optimized_ss_usd": 1150740
+  }
+}

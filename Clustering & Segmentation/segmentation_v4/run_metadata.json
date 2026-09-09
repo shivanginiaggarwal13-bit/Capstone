@@ -1,0 +1,54 @@
+{
+  "n_skus": 500,
+  "kept_features": [
+    "log_annual_net_margin",
+    "net_margin_pct",
+    "demand_cv_base",
+    "promo_depth_share",
+    "forecast_baseline_wmape",
+    "forecast_lift_wmape",
+    "lead_time_mean_days",
+    "shelf_life_days"
+  ],
+  "kept_blocks": {
+    "VALUE": [
+      "log_annual_net_margin",
+      "net_margin_pct"
+    ],
+    "VARIABILITY": [
+      "demand_cv_base",
+      "promo_depth_share"
+    ],
+    "FORECASTABILITY": [
+      "forecast_baseline_wmape",
+      "forecast_lift_wmape"
+    ],
+    "SUPPLY_RISK": [
+      "lead_time_mean_days"
+    ],
+    "PERISHABILITY": [
+      "shelf_life_days"
+    ]
+  },
+  "selected_k": 4,
+  "dropped_features": [
+    {
+      "feature": "lead_time_cv",
+      "block": "SUPPLY_RISK",
+      "reason_type": "STATISTICAL",
+      "reason": "Near-constant by construction (CV=0.0191)."
+    },
+    {
+      "feature": "otd_pct",
+      "block": "SUPPLY_RISK",
+      "reason_type": "UNAVAILABLE",
+      "reason": "No promised-vs-actual receipt table (e.g. replenishment_receipts.csv) is part of this shared input dataset, so a genuine on-time-delivery rate cannot be computed here (lead_time_cv carries the supply-risk signal instead)."
+    },
+    {
+      "feature": "write_off_rate",
+      "block": "PERISHABILITY",
+      "reason_type": "UNAVAILABLE",
+      "reason": "inventory.csv carries no lot-level aging/expiry field, so realised write-offs cannot be derived from this shared dataset (shelf_life_days is retained as the perishability signal)."
+    }
+  ]
+}

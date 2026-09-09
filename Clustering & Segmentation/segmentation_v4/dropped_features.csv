@@ -1,0 +1,4 @@
+feature,block,reason_type,reason
+lead_time_cv,SUPPLY_RISK,STATISTICAL,Near-constant by construction (CV=0.0191).
+otd_pct,SUPPLY_RISK,UNAVAILABLE,"No promised-vs-actual receipt table (e.g. replenishment_receipts.csv) is part of this shared input dataset, so a genuine on-time-delivery rate cannot be computed here (lead_time_cv carries the supply-risk signal instead)."
+write_off_rate,PERISHABILITY,UNAVAILABLE,"inventory.csv carries no lot-level aging/expiry field, so realised write-offs cannot be derived from this shared dataset (shelf_life_days is retained as the perishability signal)."

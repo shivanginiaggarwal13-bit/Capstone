@@ -1,0 +1,6 @@
+block,n_features,variance_share_unweighted_pct,variance_share_blockbalanced_pct
+VALUE,2,20.0,20.0
+VARIABILITY,2,20.0,20.0
+FORECASTABILITY,2,20.0,20.0
+SUPPLY_RISK,3,30.0,20.0
+PERISHABILITY,1,10.0,20.0

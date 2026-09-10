@@ -23,11 +23,22 @@ methodology documented in segmentation_v3_report.md:
     combined with cluster value share into a recommended CSL / case-fill /
     safety-factor ladder.
 
-Self-contained: reads the shared "input datasets" directory, writes every
-artifact under Output/segmentation_v4/.
+Handles two dataset schema variants seen so far for several tables
+(cost_parameters.csv, demand_forecast.csv, inventory.csv,
+replenishment_receipts.csv, write_offs.csv) so it doesn't hard-fail the next
+time the shared dataset gets regenerated with a different table shape --
+it detects what's available and falls back gracefully, documenting in
+dropped_features.csv whenever something genuinely can't be computed.
 
-Run:
-    python segmentation_v4.py --input "/path/to/input datasets" --outdir Output/segmentation_v4
+Self-contained: reads the shared "input datasets" directory, writes every
+artifact into the current folder by default (so dropping this script into
+Clustering & Segmentation/segmentation_v4/ and running it there puts every
+output right next to it, ready to commit).
+
+Run (from inside .../Clustering & Segmentation/segmentation_v4/):
+    python segmentation_v4.py
+Or explicitly:
+    python segmentation_v4.py --input "/path/to/input datasets" --outdir .
 """
 import argparse
 import json
@@ -48,6 +59,14 @@ warnings.filterwarnings("ignore")
 RNG_SEED = 42
 np.random.seed(RNG_SEED)
 
+
+def annualization_factor(orders):
+    """Every feature/aggregate that claims to be 'annual' should mean the
+    same thing whether orders.csv covers 52 weeks or 156 -- scale by however
+    many distinct weeks are actually present relative to a 52-week year."""
+    n_weeks = orders["period"].nunique()
+    return 52.0 / n_weeks if n_weeks else 1.0
+
 BLOCKS_CANDIDATE = {
     "VALUE": ["log_annual_net_margin", "net_margin_pct"],
     "VARIABILITY": ["demand_cv_base", "promo_depth_share"],
@@ -64,6 +83,13 @@ def load_tables(input_dir):
     def rd(name, **kw):
         return pd.read_csv(os.path.join(input_dir, name), **kw)
 
+    def rd_opt(name, **kw):
+        """Load a table only if the file exists in this dataset drop -- several
+        tables (replenishment_receipts.csv, write_offs.csv) were added between
+        dataset versions, so the script must not hard-fail if they're missing."""
+        path = os.path.join(input_dir, name)
+        return pd.read_csv(path, **kw) if os.path.exists(path) else None
+
     tables = {
         "sku_master": rd("sku_master.csv"),
         "cost_parameters": rd("cost_parameters.csv"),
@@ -71,6 +97,9 @@ def load_tables(input_dir):
         "orders": rd("orders.csv", parse_dates=["order_date", "delivery_date"]),
         "demand_forecast": rd("demand_forecast.csv"),
         "sku_customer_service_targets": rd("sku_customer_service_targets.csv"),
+        "inventory": rd_opt("inventory.csv"),
+        "replenishment_receipts": rd_opt("replenishment_receipts.csv"),
+        "write_offs": rd_opt("write_offs.csv"),
     }
     return tables
 
@@ -79,16 +108,28 @@ def load_tables(input_dir):
 # 2. FEATURE ENGINEERING (candidate set of 11)
 # --------------------------------------------------------------------------- #
 def feature_value(orders, sku_master):
-    """log_annual_net_margin, net_margin_pct — realised, post-discount economics."""
-    g = orders.groupby("sku_id").agg(revenue_usd=("revenue_usd", "sum"),
-                                      qty=("order_qty", "sum")).reset_index()
-    g = g.merge(sku_master[["sku_id", "unit_cost_usd"]], on="sku_id", how="left")
-    g["cogs_usd"] = g["qty"] * g["unit_cost_usd"]
-    g["annual_net_margin_usd"] = g["revenue_usd"] - g["cogs_usd"]
+    """log_annual_net_margin, net_margin_pct -- realised, post-discount economics.
+    Uses orders' own net_margin_usd / net_revenue_usd when present (this
+    dataset now nets off-invoice, trade fund, volume rebate and logistics
+    allowance directly at the line level -- a truer realised margin than the
+    revenue-minus-standard-cost approximation used as a fallback below).
+    Annualised to a 52-week basis regardless of how many weeks of history
+    orders.csv actually spans, so 'annual' means the same thing whether the
+    dataset covers 1 year or 3."""
+    n_weeks = orders["period"].nunique()
+    annualize = 52.0 / n_weeks if n_weeks else 1.0
+    if "net_margin_usd" in orders.columns and "net_revenue_usd" in orders.columns:
+        g = orders.groupby("sku_id").agg(revenue_usd=("net_revenue_usd", "sum"),
+                                          annual_net_margin_usd=("net_margin_usd", "sum")).reset_index()
+    else:
+        g = orders.groupby("sku_id").agg(revenue_usd=("revenue_usd", "sum"),
+                                          qty=("order_qty", "sum")).reset_index()
+        g = g.merge(sku_master[["sku_id", "unit_cost_usd"]], on="sku_id", how="left")
+        g["annual_net_margin_usd"] = g["revenue_usd"] - g["qty"] * g["unit_cost_usd"]
+
+    g["annual_net_margin_usd"] = g["annual_net_margin_usd"] * annualize
+    g["revenue_usd"] = g["revenue_usd"] * annualize
     g["net_margin_pct"] = g["annual_net_margin_usd"] / g["revenue_usd"].replace(0, np.nan)
-    # floor before log: a small number of low-volume SKUs can show near-zero
-    # or (rarely) slightly negative realised margin once heavy promo discount
-    # is netted against cost; clip at a small positive floor rather than drop.
     floor = max(g["annual_net_margin_usd"].quantile(0.01), 1.0)
     g["log_annual_net_margin"] = np.log(g["annual_net_margin_usd"].clip(lower=floor))
     return g[["sku_id", "annual_net_margin_usd", "net_margin_pct", "log_annual_net_margin"]]
@@ -101,7 +142,7 @@ def feature_variability(orders):
 
     base = orders[~orders["on_promo"]]
     weekly = base.groupby(["sku_id", "period"])["order_qty"].sum().reset_index()
-    # a SKU with fewer than 2 non-promo weeks (extreme edge case) gets CV=0 (no variability signal)
+
     def cv(s):
         m = s.mean()
         return (s.std(ddof=0) / m) if m > 0 else 0.0
@@ -115,14 +156,21 @@ def feature_variability(orders):
 
 
 def feature_forecastability(orders, demand_forecast):
-    """forecast_baseline_wmape / forecast_lift_wmape, split by whether the
-    sku/dc/customer/week had any promo activity in orders that week."""
-    promo_flag = (orders.groupby(["sku_id", "dc_id", "b2b_customer_id", "period"])["on_promo"]
-                  .any().reset_index().rename(columns={"on_promo": "promo_week"}))
-
+    """forecast_baseline_wmape / forecast_lift_wmape.
+    Prefers demand_forecast's own forecast_promo_lift_qty column to flag a
+    promo week directly at the sku/dc/customer/week grain it's already
+    computed at; falls back to rolling up orders.on_promo when that column
+    isn't in this dataset drop."""
     ins = demand_forecast[demand_forecast["horizon"] == "in_sample"].copy()
-    ins = ins.merge(promo_flag, on=["sku_id", "dc_id", "b2b_customer_id", "period"], how="left")
-    ins["promo_week"] = ins["promo_week"].fillna(False)
+
+    if "forecast_promo_lift_qty" in ins.columns:
+        ins["promo_week"] = ins["forecast_promo_lift_qty"].fillna(0) > 0
+    else:
+        promo_flag = (orders.groupby(["sku_id", "dc_id", "b2b_customer_id", "period"])["on_promo"]
+                      .any().reset_index().rename(columns={"on_promo": "promo_week"}))
+        ins = ins.merge(promo_flag, on=["sku_id", "dc_id", "b2b_customer_id", "period"], how="left")
+        ins["promo_week"] = ins["promo_week"].fillna(False)
+
     ins["abs_err"] = (ins["actual_qty"] - ins["forecast_qty"]).abs()
 
     def wmape(g):
@@ -134,54 +182,96 @@ def feature_forecastability(orders, demand_forecast):
     lift_w = (ins[ins["promo_week"]].groupby("sku_id").apply(wmape)
               .rename("forecast_lift_wmape"))
     out = pd.concat([base_w, lift_w], axis=1).reset_index()
-    # a handful of SKUs may have zero promo weeks in-sample -> lift wmape
-    # undefined; fall back to the baseline value for those (no evidence of a
-    # distinct promo-forecast regime, not evidence of a good one).
     out["forecast_lift_wmape"] = out["forecast_lift_wmape"].fillna(out["forecast_baseline_wmape"])
     return out
 
 
-def feature_supply_risk(orders, network_lanes):
-    """lead_time_mean_days, lead_time_cv — SKU-weighted (by order volume at
-    each stocking DC) average of that DC's inbound-lane lead time / CV.
-    otd_pct is engineered as NaN and dropped downstream: this shared dataset
-    carries no promised-vs-actual receipt table (no replenishment_receipts.csv),
-    so a genuine on-time-delivery rate cannot be computed here."""
-    dc_lanes = network_lanes[network_lanes["destination_node_type"].isin(
-        ["REGIONAL_DC", "CUSTOMER_DC"])].copy()
+def feature_supply_risk(orders, network_lanes, inventory=None, replenishment_receipts=None):
+    """lead_time_mean_days, lead_time_cv, otd_pct.
+    Prefers inventory.csv's own cum_lead_time_mean_days / cum_lead_time_std_days
+    (end-to-end, sku/dc/week-native) when present -- a more direct source than
+    inferring lead time from network_lanes. otd_pct is computed from
+    replenishment_receipts.on_time_flag when that table exists in this
+    dataset drop; otherwise engineered as NaN and dropped downstream as
+    UNAVAILABLE."""
+    if inventory is not None and {"cum_lead_time_mean_days", "cum_lead_time_std_days"}.issubset(inventory.columns):
+        dc_profile = (inventory.groupby(["sku_id", "dc_id"])
+                      .agg(dc_lead_time_mean_days=("cum_lead_time_mean_days", "mean"),
+                           dc_lead_time_std_days=("cum_lead_time_std_days", "mean")).reset_index())
+        dc_profile["dc_lead_time_cv"] = dc_profile["dc_lead_time_std_days"] / dc_profile["dc_lead_time_mean_days"]
 
-    def agg(g):
-        w = g["capacity_units_per_week"]
-        mean_lt = (g["lead_time_mean_days"] * w).sum() / w.sum()
-        cv_lane = g["lead_time_std_days"] / g["lead_time_mean_days"]
-        mean_cv = (cv_lane * w).sum() / w.sum()
-        return pd.Series({"dc_lead_time_mean_days": mean_lt, "dc_lead_time_cv": mean_cv})
+        vol = orders.groupby(["sku_id", "dc_id"])["order_qty"].sum().reset_index()
+        vol = vol.merge(dc_profile, on=["sku_id", "dc_id"], how="left")
 
-    dc_profile = dc_lanes.groupby("destination_node_id").apply(agg).reset_index().rename(
-        columns={"destination_node_id": "dc_id"})
+        def wavg(g, col):
+            w = g["order_qty"]
+            valid = g[col].notna() & (w > 0)
+            if not valid.any():
+                return np.nan
+            return (g.loc[valid, col] * w[valid]).sum() / w[valid].sum()
 
-    vol = orders.groupby(["sku_id", "dc_id"])["order_qty"].sum().reset_index()
-    vol = vol.merge(dc_profile, on="dc_id", how="left")
+        lt_mean = vol.groupby("sku_id").apply(lambda g: wavg(g, "dc_lead_time_mean_days")).rename(
+            "lead_time_mean_days")
+        lt_cv = vol.groupby("sku_id").apply(lambda g: wavg(g, "dc_lead_time_cv")).rename("lead_time_cv")
+        out = pd.concat([lt_mean, lt_cv], axis=1).reset_index()
+    else:
+        dc_lanes = network_lanes[network_lanes["destination_node_type"].isin(
+            ["REGIONAL_DC", "CUSTOMER_DC"])].copy()
 
-    def wavg(g, col):
-        w = g["order_qty"]
-        return (g[col] * w).sum() / w.sum()
+        def agg(g):
+            w = g["capacity_units_per_week"]
+            mean_lt = (g["lead_time_mean_days"] * w).sum() / w.sum()
+            cv_lane = g["lead_time_std_days"] / g["lead_time_mean_days"]
+            mean_cv = (cv_lane * w).sum() / w.sum()
+            return pd.Series({"dc_lead_time_mean_days": mean_lt, "dc_lead_time_cv": mean_cv})
 
-    lt_mean = vol.groupby("sku_id").apply(lambda g: wavg(g, "dc_lead_time_mean_days")).rename(
-        "lead_time_mean_days")
-    lt_cv = vol.groupby("sku_id").apply(lambda g: wavg(g, "dc_lead_time_cv")).rename("lead_time_cv")
-    out = pd.concat([lt_mean, lt_cv], axis=1).reset_index()
-    out["otd_pct"] = np.nan
+        dc_profile = dc_lanes.groupby("destination_node_id").apply(agg).reset_index().rename(
+            columns={"destination_node_id": "dc_id"})
+
+        vol = orders.groupby(["sku_id", "dc_id"])["order_qty"].sum().reset_index()
+        vol = vol.merge(dc_profile, on="dc_id", how="left")
+
+        def wavg(g, col):
+            w = g["order_qty"]
+            return (g[col] * w).sum() / w.sum()
+
+        lt_mean = vol.groupby("sku_id").apply(lambda g: wavg(g, "dc_lead_time_mean_days")).rename(
+            "lead_time_mean_days")
+        lt_cv = vol.groupby("sku_id").apply(lambda g: wavg(g, "dc_lead_time_cv")).rename("lead_time_cv")
+        out = pd.concat([lt_mean, lt_cv], axis=1).reset_index()
+
+    if replenishment_receipts is not None and "on_time_flag" in replenishment_receipts.columns:
+        w = replenishment_receipts.get("qty_ordered", pd.Series(1, index=replenishment_receipts.index))
+        rr = replenishment_receipts.assign(_w=w)
+        otd = (rr.groupby("sku_id").apply(lambda g: (g["on_time_flag"] * g["_w"]).sum() / g["_w"].sum())
+               .rename("otd_pct"))
+        out = out.merge(otd.reset_index(), on="sku_id", how="left")
+    else:
+        out["otd_pct"] = np.nan
     return out
 
 
-def feature_perishability(sku_master):
-    """shelf_life_days is read straight from sku_master. write_off_rate is
-    engineered as NaN and dropped downstream: inventory.csv has no lot-level
-    aging/expiry field, so realised write-offs cannot be derived from this
-    shared dataset (unlike lead time, which the lane table does support)."""
+def feature_perishability(sku_master, inventory=None, write_offs=None):
+    """shelf_life_days from sku_master. write_off_rate uses write_offs.csv
+    (units_written_off per sku, divided by total units shipped from
+    inventory.csv) when that table exists in this dataset drop -- including
+    the case where the table exists but is empty (zero recorded write-offs),
+    which correctly produces a zero-variance feature to prune, rather than an
+    UNAVAILABLE one. Falls back to NaN/UNAVAILABLE only when the table isn't
+    part of this dataset drop at all."""
     out = sku_master[["sku_id", "shelf_life_days"]].copy()
-    out["write_off_rate"] = np.nan
+
+    if write_offs is not None:
+        wo = write_offs.groupby("sku_id")["units_written_off"].sum() if len(write_offs) else pd.Series(dtype=float)
+        if inventory is not None and "shipments" in inventory.columns:
+            shipped = inventory.groupby("sku_id")["shipments"].sum()
+        else:
+            shipped = pd.Series(dtype=float)
+        rate = (wo.reindex(out["sku_id"]).fillna(0.0) /
+                 shipped.reindex(out["sku_id"]).replace(0, np.nan)).fillna(0.0)
+        out["write_off_rate"] = rate.values
+    else:
+        out["write_off_rate"] = np.nan
     return out
 
 
@@ -190,8 +280,9 @@ def build_feature_table(tables):
     fv = feature_value(orders, tables["sku_master"])
     fva = feature_variability(orders)
     ffc = feature_forecastability(orders, tables["demand_forecast"])
-    fsr = feature_supply_risk(orders, tables["network_lanes"])
-    fpe = feature_perishability(tables["sku_master"])
+    fsr = feature_supply_risk(orders, tables["network_lanes"], tables.get("inventory"),
+                                tables.get("replenishment_receipts"))
+    fpe = feature_perishability(tables["sku_master"], tables.get("inventory"), tables.get("write_offs"))
 
     df = tables["sku_master"][["sku_id", "sku_code", "category", "subcategory", "segment"]].copy()
     for part in (fv, fva, ffc, fsr, fpe):
@@ -243,10 +334,21 @@ def prune_features(df, cv_zero_tol=1e-6, near_constant_cv_tol=0.02):
 # --------------------------------------------------------------------------- #
 # 4. BLOCK-BALANCED SCALING
 # --------------------------------------------------------------------------- #
-def block_balanced_matrix(df, kept_blocks):
+def block_balanced_matrix(df, kept_blocks, winsor_pct=0.01):
+    """winsor_pct: clip each feature to its [p, 1-p] percentile range before
+    scaling. WMAPE-style ratios (Sigma|error| / Sigma actual) are unbounded
+    for low-volume/intermittent SKUs -- a single sparse SKU can post a WMAPE
+    of 50+ while the rest of the portfolio sits under 1.0, and a raw z-score
+    would let that one point dominate the feature's whole variance, then
+    the k-means distance metric. Winsorizing keeps that SKU's relative rank
+    (still the worst on that feature) without letting its absolute magnitude
+    outweigh every other feature and SKU."""
     all_feats = [f for feats in kept_blocks.values() for f in feats]
     X_raw = df[all_feats].copy()
     X_raw = X_raw.fillna(X_raw.median())
+    for f in all_feats:
+        lo, hi = X_raw[f].quantile([winsor_pct, 1 - winsor_pct])
+        X_raw[f] = X_raw[f].clip(lower=lo, upper=hi)
 
     scaler = StandardScaler()
     X_std = pd.DataFrame(scaler.fit_transform(X_raw), columns=all_feats, index=df.index)
@@ -382,19 +484,37 @@ def label_archetypes(cluster_stats, feat_df=None):
 # 8. SERVICE LEVEL LADDER (newsvendor + value floor/cap)
 # --------------------------------------------------------------------------- #
 def service_ladder(df, sku_master, cost_parameters):
-    m = df.merge(sku_master[["sku_id", "category", "margin_usd", "list_price_usd",
-                              "holding_cost_per_unit_year_usd"]], on="sku_id", how="left",
-                 suffixes=("", "_sm"))
-    m = m.merge(cost_parameters, on="category", how="left")
+    """Newsvendor critical ratio per SKU. cost_parameters' grain has changed
+    between dataset drops (category-only vs. dc_id x subcategory); this
+    detects which key is available and aggregates cost_parameters up to that
+    key before merging, rather than assuming a fixed schema."""
+    sm_cols = ["sku_id", "margin_usd", "list_price_usd", "holding_cost_per_unit_year_usd"]
+    if "category" in cost_parameters.columns:
+        key = "category"
+        sm_cols.append("category")
+    elif "subcategory" in cost_parameters.columns:
+        key = "subcategory"
+        sm_cols.append("subcategory")
+    else:
+        raise ValueError("cost_parameters.csv has neither 'category' nor 'subcategory' -- "
+                          "update service_ladder() for the new schema.")
+
+    cp_agg = cost_parameters.groupby(key, as_index=False)[
+        ["storage_cost_per_unit_year_usd", "inventory_carrying_pct_annual", "stockout_cost_multiplier"]
+    ].mean()
+
+    m = df.merge(sku_master[sm_cols], on="sku_id", how="left", suffixes=("", "_sm"))
+    m = m.merge(cp_agg, on=key, how="left")
 
     understock_cost = m["margin_usd"] * m["stockout_cost_multiplier"]
     holding = m["holding_cost_per_unit_year_usd"]
-    # obsolescence proxy: expected annual write-off cost per unit implied by
-    # shelf life relative to the ~2-year (728-day) simulated span — this is
-    # the term that was exactly zero in segmentation_v3's relaxed-shelf-life
-    # dataset (report §5) and is what lets the economics differentiate here.
     span_days = 728.0
-    obsolescence_risk = (span_days / m["shelf_life_days"]).clip(upper=1.0)
+    # obsolescence risk should fall to ~0 once shelf life comfortably exceeds
+    # the simulated span, and rise toward 1 as shelf life shrinks well below
+    # it -- (1 - shelf_life/span) does that; the earlier (span/shelf_life)
+    # form decayed too slowly and stayed near 1 even for a shelf life already
+    # 2x the horizon, which overstated obsolescence cost for long-life SKUs.
+    obsolescence_risk = (1.0 - m["shelf_life_days"] / span_days).clip(lower=0.0, upper=1.0)
     overstock_cost = holding * 0.5 + m["list_price_usd"] * 0.15 * obsolescence_risk
     cr = understock_cost / (understock_cost + overstock_cost)
     m["newsvendor_cr"] = cr
@@ -464,7 +584,9 @@ def main(input_dir, outdir):
     feat_df = feat_df.merge(sl, on="sku_id", how="left")
 
     orders = tables["orders"]
-    rev = orders.groupby("sku_id")["revenue_usd"].sum().rename("revenue_usd_total")
+    annualize = annualization_factor(orders)
+    rev_col = "net_revenue_usd" if "net_revenue_usd" in orders.columns else "revenue_usd"
+    rev = (orders.groupby("sku_id")[rev_col].sum() * annualize).rename("revenue_usd_total")
     feat_df = feat_df.merge(rev, on="sku_id", how="left")
 
     total_rev = feat_df["revenue_usd_total"].sum()

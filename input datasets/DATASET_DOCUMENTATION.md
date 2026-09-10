@@ -1,6 +1,6 @@
 # Supply Brain — Synthetic CPG Supply-Chain Dataset
 
-*Auto-generated 2026-09-10 22:01 by `supply_brain_generator_v4.py`.
+*Auto-generated 2026-09-10 22:37 by `supply_brain_generator_v4.py`.
 This document and the data are produced in the same run, so the figures below always describe the
 current instance. It supersedes the separate EDA report, whose content is folded in as Part 6.*
 

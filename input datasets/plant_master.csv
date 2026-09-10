@@ -1,5 +1,5 @@
 plant_id,plant_name,city,state,production_capacity_units_per_week,no_inventory_flag
-PLANT01,Atlanta Production Center,Atlanta,GA,4607407,TRUE
-PLANT02,Dallas Production Center,Dallas,TX,3732615,TRUE
-PLANT03,Chicago Production Center,Chicago,IL,3534342,TRUE
-PLANT04,Los Angeles Production Center,Los Angeles,CA,4331887,TRUE
+PLANT01,Atlanta Production Center,Atlanta,GA,105501,True
+PLANT02,Dallas Production Center,Dallas,TX,43484,True
+PLANT03,Chicago Production Center,Chicago,IL,136187,True
+PLANT04,Los Angeles Production Center,Los Angeles,CA,67116,True

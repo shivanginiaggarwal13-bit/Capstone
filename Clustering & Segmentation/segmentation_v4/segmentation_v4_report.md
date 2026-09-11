@@ -1,157 +1,148 @@
-# Supply Brain — SKU Segmentation on the Shared Input Dataset (v4)
+# Supply Brain — SKU Segmentation on the Shared Input Dataset (v4, 2nd dataset drop)
 
-**Same methodology as v3, re-run on this project's actual "input datasets" folder**
+**Same methodology as before, re-run on this project's newest "input datasets" folder**
+(156 weeks of history — 2023–2025 — with `replenishment_receipts.csv`, `write_offs.csv`, and richer order/inventory economics added since the first v4 run.)
 
 | | |
 |---|---|
-| Dataset | `input datasets/` — 500 SKUs, 52 historical weeks (2025) + 52 forward weeks (2026) |
-| Method | 11 candidate features in 5 blocks → **8 survive pruning, still 5 blocks** · k-means, **k=4 auto-selected** · newsvendor service-level ladder |
-| Script | `segmentation_v4.py` — self-contained, reads `../../input datasets` by default |
-| Reproduce | `python segmentation_v4.py` from inside `Clustering & Segmentation/segmentation_v4/` |
+| Dataset | `input datasets/` — 500 SKUs, 156 historical weeks (2023–2025) + 52 forward weeks (2026) |
+| Method | 11 candidate features in 5 blocks → **10 survive pruning** · k-means, **k=4 auto-selected** · newsvendor service-level ladder |
+| Script | `segmentation_v4.py` (schema-adaptive version) |
 | Outputs | all in this same folder (see Appendix) |
 
 ---
 
 ## 1. Executive summary
 
-The portfolio resolves into **4 clusters** (not v3's 5 — this dataset's own diagnostics picked a different k; see §3). Two things stand out immediately, and both are genuine, data-driven findings rather than assumptions carried over from v3:
+This is the cleanest run so far, and it looks structurally close to the original v3 "relaxed shelf-life" scenario — because this dataset drop **is** that scenario: 156 weeks of history and shelf life of 1,095–1,458 days (3–4 years), far beyond anything the simulation window can exhaust. Two things worth knowing up front:
 
-1. **One feature block effectively disappeared as a *statistical* matter, not a business one.** `lead_time_cv` — the SKU-level lead-time variability computed from this dataset's actual lanes — has almost no spread at all (std **0.006**, full range **0.29–0.34** across all 500 SKUs). It was correctly dropped before clustering. Two other candidates (`otd_pct`, `write_off_rate`) couldn't be computed at all because the source tables they need aren't part of this shared dataset. Net effect: **8 of 11 candidate features survive**, still spread across all **5** blocks because `shelf_life_days` (dropped in v3 as semantically inert) is a **live, discriminating feature here** — shelf life in this dataset ranges from ~12 days (Dairy & Bakery) to 370+ days (Frozen/Grocery), squarely inside the simulated span. §2 has the full pruning table.
+1. **Only 1 of 11 candidate features drops out this time** — `write_off_rate`. The new `write_offs.csv` table exists but is **completely empty** (0 recorded events across 500 SKUs, 3 years), so the rate is exactly 0.0 for everyone: a genuine zero-variance statistical drop, not a missing-table one. Every other candidate — including `otd_pct`, which was uncomputable in the first v4 run — now has real (if narrow) signal and survives. Full table in §2.
 
-2. **The strongest single cluster split in this data is seasonality, and it does not line up with revenue tail.** Cluster 1 (128 SKUs, **26.7% of revenue**) is **122 of the dataset's 150 Seasonal-segment SKUs** — it is a seasonality cluster that happens to also have the worst forecast error, not a small or unprofitable one. The automatic labeller in `segmentation_v4.py` names it *"Long-Tail Forecast-Challenged"* purely because it ranks by margin share and dominant weakness; that name **undersells its size** (its revenue concentration is 1.04×, i.e. almost exactly average value-per-SKU, the opposite of "long tail"). Read it as **"Seasonal Core — Forecast-Challenged"** instead. See §4.2 and the caveat in §6.
+2. **One 16-SKU cluster is defined almost entirely by a single extreme signal: catastrophic promo-week forecasting.** Cluster 3's average `forecast_lift_wmape` is **52.75** (i.e. the forecast is off by ~53x the actual demand, on average, during promo weeks) versus 0.40–2.43 everywhere else. This isn't a data error — every one of the 16 SKUs individually shows lift error in the 20–170x range (see §4.4) — but it does mean this cluster's identity rests on one dominant axis rather than a rounded profile, and the standard `chart_failure_modes.png` scatter is visually useless as a result (everything else gets squashed into a corner). Read the numbers in `sku_clusters.csv` directly for this cluster rather than the chart.
 
-| Cluster (script label) | Better read | SKUs | % catalog | % revenue | % net margin | Margin rate | Concentration | Baseline WMAPE | Promo-lift WMAPE | Promo share | Recommended CSL |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 — Flagship Promo-Driven | Flagship / Fast-Moving core | 179 | 35.8% | **60.3%** | **60.7%** | 31.7% | 1.68× | 0.089 | 0.081 | 9.9% | **97.0%** |
-| 1 — "Long-Tail Forecast-Challenged" | **Seasonal Core** (near-average value/SKU, worst forecast) | 128 | 25.6% | 26.7% | 27.6% | 32.6% | 1.04× | **0.219** | **0.224** | 9.4% | 85.0% |
-| 2 — Long-Tail Erratic | True long tail, forecast is fine | 82 | 16.4% | 6.9% | 6.4% | 29.2% | 0.42× | 0.099 | 0.092 | 9.6% | 85.0% |
-| 3 — "Long-Tail Supply-Risk" | **Long-Tail, Short-Shelf-Life & Erratic** (see caveat) | 111 | 22.2% | 6.1% | 5.3% | 27.2% | 0.28× | 0.110 | 0.104 | 11.6% | 85.0% |
+| Cluster (script label) | SKUs | % catalog | % revenue | % net margin | Concentration | Baseline WMAPE | Promo-lift WMAPE | Lead time (days) | Recommended CSL |
+|---|---|---|---|---|---|---|---|---|---|
+| 2 — Flagship Promo-Driven | 189 | 37.8% | **59.9%** | **61.0%** | 1.58× | 0.42 | 0.42 | 6.0 | **97.0%** |
+| 1 — Mid-Tier Core | 190 | 38.0% | 37.7% | 36.8% | 0.99× | 0.44 | 0.40 | 6.6 | **97.0%** |
+| 0 — Long-Tail Erratic | 105 | 21.0% | 2.0% | 1.9% | 0.10× | 1.63 | 2.43 | 7.6 | 90.0% |
+| 3 — Long-Tail Supply-Risk | 16 | 3.2% | 0.4% | 0.3% | 0.11× | 1.74 | **52.75** | **8.5 (highest)** | 90.0% |
 
-**Concentration.** The top cluster alone (35.8% of the catalogue) carries 60.3% of revenue and 60.7% of net margin. The two smallest clusters (193 SKUs, 38.6% of the catalogue) return only **13.0%** of revenue between them — that part of the picture does look like a classic long tail.
+**Concentration is stark and clean this time.** Clusters 1 and 2 together are 75.8% of the catalogue and 97.6% of both revenue and margin. Clusters 0 and 3 (126 SKUs, 24.2% of the catalogue) return just **2.4%** of revenue between them — an unambiguous long tail, unlike the first v4 run where one "long-tail" label was actually misapplied to a near-average-value cluster.
 
-**Promo depth is not a real discriminator here.** Unlike v3 (where promo share ranged 21%–36% across clusters and drove the "Flagship" narrative), promo_depth_share sits in a tight 9.4%–11.6% band across all four clusters in this dataset and is **not statistically significant** (ANOVA p = 0.227, §3). Cluster 0 is the flagship segment on margin and demand-variability grounds, not because it is more promo-dependent.
-
----
-
-## 2. Feature engineering: what was computed, and what survived pruning
-
-The script builds the same 11 candidates in the same 5 blocks as v3, then applies the same two-part pruning test (statistical zero/near-zero variance, or semantic/unavailable) — but the test is re-run against *this* dataset's own numbers, so the outcome differs from v3's.
-
-| Feature | Block | Status | Why |
-|---|---|---|---|
-| `log_annual_net_margin` | VALUE | **kept** | Realised, post-discount margin (`revenue_usd − qty×unit_cost_usd`, summed per SKU over 2025), log-transformed. |
-| `net_margin_pct` | VALUE | **kept** | Realised margin ÷ realised revenue (not the static `sku_master.margin_pct` — this one reflects actual promo discounting). |
-| `demand_cv_base` | VARIABILITY | **kept** | Coefficient of variation of weekly *non-promo* order quantity. |
-| `promo_depth_share` | VARIABILITY | **kept** (but not significant, see §3) | Share of a SKU's annual units sold on promotion. |
-| `forecast_baseline_wmape` | FORECASTABILITY | **kept** | WMAPE (`Σ|actual−forecast| / Σactual`) on in-sample weeks with no promo activity for that sku/dc/customer/week. |
-| `forecast_lift_wmape` | FORECASTABILITY | **kept** | Same WMAPE, restricted to weeks flagged as promo weeks (via `orders.on_promo`, rolled up to the forecast grain). |
-| `lead_time_mean_days` | SUPPLY_RISK | **kept** | Per-SKU order-volume-weighted average of the inbound-lane lead time at each stocking DC that sells it. |
-| `lead_time_cv` | SUPPLY_RISK | **dropped — STATISTICAL** | CV = 0.0191 across SKUs (std 0.006 on the raw feature, range 0.29–0.34). This dataset's lane network doesn't vary lead-time *variability* enough by SKU mix to carry clustering signal — every SKU sees roughly the same blend of dual-sourced lanes. |
-| `otd_pct` | SUPPLY_RISK | **dropped — UNAVAILABLE** | No promised-vs-actual receipt table (e.g. a `replenishment_receipts.csv`) exists in this shared dataset, so a genuine on-time-delivery rate can't be derived — there's nothing to compute it *from*, unlike v3 where it existed but was constant by construction. |
-| `shelf_life_days` | PERISHABILITY | **kept** | Read from `sku_master`. Genuinely live here: median shelf life is ~12 days for Dairy & Bakery vs. 370+ days for Frozen Foods/Grocery — a real, wide, operationally meaningful spread, the opposite of v3's relaxed-shelf-life dataset. |
-| `write_off_rate` | PERISHABILITY | **dropped — UNAVAILABLE** | `inventory.csv` has opening/receipts/shipments/closing stock but no lot-level aging or expiry field, so realised write-offs cannot be derived from what's shipped in this dataset. |
-
-**Net result: 8 features survive, spanning all 5 blocks** (SUPPLY_RISK and PERISHABILITY each keep exactly one feature). Block-balanced scaling still gives every *surviving block* an equal 20% share of total variance regardless of how many features it contributes — confirmed numerically in `cluster_feature_block_balance.csv` (each block: 20.0% ± 0.0%).
-
-This is the main structural difference from v3: v3 dropped an entire block (PERISHABILITY) and kept 4 blocks; this dataset drops individual *features* from two different blocks but keeps all 5 blocks alive, because shelf life is a real signal here and lead-time variability isn't.
+**The economics genuinely don't differentiate clusters here** — same finding as the original v3 report on this scenario. Median newsvendor critical ratio is essentially flat: 95.3%–95.5% across all four clusters (chart_service_ladder.png). With shelf life running 3–4x longer than the simulated horizon, the obsolescence term in the cost model is ~0 for every SKU, so the recommended CSL split (97.0% for clusters 1–2 vs. 90.0% for clusters 0/3) is being driven entirely by the **value floor/cap business rule**, not by the underlying economics. That's a legitimate and important thing to say out loud in any write-up that uses this ladder: the "97% vs 90%" story here is "how much revenue this cluster carries," not "how differently its stockout/holding costs behave."
 
 ---
 
-## 3. Statistical validation
+## 2. Feature engineering: what survived, and why this run differs from the first v4 run
 
-**7 of 8 features are significant at p < 0.05** (`cluster_anova.csv`):
-
-| Feature | Block | F | p-value |
+| Feature | Block | Status | Why (this dataset) |
 |---|---|---|---|
-| forecast_baseline_wmape | FORECASTABILITY | **355.0** | 4.9e-123 |
-| forecast_lift_wmape | FORECASTABILITY | 322.5 | 4.2e-116 |
-| lead_time_mean_days | SUPPLY_RISK | 133.5 | 2.1e-63 |
-| shelf_life_days | PERISHABILITY | 104.4 | 2.0e-52 |
-| demand_cv_base | VARIABILITY | 24.3 | 1.1e-14 |
-| log_annual_net_margin | VALUE | 19.4 | 6.4e-12 |
-| net_margin_pct | VALUE | 11.2 | 3.9e-07 |
-| **promo_depth_share** | VARIABILITY | **1.5** | **0.227 — not significant** |
+| `log_annual_net_margin` | VALUE | **kept** | From orders' own `net_margin_usd` (already nets off-invoice, trade fund, volume rebate, logistics allowance), annualized to a 52-week basis since this dataset spans 156 weeks. |
+| `net_margin_pct` | VALUE | **kept** (not significant, F=2.45, p=0.063) | Realized net margin ÷ realized net revenue. |
+| `demand_cv_base` | VARIABILITY | **kept** | CV of weekly non-promo order quantity. |
+| `promo_depth_share` | VARIABILITY | **kept** (significant here, F=4.99, p=0.002 — flips from *not* significant in the first v4 run) | Share of annual units sold on promotion. |
+| `forecast_baseline_wmape` | FORECASTABILITY | **kept** | Non-promo-week WMAPE. |
+| `forecast_lift_wmape` | FORECASTABILITY | **kept** | Promo-week WMAPE — the dominant signal in this run (§1, §4.4). |
+| `lead_time_mean_days` | SUPPLY_RISK | **kept** | Now read directly from `inventory.csv`'s own `cum_lead_time_mean_days` (end-to-end, sku/dc-native) rather than inferred from lane capacity. |
+| `lead_time_cv` | SUPPLY_RISK | **kept this time** (was dropped in the first v4 run for near-zero variance) | The inventory-native cumulative lead-time fields carry real spread here (CV range 0.23–0.48 across SKUs) that the lane-level approximation used in the first run didn't expose. |
+| `otd_pct` | SUPPLY_RISK | **kept, barely** (not significant, F=1.59, p=0.191) | `replenishment_receipts.csv` now exists in this dataset drop. Per-SKU on-time rate is pinned tight around 90% (mean 0.900, std 0.022, range 0.80–0.95) — this is very likely the same "OTD fixed near 90% by construction" artifact the original v3 report flagged, just not tight enough to trip the near-constant statistical test this time. Treat it as marginal, not a real driver. |
+| `shelf_life_days` | PERISHABILITY | **kept** | Read from `sku_master`; ranges 1,095–1,458 days, uniformly 3–4x the simulated span, so no SKU's obsolescence risk differs meaningfully — it's a valid clustering feature, but see §5 for why it doesn't create real economic separation. |
+| `write_off_rate` | PERISHABILITY | **dropped — STATISTICAL** | `write_offs.csv` exists this time but contains **zero rows** — every SKU's rate computes to exactly 0.0. |
 
-`promo_depth_share` survives the *pre-clustering* pruning test (it has real variance across SKUs, ~5%–35% between individuals) but doesn't turn out to separate the final 4 clusters — the clusters differ on margin, seasonality/forecastability, lead time and shelf life, not on how promo-heavy they are. That's a legitimate, disclosed result, not a defect in the pipeline: pruning removes features with *no* variance; ANOVA afterward is a diagnostic on whether a *surviving* feature happened to matter for *this particular* k and cluster split. PCA (2 components) captures **41.6%** of total variance — lower than v3's 57.5%, consistent with a less separable / more continuum-like structure this time (see `chart_pca.png`).
+**Net result: 10 of 11 features survive**, still across all 5 blocks. Block-balancing confirms every block still gets exactly 20% of total variance (`cluster_feature_block_balance.csv`) even though SUPPLY_RISK now carries 3 features and PERISHABILITY only 1.
 
-### Choosing k
+**A methodology fix made between the two v4 runs, relevant to this output:** `forecast_lift_wmape` is a ratio (`Σ|error| / Σactual`) that's unbounded for low-volume/intermittent SKUs — this run's own cluster 3 is the proof, with values up to 169x. Before scaling for clustering, the script now winsorizes every feature to its 1st/99th percentile so one or two extreme SKUs can't dominate a whole feature's variance (and therefore the whole distance metric) by themselves. The **raw, un-winsorized** values are still what's reported in `sku_clusters.csv` and `cluster_service_levels.csv` — so the 52.75 average you see for cluster 3 in this report is the true, un-clipped picture; only the clustering math underneath it was protected from being skewed by it.
+
+---
+
+## 3. Statistical validation & k selection
+
+**7 of 10 surviving features are significant at p < 0.05** (`cluster_anova.csv`):
+
+| Feature | F | p-value |
+|---|---|---|
+| forecast_baseline_wmape | 433.4 | 3.8e-138 |
+| forecast_lift_wmape | 332.3 | 3.1e-118 |
+| shelf_life_days | 250.4 | 6.9e-99 |
+| log_annual_net_margin | 60.1 | 3.9e-33 |
+| lead_time_mean_days | 46.0 | 2.9e-26 |
+| demand_cv_base | 45.2 | 7.8e-26 |
+| lead_time_cv | 45.2 | 8.1e-26 |
+| promo_depth_share | 5.0 | 0.0020 |
+| net_margin_pct | 2.5 | 0.063 — not significant |
+| otd_pct | 1.6 | 0.191 — not significant |
+
+PCA (2 components) captures **45.9%** of total variance (up from 41.6% in the first v4 run) — a cleaner, more separable structure this time, visible in `chart_pca.png` as four fairly distinct clouds (cluster 3 sits off to the upper right, clearly apart from the rest).
 
 | k | Inertia | Silhouette | Stability (bootstrap ARI) |
 |---|---|---|---|
-| **4** | **334.2** | 0.161 | **0.847 ← selected** |
-| 5 | 310.6 | 0.144 | 0.636 |
-| 6 | 285.2 | 0.153 | 0.680 |
-| 7 | 267.7 | 0.156 | 0.694 |
-| 8 | 254.8 | 0.150 | 0.694 |
+| **4** | **315.7** | 0.181 | **0.816 ← selected** |
+| 5 | 293.7 | 0.153 | 0.546 |
+| 6 | 273.6 | 0.143 | 0.625 |
+| 7 | 260.7 | 0.133 | 0.486 |
+| 8 | 248.6 | 0.131 | 0.468 |
 
-Same selection rule as v3 (most reproducible partition inside a 4–8 business range, silhouette as tie-break) — but on this dataset **k=4 wins outright** on stability (0.847 vs. the next-best 0.694), rather than needing a tie-break. Silhouette is uniformly low (0.14–0.16) across every k, same as v3's finding: this is a continuum of archetypes, not well-separated islands.
+k=4 wins outright on stability again, by a wide margin (0.816 vs. next-best 0.625).
 
 ---
 
 ## 4. The four clusters
 
-### 4.1 Cluster 0 — "Flagship Promo-Driven" → read as **Flagship / Fast-Moving core**
-**179 SKUs (35.8%) · 60.3% of revenue · 60.7% of net margin · concentration 1.68×**
+### 4.1 Cluster 2 — Flagship Promo-Driven
+**189 SKUs (37.8%) · 59.9% of revenue · 61.0% of net margin · concentration 1.58×**
 
-The commercial engine of the catalogue, and — unlike v3's flagship — **not particularly promo-driven** (9.9% promo share, right in the middle of the four clusters' narrow 9.4–11.6% band). What actually sets it apart: the **best forecast accuracy in the portfolio** (baseline WMAPE 0.089, lift 0.081), the **lowest demand variability** (CV 0.348 vs. 0.46–0.55 elsewhere), and it's overwhelmingly Fast-Moving segment (134/179 SKUs). It also skews toward longer shelf life (avg 338 days) and carries the healthiest margin rate isn't actually the highest (31.7%, second to cluster 1's 32.6%) — its size, not its rate, is what makes it the flagship.
+The commercial core: best-in-portfolio forecast accuracy (baseline 0.42, lift 0.42 — essentially no promo-forecasting penalty at all), shortest average lead time (6.0 days), and the longest average shelf life of the four (1,368 days). 119 of 189 SKUs are Fast-Moving segment. This is the archetype the "Flagship" label is built for, and it earns it.
 
-*Reading:* this looks like the "well-behaved, high-volume, easy-to-forecast" segment — protect it with a straightforward continuous-review policy; there's little forecast risk to manage.
+### 4.2 Cluster 1 — Mid-Tier Core
+**190 SKUs (38.0%) · 37.7% of revenue · 36.8% of net margin · concentration 0.99×**
 
-### 4.2 Cluster 1 — "Long-Tail Forecast-Challenged" → read as **Seasonal Core**
-**128 SKUs (25.6%) · 26.7% of revenue · 27.6% of net margin · concentration 1.04×**
+Near-identical forecast performance to the flagship cluster (baseline 0.44, lift 0.40) and almost exactly proportional value (0.99× concentration — it earns precisely its catalogue share, no more, no less). Its one real distinguishing trait: **shortest average shelf life** of the four clusters (1,178 days) — still nowhere near the 728-day simulated span, so this doesn't translate into different economics (§5), but it is the cluster's most literal fingerprint (see the dark cell in `chart_fingerprints.png`).
 
-**This is the most important relabeling in this report.** The script's automated namer calls this cluster "Long-Tail Forecast-Challenged" because among the three non-flagship clusters it has the worst forecast error — true — but "long-tail" is the wrong frame: at 1.04× concentration it earns almost exactly its proportional share of revenue, and its actual defining trait is composition: **122 of the dataset's 150 Seasonal-segment SKUs (81%) sit in this one cluster**, plus 16 more SKUs (44% of Dairy & Bakery, the shortest-shelf-life category). Forecast error here is roughly **2.5× worse** than the flagship cluster (baseline WMAPE 0.219 vs. 0.089) — seasonality is genuinely hard to forecast, and the clustering has correctly isolated that population.
+### 4.3 Cluster 0 — Long-Tail Erratic
+**105 SKUs (21.0%) · 2.0% of revenue · 1.9% of net margin · concentration 0.10×**
 
-*Reading:* this is a real, average-value segment whose core problem is seasonal demand shaping, not neglect or low value. Investment in seasonal-profile forecasting (not safety stock) is the highest-leverage fix here, same diagnosis v3 reached for its (differently-composed) forecast-challenged tail.
+A genuine, unambiguous long tail this time (unlike the equivalent cluster in the first v4 run). Forecast error is meaningfully worse than the two core clusters (baseline 1.63, ~4x worse) and demand variability is the highest in the portfolio (CV 0.77 vs. 0.45–0.65 elsewhere), but nothing here is as extreme as cluster 3. Category mix is fairly even; nothing about it screams a single category story.
 
-### 4.3 Cluster 2 — "Long-Tail Erratic"
-**82 SKUs (16.4%) · 6.9% of revenue · 6.4% of net margin · concentration 0.42×**
+### 4.4 Cluster 3 — "Long-Tail Supply-Risk" → read as **Long-Tail: Extreme Promo-Forecast Failure**
+**16 SKUs (3.2%) · 0.4% of revenue · 0.3% of net margin · concentration 0.11×**
 
-A genuine long tail: below-average value per SKU, moderate-to-high demand variability (CV 0.463, tied with cluster 1) but **good forecast accuracy** (baseline WMAPE 0.099 — nearly as good as the flagship cluster). A mixed segment composition (57 Fast-Moving, 15 Intermediate, 10 Seasonal) and a longer average shelf life (180 days) than cluster 3.
+The smallest and most extreme cluster, and worth naming precisely because both parts of the automated label are individually defensible here but tell only part of the story:
 
-*Reading:* the forecast isn't the problem here — the demand itself is erratic and the value doesn't justify heavy buffering. A min-max / lighter-review policy fits better than statistical safety stock.
+- **Supply risk is real, if secondary:** this cluster's median lead time (9.0 days) and lead-time CV (0.39) are both the highest of the four clusters (vs. 6.2 days / 0.32 CV portfolio-wide) — a genuine, if modest, difference, and `lead_time_cv` did survive pruning this time (§2), so it's contributing real signal, unlike the first v4 run's version of this label.
+- **But the defining trait, by an order of magnitude, is promo-week forecast collapse.** Every one of the 16 SKUs has `forecast_lift_wmape` between 22x and 169x — led by SKU0071 (169x), SKU0062 (82x), and SKU0007 (81x). These are low-revenue, promo-sensitive SKUs (7 of 16 are Beverages/Seasonal, several under $2,000/year in revenue) where a promo week's actual demand is small enough that even a modest absolute forecast miss produces an enormous relative error. Baseline (non-promo) forecast error for this cluster (1.74) is only modestly worse than cluster 0's, not extreme — **the failure is specific to promo weeks.**
 
-### 4.4 Cluster 3 — "Long-Tail Supply-Risk" → read with caution, see caveat below
-**111 SKUs (22.2%) · 6.1% of revenue · 5.3% of net margin · concentration 0.28×**
-
-The smallest-value cluster on every axis: lowest margin rate (27.2%), lowest economic critical ratio (0.658, see §5), **highest promo share of the four** (11.6%), **highest demand variability** (CV 0.551), and by far the **shortest average shelf life** (90.5 days vs. 180–338 elsewhere) — 62 of its 111 SKUs are Dairy & Bakery, the category with a median 12-day shelf life. That combination — short shelf life, high demand variability, weak margin — is the genuinely distinctive story for this cluster.
-
-**Caveat on the "Supply-Risk" name:** the automated labeller assigned this name because this cluster has the *highest average* `lead_time_cv` among the tail clusters — but `lead_time_cv` was **dropped before clustering** for having almost no variance across the whole 500-SKU population (§2: std 0.006, full range 0.29–0.34). The gap between this cluster's average (0.325) and the others (0.312–0.322) is real but tiny relative to that near-zero spread, and it played **no role** in forming the clusters. Read this cluster as **"Long-Tail, Short-Shelf-Life & Erratic,"** not as a supply-risk story — there isn't one in this dataset the way there was in v3 (whose Long-Tail Supply-Risk cluster was built on genuine lead-time CV up to 0.99).
+*Reading:* this is a "do not trust the promo forecast for these 16 SKUs" list, with a secondary, smaller supply-risk flag attached. It's too small and too dominated by one axis to generalize a broader policy from — worth reviewing SKU-by-SKU (`sku_clusters.csv`, filter `cluster == 3`) rather than treating it as a segment to set one blanket policy for.
 
 ---
 
 ## 5. Service level ladder
 
-For each SKU, `segmentation_v4.py` computes a newsvendor-style critical ratio (`newsvendor_cr` in `sku_clusters.csv`):
-
+Same newsvendor construction as the first v4 run:
 ```
-understock_cost = margin_usd × category_stockout_cost_multiplier      (from cost_parameters.csv)
+understock_cost = margin_usd × category_stockout_cost_multiplier
 overstock_cost   = 0.5 × holding_cost_per_unit_year_usd
-                   + 0.15 × list_price_usd × min(1, 728 / shelf_life_days)
+                   + 0.15 × list_price_usd × max(0, 1 − shelf_life_days/728)
 CR = understock_cost / (understock_cost + overstock_cost)
 ```
 
-Unlike v3's relaxed-shelf-life dataset — where the obsolescence term was exactly zero and every SKU's economics pinned at ~99% — this dataset's `overstock_cost` carries a real obsolescence term driven by `shelf_life_days` relative to the ~728-day (2-year) simulated span, so the economics **do** differentiate by cluster:
-
 | Cluster | Median economic CR | Recommended CSL | Target case fill | Safety factor z |
 |---|---|---|---|---|
-| 0 — Flagship | 0.716 | **97.0%** | 95.0% | 1.881 |
-| 1 — Seasonal Core | 0.714 | 85.0% | 83.0% | 1.036 |
-| 2 — Long-Tail Erratic | 0.709 | 85.0% | 83.0% | 1.036 |
-| 3 — Long-Tail Short-Shelf-Life | **0.658** (lowest) | 85.0% | 83.0% | 1.036 |
+| Flagship Promo-Driven | 0.955 | **97.0%** | 95.0% | 1.881 |
+| Mid-Tier Core | 0.955 | **97.0%** | 95.0% | 1.881 |
+| Long-Tail Erratic | 0.954 | 90.0% | 88.0% | 1.282 |
+| Long-Tail Supply-Risk | 0.953 | 90.0% | 88.0% | 1.282 |
 
-The recommended CSL applies a value floor (≥97% for any cluster carrying ≥30% of net margin — only cluster 0 qualifies) and a value cap (≤90% for any cluster carrying ≤3% of net margin — none fall that low here) on top of the raw economic ratio, clipped to an 85%–99.5% business range. Because none of the three tail clusters individually earns more than 3% of net margin as a *whole cluster* but none is starved to a floor either, all three land at the 85% clip floor. This is a coarser ladder than v3's five-tier 88–99% spread; a useful next iteration would tighten the floor/cap thresholds or work at the SKU level rather than the cluster level for the final CSL assignment.
+The economic CR is flat to three significant figures (0.953–0.955) across every cluster — because with shelf life 3–4x the simulated span, `max(0, 1 - shelf_life/728)` clips to 0 for every single SKU, so the obsolescence term vanishes and the whole ratio collapses to `margin × stockout_multiplier ÷ (that + 0.5×holding_cost)`, which is fairly stable across this portfolio. The 97.0%/90.0% split you actually see is the **value floor/cap rule** (≥30% net-margin-share clusters get floored to 97%; ≤3% clusters get capped to 90%) doing all the work, not the economics underneath it. This matches the original v3 report's own finding on its "relaxed shelf-life" dataset: when perishability can't bite, the newsvendor model alone can't tell your best SKU from your worst, and a value-based override is what actually produces a usable ladder.
 
 ---
 
 ## 6. Honest caveats
 
-- **Two of the four archetype names generated by the script are misleading if taken at face value** (§4.2, §4.4). This report gives the corrected reading; if you re-use `sku_clusters.csv` / `cluster_service_levels.csv` downstream, prefer the cluster **number** and the characteristics table in §1 over the `archetype` string, or relabel the column before presenting it further.
-- **Silhouette is low (0.14–0.16) at every k**, same finding as v3 — these are archetypes on a continuum, not well-separated groups. Bootstrap stability (0.847 at k=4) and the ANOVA table are the stronger evidence; boundary SKUs will need judgement.
-- **`otd_pct` and `write_off_rate` are not just weak here — they're not computable from this shared dataset at all** (no promised/actual receipt log, no lot-level expiry tracking). If those tables get added to the shared dataset later, re-running this script will very likely surface them as live features.
-- **`lead_time_cv` has almost no cross-SKU signal in this dataset's network** (§2) — worth checking whether that's a realistic feature of this network design (heavily dual-sourced, homogeneous lane mix) or an artifact of how SKUs are assigned to plants/lanes in the generator.
-- **The service-level ladder is coarse** (§5) — three of four clusters land at the same 85% floor. Treat it as a starting point, not a final policy.
-- **The data is synthetic** (per `DATASET_DOCUMENTATION.md` / `EDA_REPORT.md`). The pipeline and its diagnostics are the transferable asset; re-derive feature values on real sell-through before committing targets.
+- **`chart_failure_modes.png` is not usable as delivered.** Cluster 3's extreme `forecast_lift_wmape` values (up to 169) compress every other cluster into an unreadable cluster of points near the origin. Read `sku_clusters.csv` directly for the promo-forecast story instead of this chart; a log-scale or capped-axis version would fix it if this chart needs to go in front of an audience.
+- **`otd_pct` is marginal, not a real driver.** It technically survived the pre-clustering variance test (CV just above the 2% threshold) but isn't ANOVA-significant on the final clusters (p=0.19) and its cross-SKU range (80–95%) is exactly the "pinned near 90% by construction" pattern the original v3 report flagged as a data-generator artifact rather than real signal. Don't read operational meaning into it.
+- **The service-level ladder is economically flat this run** (§5) — treat the 97%/90% split as a value-based business decision, not a data-driven economic one. If perishability risk needs to actually differentiate the ladder, it requires a dataset where shelf life falls inside (not outside) the simulated horizon for at least some SKUs — as the first v4 dataset drop did.
+- **Cluster 3 is small (16 SKUs) and built almost entirely on one axis.** Treat any policy recommendation for it as SKU-level, not segment-level, guidance.
+- **The data is synthetic** (per `DATASET_DOCUMENTATION.md`). The pipeline and its diagnostics are the transferable asset — re-derive feature values on real sell-through before committing targets.
 
 ---
 
@@ -162,14 +153,14 @@ The recommended CSL applies a value floor (≥97% for any cluster carrying ≥30
 | `sku_clusters.csv` | Per-SKU features, cluster, archetype label, `recommended_csl`, `target_case_fill_rate`, `safety_factor_z` |
 | `cluster_service_levels.csv` | Cluster-level roll-up → revenue/margin share, archetype, CSL/case-fill/z |
 | `cluster_anova.csv` | F-test significance of every surviving feature across the final 4 clusters |
-| `dropped_features.csv` | The 3 pruned candidates and why (1 statistical, 2 unavailable) |
+| `dropped_features.csv` | The 1 pruned candidate (`write_off_rate`) and why |
 | `cluster_feature_block_balance.csv` | Confirms all 5 surviving blocks carry an equal 20% variance share |
 | `cluster_k_diagnostics.csv` | Inertia, silhouette, bootstrap stability for k = 4..8 |
 | `run_metadata.json` | Machine-readable record of kept/dropped features, blocks, and selected k |
-| `chart_pca.png` | Cluster separation in PCA space (41.6% of variance) |
-| `chart_fingerprints.png` | Standardised feature centroids per cluster |
-| `chart_service_ladder.png` | Economic (newsvendor) CR vs. recommended CSL per cluster |
-| `chart_failure_modes.png` | Baseline vs. promo-lift forecast error, colored by cluster — this is the clearest visual evidence for the seasonality finding in §4.2 |
+| `chart_pca.png` | Cluster separation in PCA space (45.9% of variance) — four distinct clouds, cluster 3 clearly isolated |
+| `chart_fingerprints.png` | Standardised feature centroids per cluster — cluster 3's `forecast_lift_wmape` cell is the single dominant signal |
+| `chart_service_ladder.png` | Economic (newsvendor) CR vs. recommended CSL per cluster — visual proof the economics are flat (§5) |
+| `chart_failure_modes.png` | Baseline vs. promo-lift forecast error — **not readable as delivered**, see caveat in §6 |
 | `segmentation_v4.py` | The script that produced everything above |
 
-Data provenance: `input datasets/` per `DATASET_DOCUMENTATION.md` and `EDA_REPORT.md` (auto-generated 2026-09-08, 500 SKUs, 2025 actuals + 2026 forward).
+Data provenance: `input datasets/` per `DATASET_DOCUMENTATION.md` (500 SKUs, 2023–2025 actuals + 2026 forward, this drop adding `replenishment_receipts.csv` and `write_offs.csv`).

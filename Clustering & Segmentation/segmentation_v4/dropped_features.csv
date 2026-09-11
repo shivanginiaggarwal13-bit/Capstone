@@ -1,0 +1,2 @@
+feature,block,reason_type,reason
+write_off_rate,PERISHABILITY,STATISTICAL,Zero variance across SKUs (var=0.00e+00).

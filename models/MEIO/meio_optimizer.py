@@ -7,36 +7,64 @@ levels for the 2026 forward planning horizon, using a two-echelon
 guaranteed-service-style stacking model on top of the Supply Brain
 synthetic dataset (../input datasets/).
 
-Network (from network_lanes.csv, restricted to the 16 DCs that actually
+Network (from network_lanes.csv, restricted to the 23 DCs that actually
 carry demand/inventory in this dataset):
 
-    Plant --(0.5d)--> Plant DC --(primary lane)--> Regional DC --(primary lane)--> Customer DC
+    Plant --(0.5d)--> Plant DC --(SKU-specific primary-plant lane)--> Regional DC --(fastest lane)--> Customer DC
+
+v2 update (Sep 2026 dataset refresh) — two things changed structurally and
+this script now reflects both:
+
+  * Regional DCs no longer buy from one globally-fastest Plant DC. Each SKU
+    is sourced from whichever plant is *qualified to make it*
+    (`sku_plant_sourcing.csv`, `is_primary=True`), and every Plant DC has a
+    lane to every Regional DC (`network_lanes.csv`) — so the Plant DC leg,
+    and therefore the cumulative lead time, is now SKU-specific, not just
+    node-specific. The Regional DC -> Customer DC leg is unchanged
+    (fastest available lane, global per CDC).
+  * `cost_parameters.csv` moved from a 5-row category table to a 675-row
+    (dc_id x subcategory) table with a genuinely location- and
+    density-aware holding-cost model:
+        holding_cost_per_unit_year = storage_cost_per_unit_year_usd
+                                   + unit_cost_usd * inventory_carrying_pct_annual / 100
+    (per `input datasets/DATASET_DOCUMENTATION.md` §5.3 — this replaces
+    `sku_master.holding_cost_per_unit_year_usd`, which is documented as
+    just the national average of this same calculation, kept "for
+    convenience" but explicitly superseded for anything location-aware.)
+  * The "current policy" baseline moved from `inventory.csv` (now a weekly
+    flow/shortfall ledger with no safety_stock/reorder_point columns) to
+    `opening_inventory_2026.csv` (the 2026-W01 snapshot, which does carry
+    them).
 
 Method
 ------
-1. Primary lane selection: for every stocking node, the upstream lane
-   with the lowest mean lead time is treated as its replenishment route
-   (single-sourcing assumption — standard simplification when actual
-   sourcing flags aren't in the extract).
+1. Primary-plant lane selection: each SKU's primary plant (is_primary=True
+   in sku_plant_sourcing.csv) fixes its Plant DC; every Plant DC has a
+   direct lane to every Regional DC, so the Plant DC -> Regional DC leg is
+   a direct lookup, not a "pick the fastest origin" search. The Regional DC
+   -> Customer DC leg keeps the original fastest-available-lane logic
+   (real per-SKU sourcing data isn't published at that leg).
 2. Cumulative replenishment lead time (mean, variance in days) to every
-   RDC and CDC, built by walking Plant -> PDC -> RDC (-> CDC).
+   (SKU, RDC) and (SKU, CDC) pair, walking Plant -> PDC -> RDC (-> CDC).
 3. Demand mean/std per (SKU, DC, week) estimated from 2025 in-sample
    actuals; forward (2026) mean taken from forecast_qty, forward std
    scaled by the SKU's historical coefficient of variation.
-4. RDC "total demand" = RDC's own direct (BULT) demand + the demand of
+4. RDC "total demand" = RDC's own direct (BULK) volume + the demand of
    every CDC for which that RDC is the primary source (echelon /
    installation-stock pooling) — RDCs must carry stock to replenish
    their downstream CDCs, not just serve their own direct customers.
-5. Target cycle service level per SKU derived from a newsvendor critical
-   ratio: Cu = margin_usd * stockout_cost_multiplier (cost of a lost
-   sale), Co = holding_cost_per_unit_year_usd amortized over the lead
-   time. z = Phi^-1(Cu / (Cu + Co)).
+5. Target cycle service level per SKU-DC derived from a newsvendor
+   critical ratio: Cu = margin_usd * stockout_cost_multiplier (cost of a
+   lost sale), Co = holding_cost_per_unit_year_usd (location- and
+   density-aware, see above) amortized over the lead time.
+   z = Phi^-1(Cu / (Cu + Co)).
 6. Safety stock under demand AND lead-time uncertainty:
-       SS = z * sqrt(LT_weeks * sigma_d^2 + mean_d^2 * sigma_LT_weeks^2)
-   Reorder point = mean_d * LT_weeks + SS
+       SS = z * sqrt(LT_weeks * sigma_demand^2 + demand_mean^2 * sigma_LT_weeks^2)
+   Reorder point = cycle stock + safety stock
    Order-up-to (base stock) = ROP + mean_d * review_period(=1 week)
-7. Compare against the as-is safety_stock/reorder_point carried in
-   inventory.csv (2025 policy) to quantify the working-capital delta.
+7. Compare against the 2026-W01 safety_stock/reorder_point carried in
+   opening_inventory_2026.csv (the as-is baseline policy) to quantify the
+   working-capital delta.
 
 Outputs (./output/):
     meio_recommendations.csv   SKU x DC line-level recommendations
@@ -73,7 +101,8 @@ sku = pd.read_csv(f"{DATA}/sku_master.csv")
 cost_p = pd.read_csv(f"{DATA}/cost_parameters.csv")
 lanes = pd.read_csv(f"{DATA}/network_lanes.csv")
 dfc = pd.read_csv(f"{DATA}/demand_forecast.csv")
-inv = pd.read_csv(f"{DATA}/inventory.csv")
+opening_inv = pd.read_csv(f"{DATA}/opening_inventory_2026.csv")
+sourcing = pd.read_csv(f"{DATA}/sku_plant_sourcing.csv")
 
 active_dc = sorted(dfc["dc_id"].unique())
 active_cdc = [d for d in active_dc if d.startswith("CDC")]
@@ -81,45 +110,62 @@ active_rdc = [d for d in active_dc if d.startswith("RDC")]
 print(f"Active stocking DCs: {len(active_rdc)} RDC + {len(active_cdc)} CDC = {len(active_dc)}")
 
 # --------------------------------------------------- primary lane graph ---
-def primary_upstream(dest_ids, dest_type, allowed_origins=None):
-    """For each destination node, pick the min-mean-lead-time inbound lane."""
-    sub = lanes[lanes.destination_node_type == dest_type]
-    if allowed_origins is not None:
-        sub = sub[sub.origin_node_id.isin(allowed_origins)]
-    sub = sub[sub.destination_node_id.isin(dest_ids)]
-    best = sub.sort_values("lead_time_mean_days").drop_duplicates("destination_node_id", keep="first")
-    return best.set_index("destination_node_id")[
-        ["origin_node_id", "lead_time_mean_days", "lead_time_std_days"]
-    ]
+# Plant -> Plant DC: fixed 1:1 per plant.
+plant_pdc = lanes[(lanes.origin_node_type == "PLANT") & (lanes.destination_node_type == "PLANT_DC")]
+plant_to_pdc = plant_pdc.set_index("origin_node_id")[
+    ["destination_node_id", "lead_time_mean_days", "lead_time_std_days"]
+]
 
-pdc_ids = lanes.loc[lanes.destination_node_type == "PLANT_DC", "destination_node_id"].unique()
-plant_to_pdc = primary_upstream(pdc_ids, "PLANT_DC")
-pdc_to_rdc = primary_upstream(active_rdc, "REGIONAL_DC", allowed_origins=pdc_ids)
-rdc_to_cdc = primary_upstream(active_cdc, "CUSTOMER_DC", allowed_origins=active_rdc)
+# Each SKU's primary plant (sku_plant_sourcing.csv) fixes its Plant DC.
+primary_plant = (sourcing[sourcing.is_primary.astype(str) == "True"]
+                  .set_index("sku_id")["plant_id"])
+missing_primary = sku[~sku.sku_id.isin(primary_plant.index)]
+if len(missing_primary):
+    print(f"WARNING: {len(missing_primary)} SKUs have no primary-plant row; dropped from MEIO scope.")
 
-# cumulative (mean, var) days from Plant to each RDC
-rdc_leadtime = {}
-for rdc, row in pdc_to_rdc.iterrows():
-    pdc = row.origin_node_id
-    p2p = plant_to_pdc.loc[pdc]
-    mean = p2p.lead_time_mean_days + row.lead_time_mean_days
-    var = p2p.lead_time_std_days**2 + row.lead_time_std_days**2
-    rdc_leadtime[rdc] = (mean, var)
+# Plant DC -> Regional DC: every PDC has a direct lane to every RDC now —
+# a table lookup keyed on (pdc, rdc), not a "fastest origin" search.
+pdc_rdc = lanes[(lanes.origin_node_type == "PLANT_DC") & (lanes.destination_node_type == "REGIONAL_DC")]
+pdc_rdc_idx = pdc_rdc.set_index(["origin_node_id", "destination_node_id"])[
+    ["lead_time_mean_days", "lead_time_std_days"]
+]
 
-# cumulative (mean, var) days from Plant to each CDC (via its primary RDC)
-cdc_leadtime = {}
-cdc_primary_rdc = {}
-for cdc, row in rdc_to_cdc.iterrows():
-    rdc = row.origin_node_id
-    cdc_primary_rdc[cdc] = rdc
-    r_mean, r_var = rdc_leadtime[rdc]
-    mean = r_mean + row.lead_time_mean_days
-    var = r_var + row.lead_time_std_days**2
-    cdc_leadtime[cdc] = (mean, var)
-
+# Regional DC -> Customer DC: unchanged — fastest available lane, per CDC.
+rdc_cdc = lanes[(lanes.origin_node_type == "REGIONAL_DC") & (lanes.destination_node_type == "CUSTOMER_DC")]
+rdc_cdc = rdc_cdc[rdc_cdc.origin_node_id.isin(active_rdc) & rdc_cdc.destination_node_id.isin(active_cdc)]
+best_rdc_cdc = (rdc_cdc.sort_values("lead_time_mean_days")
+                .drop_duplicates("destination_node_id", keep="first")
+                .set_index("destination_node_id"))
+cdc_primary_rdc = best_rdc_cdc["origin_node_id"].to_dict()
 print("\nPrimary RDC per CDC:")
 for cdc, rdc in cdc_primary_rdc.items():
     print(f"  {cdc} <- {rdc}")
+
+# ------------------------------------------- SKU-specific cumulative LT ---
+sku_ids = sorted(primary_plant.index)
+rdc_lt_rows = []
+for s in sku_ids:
+    plant_id = primary_plant.loc[s]
+    p2p = plant_to_pdc.loc[plant_id]
+    pdc = p2p.destination_node_id
+    for rdc in active_rdc:
+        leg = pdc_rdc_idx.loc[(pdc, rdc)]
+        mean = p2p.lead_time_mean_days + leg.lead_time_mean_days
+        var = p2p.lead_time_std_days**2 + leg.lead_time_std_days**2
+        rdc_lt_rows.append((s, rdc, mean, var))
+rdc_lt = pd.DataFrame(rdc_lt_rows, columns=["sku_id", "dc_id", "lt_mean_days", "lt_var_days"])
+
+cdc_lt_rows = []
+rdc_lt_lookup = rdc_lt.set_index(["sku_id", "dc_id"])
+for s in sku_ids:
+    for cdc in active_cdc:
+        rdc = cdc_primary_rdc[cdc]
+        r_mean, r_var = rdc_lt_lookup.loc[(s, rdc), ["lt_mean_days", "lt_var_days"]]
+        leg = best_rdc_cdc.loc[cdc]
+        mean = r_mean + leg.lead_time_mean_days
+        var = r_var + leg.lead_time_std_days**2
+        cdc_lt_rows.append((s, cdc, mean, var))
+cdc_lt = pd.DataFrame(cdc_lt_rows, columns=["sku_id", "dc_id", "lt_mean_days", "lt_var_days"])
 
 # ------------------------------------------------- demand stats per SKU/DC ---
 in_sample = dfc[dfc.horizon == "in_sample"]
@@ -137,25 +183,22 @@ demand["cv"] = demand["cv"].fillna(demand["cv"].median())
 demand["fwd_std"] = demand["fwd_mean"] * demand["cv"]
 
 # ------------------------------------------------- cost & service level ---
-sku_c = sku.merge(cost_p, on="category", how="left")
-sku_c["holding_per_unit_week"] = sku_c.holding_cost_per_unit_year_usd / 52.0
-sku_c["stockout_cost_unit"] = sku_c.margin_usd * sku_c.stockout_cost_multiplier
-
-demand = demand.merge(
-    sku_c[["sku_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    on="sku_id", how="left",
+# holding_cost_per_unit_year = storage leg (location + density) + capital
+# leg (value-based) — location-aware per DATASET_DOCUMENTATION.md §5.3.
+sku_cost = sku[["sku_id", "category", "subcategory", "unit_cost_usd", "margin_usd"]]
+demand = demand.merge(sku_cost, on="sku_id", how="left")
+demand = demand.merge(cost_p, on=["dc_id", "subcategory"], how="left")
+demand["holding_per_unit_year"] = (
+    demand.storage_cost_per_unit_year_usd
+    + demand.unit_cost_usd * demand.inventory_carrying_pct_annual / 100.0
 )
+demand["holding_per_unit_week"] = demand.holding_per_unit_year / 52.0
+demand["stockout_cost_unit"] = demand.margin_usd * demand.stockout_cost_multiplier
 
 # ---------------------------------------------- CDC-level recommendations ---
-cdc_rows = []
-for cdc in active_cdc:
-    lt_mean_days, lt_var_days = cdc_leadtime[cdc]
-    lt_mean_wk = lt_mean_days / 7.0
-    lt_std_wk = np.sqrt(lt_var_days) / 7.0
-    d = demand[demand.dc_id == cdc].copy()
-    d["lt_mean_wk"], d["lt_std_wk"] = lt_mean_wk, lt_std_wk
-    cdc_rows.append(d)
-cdc_demand = pd.concat(cdc_rows, ignore_index=True)
+cdc_demand = demand[demand.dc_id.isin(active_cdc)].merge(cdc_lt, on=["sku_id", "dc_id"], how="left")
+cdc_demand["lt_mean_wk"] = cdc_demand.lt_mean_days / 7.0
+cdc_demand["lt_std_wk"] = np.sqrt(cdc_demand.lt_var_days) / 7.0
 
 # ---------------------------------------------- RDC pooled total demand ---
 # RDC total = its own direct demand + demand of every CDC it primary-sources
@@ -177,23 +220,26 @@ for rdc in active_rdc:
     merged["fwd_mean"] = merged.own_mean + merged.down_mean
     merged["fwd_std"] = np.sqrt(merged.own_std**2 + merged.down_var)
     merged["dc_id"] = rdc
-    lt_mean_days, lt_var_days = rdc_leadtime[rdc]
-    merged["lt_mean_wk"] = lt_mean_days / 7.0
-    merged["lt_std_wk"] = np.sqrt(lt_var_days) / 7.0
-    rdc_rows.append(merged[["sku_id", "dc_id", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk"]])
+    rdc_rows.append(merged[["sku_id", "dc_id", "fwd_mean", "fwd_std"]])
 rdc_demand = pd.concat(rdc_rows, ignore_index=True)
 rdc_demand = rdc_demand.merge(
-    sku_c[["sku_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    on="sku_id", how="left",
+    sku_cost, on="sku_id", how="left",
+).merge(cost_p, on=["dc_id", "subcategory"], how="left")
+rdc_demand["holding_per_unit_year"] = (
+    rdc_demand.storage_cost_per_unit_year_usd
+    + rdc_demand.unit_cost_usd * rdc_demand.inventory_carrying_pct_annual / 100.0
 )
+rdc_demand["holding_per_unit_week"] = rdc_demand.holding_per_unit_year / 52.0
+rdc_demand["stockout_cost_unit"] = rdc_demand.margin_usd * rdc_demand.stockout_cost_multiplier
+rdc_demand = rdc_demand.merge(rdc_lt, on=["sku_id", "dc_id"], how="left")
+rdc_demand["lt_mean_wk"] = rdc_demand.lt_mean_days / 7.0
+rdc_demand["lt_std_wk"] = np.sqrt(rdc_demand.lt_var_days) / 7.0
 
 # ------------------------------------------------------ combine & solve ---
-all_nodes = pd.concat([
-    cdc_demand[["sku_id", "dc_id", "category", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk",
-                "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    rdc_demand[["sku_id", "dc_id", "category", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk",
-                "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-], ignore_index=True)
+cols = ["sku_id", "dc_id", "category", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk",
+        "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]
+all_nodes = pd.concat([cdc_demand[cols], rdc_demand[cols]], ignore_index=True)
+all_nodes = all_nodes.dropna(subset=["lt_mean_wk", "holding_per_unit_week", "stockout_cost_unit"])
 
 # newsvendor critical ratio -> service level -> z
 co_lt = all_nodes.holding_per_unit_week * all_nodes.lt_mean_wk.clip(lower=1.0)
@@ -213,11 +259,13 @@ all_nodes["reorder_point"] = (all_nodes.cycle_stock + all_nodes.safety_stock).ro
 all_nodes["order_up_to"] = (all_nodes.reorder_point + all_nodes.fwd_mean * REVIEW_PERIOD_WEEKS).round(1)
 all_nodes["safety_stock_usd"] = (all_nodes.safety_stock * all_nodes.unit_cost_usd).round(2)
 
-# ----------------------------------------- compare vs current (2025) policy ---
-current = (inv.groupby(["sku_id", "dc_id"])
-           .agg(current_safety_stock=("safety_stock", "mean"),
-                current_reorder_point=("reorder_point", "mean"))
-           .reset_index())
+# ----------------------------------------- compare vs current (2026-W01) policy ---
+# opening_inventory_2026.csv is the 2026-W01 snapshot — the as-is baseline
+# policy carried into the forward horizon (inventory.csv, the weekly
+# flow/shortfall ledger, no longer carries safety_stock/reorder_point).
+current = opening_inv[opening_inv.dc_id.isin(active_rdc + active_cdc)][
+    ["sku_id", "dc_id", "safety_stock", "reorder_point"]
+].rename(columns={"safety_stock": "current_safety_stock", "reorder_point": "current_reorder_point"})
 all_nodes = all_nodes.merge(current, on=["sku_id", "dc_id"], how="left")
 all_nodes["current_safety_stock_usd"] = all_nodes.current_safety_stock * all_nodes.unit_cost_usd
 all_nodes["ss_delta_usd"] = all_nodes.safety_stock_usd - all_nodes.current_safety_stock_usd
@@ -241,15 +289,15 @@ by_dc = all_nodes.groupby("dc_id").agg(
     skus=("sku_id", "nunique"),
     optimized_ss_usd=("safety_stock_usd", "sum"),
     current_ss_usd=("current_safety_stock_usd", "sum"),
-    lt_mean_wk=("lt_mean_wk", "first"),
+    lt_mean_wk=("lt_mean_wk", "mean"),
 ).reset_index()
 by_dc["delta_usd"] = by_dc.optimized_ss_usd - by_dc.current_ss_usd
 by_dc.to_csv(f"{OUT}/meio_summary_by_dc.csv", index=False)
 
 total_current = all_nodes.current_safety_stock_usd.sum()
 total_opt = all_nodes.safety_stock_usd.sum()
-print(f"\nTotal current SS (2025 policy): ${total_current:,.0f}")
-print(f"Total optimized SS (MEIO 2026): ${total_opt:,.0f}")
+print(f"\nTotal current SS (2026-W01 policy): ${total_current:,.0f}")
+print(f"Total optimized SS (MEIO 2026):     ${total_opt:,.0f}")
 print(f"Delta: ${total_opt - total_current:,.0f}  ({(total_opt/total_current-1)*100:.1f}%)")
 
 # ------------------------------------------------------------------ charts ---
@@ -257,7 +305,7 @@ fig, ax = plt.subplots(figsize=(9, 5))
 by_cat_sorted = by_cat.sort_values("optimized_ss_usd", ascending=False)
 x = np.arange(len(by_cat_sorted))
 w = 0.38
-ax.bar(x - w/2, by_cat_sorted.current_ss_usd/1000, width=w, label="Current (2025 policy)", color="#9aa5b1")
+ax.bar(x - w/2, by_cat_sorted.current_ss_usd/1000, width=w, label="Current (2026-W01 policy)", color="#9aa5b1")
 ax.bar(x + w/2, by_cat_sorted.optimized_ss_usd/1000, width=w, label="MEIO optimized (2026)", color="#2b6cb0")
 ax.set_xticks(x)
 ax.set_xticklabels(by_cat_sorted.category, rotation=20, ha="right")
@@ -271,7 +319,7 @@ plt.close(fig)
 fig, ax = plt.subplots(figsize=(9, 5))
 by_dc_sorted = by_dc.sort_values("optimized_ss_usd", ascending=False)
 x = np.arange(len(by_dc_sorted))
-ax.bar(x - w/2, by_dc_sorted.current_ss_usd/1000, width=w, label="Current (2025 policy)", color="#9aa5b1")
+ax.bar(x - w/2, by_dc_sorted.current_ss_usd/1000, width=w, label="Current (2026-W01 policy)", color="#9aa5b1")
 ax.bar(x + w/2, by_dc_sorted.optimized_ss_usd/1000, width=w, label="MEIO optimized (2026)", color="#2b6cb0")
 ax.set_xticks(x)
 ax.set_xticklabels(by_dc_sorted.dc_id, rotation=45, ha="right")
@@ -286,25 +334,34 @@ print(f"Wrote charts + summaries to {OUT}/")
 
 # --------------------------------------------------------------- report ---
 report = f"""# MEIO — Multi-Echelon Inventory Optimization
-Supply Brain capstone | generated by `meio_optimizer.py`
+Supply Brain capstone | generated by `meio_optimizer.py` (v2 — refreshed dataset, {pd.Timestamp.now().strftime('%Y-%m-%d')})
 
 ## Network scope
 - {len(active_rdc)} Regional DCs + {len(active_cdc)} Customer DCs actively carry demand/inventory in this dataset.
-- Replenishment path: Plant -> Plant DC -> Regional DC (-> Customer DC), single-sourced
-  via the fastest (min mean lead-time) available lane at each node.
+- Replenishment path: Plant -> Plant DC -> Regional DC (-> Customer DC).
+  Plant DC is fixed per SKU by its primary plant (`sku_plant_sourcing.csv`); every Plant DC
+  has a direct lane to every Regional DC, so this leg is SKU-specific, not a single global
+  fastest-origin choice. The Regional DC -> Customer DC leg is single-sourced via the
+  fastest available lane (global per CDC — real per-SKU sourcing isn't published at that leg).
 - RDC demand pools its own direct (BULK) volume with the demand of every CDC it primary-sources
   (echelon / installation-stock pooling), so RDC safety stock reflects the full downstream buffer it must support.
 
 ## Method
 1. Demand mean from 2026 `forecast_qty`; demand std scaled from each SKU's 2025 in-sample coefficient of variation.
-2. Cumulative lead-time mean/variance built by walking the network graph, converted to weeks.
-3. Target cycle service level per SKU-DC from a newsvendor critical ratio:
+2. Cumulative lead-time mean/variance built by walking the network graph per SKU (via its primary plant), converted to weeks.
+3. Holding cost per unit-year = `storage_cost_per_unit_year_usd` (location + product density) +
+   `unit_cost_usd x inventory_carrying_pct_annual` (value-based capital/shrink leg) — both from
+   `cost_parameters.csv` at (dc_id, subcategory) grain, per `DATASET_DOCUMENTATION.md` §5.3.
+4. Target cycle service level per SKU-DC from a newsvendor critical ratio:
    `CR = stockout_cost / (stockout_cost + holding_cost_over_lead_time)`, clipped to [80%, 99.9%].
-4. Safety stock = `z * sqrt(LT_weeks * sigma_demand^2 + demand_mean^2 * sigma_LT_weeks^2)`.
-5. Reorder point = cycle stock + safety stock; order-up-to = reorder point + 1 week of demand (weekly review).
+5. Safety stock = `z * sqrt(LT_weeks * sigma_demand^2 + demand_mean^2 * sigma_LT_weeks^2)`.
+6. Reorder point = cycle stock + safety stock; order-up-to = reorder point + 1 week of demand (weekly review).
+7. Baseline for comparison: the 2026-W01 snapshot in `opening_inventory_2026.csv`
+   (`inventory.csv` is now a weekly flow/shortfall ledger and no longer carries a
+   safety_stock / reorder_point column).
 
 ## Headline result
-- Total current (2025 policy) safety-stock investment: **${total_current:,.0f}**
+- Total current (2026-W01 policy) safety-stock investment: **${total_current:,.0f}**
 - Total MEIO-optimized (2026) safety-stock investment: **${total_opt:,.0f}**
 - Net change: **${total_opt - total_current:,.0f}** ({(total_opt/total_current-1)*100:+.1f}%)
 

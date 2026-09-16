@@ -1,0 +1,3 @@
+# Full per-observation detail (~30MB, 300K+ rows) is regenerable by
+# re-running backtest_csl.py. Only the small aggregated outputs are tracked.
+backtest_detail.csv

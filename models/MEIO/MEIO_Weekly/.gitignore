@@ -1,0 +1,7 @@
+# Per-run output (recommendations CSV + summaries + report + chart) is
+# regenerable by re-running meio_optimizer_weekly.py --as-of <period>.
+# Keep it local only — don't let 52 weekly runs/year bloat the repo.
+output/2*-W*/
+
+# meio_weekly_history.csv and chart_ss_trend.png are NOT ignored — they're
+# the small, persistent cross-run log this workflow exists to build.

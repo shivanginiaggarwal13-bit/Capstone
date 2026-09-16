@@ -1,0 +1,3 @@
+# Full weekly per-node trace (~30MB, 328K+ rows) is regenerable by
+# re-running simulate_policy.py. Only the small aggregated outputs are tracked.
+simulation_detail.csv

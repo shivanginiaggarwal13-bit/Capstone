@@ -7,8 +7,9 @@ levels for the 2026 forward planning horizon, using a two-echelon
 guaranteed-service-style stacking model on top of the Supply Brain
 synthetic dataset (../input datasets/).
 
-Network (from network_lanes.csv, restricted to the 16 DCs that actually
-carry demand/inventory in this dataset):
+Network (from network_lanes.csv, restricted to whichever DCs actually
+carry demand/inventory in demand_forecast.csv — 23 in the current extract,
+8 RDC + 15 CDC):
 
     Plant --(0.5d)--> Plant DC --(primary lane)--> Regional DC --(primary lane)--> Customer DC
 
@@ -27,10 +28,13 @@ Method
    every CDC for which that RDC is the primary source (echelon /
    installation-stock pooling) — RDCs must carry stock to replenish
    their downstream CDCs, not just serve their own direct customers.
-5. Target cycle service level per SKU derived from a newsvendor critical
-   ratio: Cu = margin_usd * stockout_cost_multiplier (cost of a lost
-   sale), Co = holding_cost_per_unit_year_usd amortized over the lead
-   time. z = Phi^-1(Cu / (Cu + Co)).
+5. Target cycle service level per SKU x DC derived from a newsvendor
+   critical ratio: Cu = margin_usd * stockout_cost_multiplier (cost of a
+   lost sale), Co = holding cost amortized over the lead time, where
+   holding cost = storage_cost_per_unit_year_usd + unit_cost_usd *
+   inventory_carrying_pct_annual (cost_parameters.csv, keyed by
+   dc_id x subcategory — both terms vary by stocking location, not just
+   by category). z = Phi^-1(Cu / (Cu + Co)).
 6. Safety stock under demand AND lead-time uncertainty:
        SS = z * sqrt(LT_weeks * sigma_d^2 + mean_d^2 * sigma_LT_weeks^2)
    Reorder point = mean_d * LT_weeks + SS
@@ -74,6 +78,13 @@ cost_p = pd.read_csv(f"{DATA}/cost_parameters.csv")
 lanes = pd.read_csv(f"{DATA}/network_lanes.csv")
 dfc = pd.read_csv(f"{DATA}/demand_forecast.csv")
 inv = pd.read_csv(f"{DATA}/inventory.csv")
+
+# demand_forecast.csv is actually (period, sku, dc, b2b_customer) grain -- ~5% of
+# sku x dc x period combos are split across 2 B2B customers. Collapse to true
+# DC-level weekly totals before anything else touches it, or per-customer rows
+# leak through as duplicate SKU lines downstream.
+dfc = (dfc.groupby(["period", "week_start_date", "horizon", "sku_id", "dc_id"], as_index=False)
+       .agg(forecast_qty=("forecast_qty", "sum"), actual_qty=("actual_qty", lambda s: s.sum(min_count=1))))
 
 active_dc = sorted(dfc["dc_id"].unique())
 active_cdc = [d for d in active_dc if d.startswith("CDC")]
@@ -137,14 +148,13 @@ demand["cv"] = demand["cv"].fillna(demand["cv"].median())
 demand["fwd_std"] = demand["fwd_mean"] * demand["cv"]
 
 # ------------------------------------------------- cost & service level ---
-sku_c = sku.merge(cost_p, on="category", how="left")
-sku_c["holding_per_unit_week"] = sku_c.holding_cost_per_unit_year_usd / 52.0
-sku_c["stockout_cost_unit"] = sku_c.margin_usd * sku_c.stockout_cost_multiplier
+# cost_parameters.csv is keyed by (dc_id, subcategory), not category alone — storage
+# cost and stockout multiplier both vary by stocking location. Holding cost per unit-year
+# = location storage cost + (carrying % x unit cost); applied per node once dc_id is known
+# (after the CDC/RDC split below), since it's no longer a flat per-SKU figure.
+sku_c = sku[["sku_id", "category", "subcategory", "unit_cost_usd", "margin_usd"]].copy()
 
-demand = demand.merge(
-    sku_c[["sku_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    on="sku_id", how="left",
-)
+demand = demand.merge(sku_c, on="sku_id", how="left")
 
 # ---------------------------------------------- CDC-level recommendations ---
 cdc_rows = []
@@ -182,18 +192,20 @@ for rdc in active_rdc:
     merged["lt_std_wk"] = np.sqrt(lt_var_days) / 7.0
     rdc_rows.append(merged[["sku_id", "dc_id", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk"]])
 rdc_demand = pd.concat(rdc_rows, ignore_index=True)
-rdc_demand = rdc_demand.merge(
-    sku_c[["sku_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    on="sku_id", how="left",
-)
+rdc_demand = rdc_demand.merge(sku_c, on="sku_id", how="left")
 
 # ------------------------------------------------------ combine & solve ---
-all_nodes = pd.concat([
-    cdc_demand[["sku_id", "dc_id", "category", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk",
-                "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    rdc_demand[["sku_id", "dc_id", "category", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk",
-                "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-], ignore_index=True)
+node_cols = ["sku_id", "dc_id", "category", "subcategory", "fwd_mean", "fwd_std",
+             "lt_mean_wk", "lt_std_wk", "unit_cost_usd", "margin_usd"]
+all_nodes = pd.concat([cdc_demand[node_cols], rdc_demand[node_cols]], ignore_index=True)
+
+# DC-specific cost join: holding cost = location storage cost + (carrying % x unit cost)
+all_nodes = all_nodes.merge(cost_p, on=["dc_id", "subcategory"], how="left")
+all_nodes["holding_per_unit_week"] = (
+    all_nodes.storage_cost_per_unit_year_usd
+    + all_nodes.unit_cost_usd * all_nodes.inventory_carrying_pct_annual / 100.0
+) / 52.0
+all_nodes["stockout_cost_unit"] = all_nodes.margin_usd * all_nodes.stockout_cost_multiplier
 
 # newsvendor critical ratio -> service level -> z
 co_lt = all_nodes.holding_per_unit_week * all_nodes.lt_mean_wk.clip(lower=1.0)

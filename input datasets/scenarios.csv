@@ -1,26 +1,26 @@
 scenario_id,scenario_type,affected_node_id,affected_node_type,affected_sku_id,region,affected_family,start_date,end_date,duration_weeks,magnitude_value,magnitude_unit,ttr_days,tts_days,impact_dimension,probability,notes
-SCN0001,demand_surge,CDC01,CUSTOMER_DC,SKU0318,,,2026-07-06,2026-08-02,3,0.744,pct_uplift,0,15,service,0.184,unplanned market-driven demand spike
-SCN0002,demand_surge,CDC15,CUSTOMER_DC,SKU0179,,,2026-05-11,2026-05-24,1,1.301,pct_uplift,0,9,service,0.123,unplanned market-driven demand spike
-SCN0003,demand_surge,CDC14,CUSTOMER_DC,SKU0106,,,2026-09-28,2026-10-18,2,1.259,pct_uplift,0,15,service,0.251,unplanned market-driven demand spike
-SCN0004,demand_surge,CDC15,CUSTOMER_DC,SKU0386,,,2026-05-04,2026-05-17,1,1.371,pct_uplift,0,9,service,0.345,unplanned market-driven demand spike
-SCN0005,demand_surge,CDC04,CUSTOMER_DC,SKU0072,,,2026-02-16,2026-03-15,3,1.379,pct_uplift,0,11,service,0.14,unplanned market-driven demand spike
-SCN0006,demand_surge,CDC07,CUSTOMER_DC,SKU0130,,,2026-04-27,2026-05-17,2,0.888,pct_uplift,0,13,service,0.129,unplanned market-driven demand spike
+SCN0001,demand_surge,CDC01,CUSTOMER_DC,SKU0318,,,2026-07-06,2026-08-02,3,0.744,pct_uplift,0,22,service,0.184,unplanned market-driven demand spike
+SCN0002,demand_surge,CDC15,CUSTOMER_DC,SKU0179,,,2026-05-11,2026-05-24,1,1.301,pct_uplift,0,19,service,0.123,unplanned market-driven demand spike
+SCN0003,demand_surge,CDC14,CUSTOMER_DC,SKU0106,,,2026-09-28,2026-10-18,2,1.259,pct_uplift,0,23,service,0.251,unplanned market-driven demand spike
+SCN0004,demand_surge,CDC15,CUSTOMER_DC,SKU0386,,,2026-05-04,2026-05-17,1,1.371,pct_uplift,0,19,service,0.345,unplanned market-driven demand spike
+SCN0005,demand_surge,CDC04,CUSTOMER_DC,SKU0072,,,2026-02-16,2026-03-15,3,1.379,pct_uplift,0,21,service,0.14,unplanned market-driven demand spike
+SCN0006,demand_surge,CDC07,CUSTOMER_DC,SKU0130,,,2026-04-27,2026-05-17,2,0.888,pct_uplift,0,21,service,0.129,unplanned market-driven demand spike
 SCN0007,forecast_miss,,,SKU0275,,,2026-03-02,2026-03-22,2,0.2,pct_shortfall,0,0,service,0.339,seasonal peak under-called by the baseline forecast
 SCN0008,forecast_miss,,,SKU0171,,,2026-01-19,2026-02-08,2,0.2,pct_shortfall,0,0,service,0.248,seasonal peak under-called by the baseline forecast
 SCN0009,forecast_miss,,,SKU0230,,,2025-12-29,2026-01-18,2,0.2,pct_shortfall,0,0,service,0.265,seasonal peak under-called by the baseline forecast
 SCN0010,forecast_miss,,,SKU0364,,,2026-01-26,2026-02-15,2,0.2,pct_shortfall,0,0,service,0.159,seasonal peak under-called by the baseline forecast
 SCN0011,forecast_miss,,,SKU0345,,,2026-10-05,2026-10-25,2,0.2,pct_shortfall,0,0,service,0.202,seasonal peak under-called by the baseline forecast
-SCN0012,lane_outage,CDC01,CUSTOMER_DC,,,,2026-11-16,2026-12-06,2,1.0,nodes_offline,4,15,service,0.17,primary inbound lane down; requires failover RDC or lateral transfer
-SCN0013,lane_outage,CDC07,CUSTOMER_DC,,,,2026-10-19,2026-11-01,1,1.0,nodes_offline,6,13,service,0.196,primary inbound lane down; requires failover RDC or lateral transfer
-SCN0014,lane_outage,CDC13,CUSTOMER_DC,,,,2026-08-10,2026-08-23,1,1.0,nodes_offline,6,9,service,0.062,primary inbound lane down; requires failover RDC or lateral transfer
-SCN0015,lane_outage,CDC12,CUSTOMER_DC,,,,2026-12-14,2026-12-27,1,1.0,nodes_offline,3,10,service,0.165,primary inbound lane down; requires failover RDC or lateral transfer
-SCN0016,lane_outage,CDC01,CUSTOMER_DC,,,,2026-04-13,2026-04-26,1,1.0,nodes_offline,5,15,service,0.061,primary inbound lane down; requires failover RDC or lateral transfer
-SCN0017,lane_outage,CDC06,CUSTOMER_DC,,,,2026-03-23,2026-04-05,1,1.0,nodes_offline,7,7,service,0.165,primary inbound lane down; requires failover RDC or lateral transfer
-SCN0018,leadtime_spike,RDC02,REGIONAL_DC,,,,2026-09-21,2026-10-18,3,6.94,days_added,0,17,service,0.152,carrier / rail delay on the inbound lane
-SCN0019,leadtime_spike,RDC08,REGIONAL_DC,,,,2026-02-16,2026-03-08,2,8.906,days_added,0,25,service,0.13,carrier / rail delay on the inbound lane
+SCN0012,lane_outage,CDC01,CUSTOMER_DC,,,,2026-11-16,2026-12-06,2,1.0,nodes_offline,4,22,service,0.17,primary inbound lane down; requires failover RDC or lateral transfer
+SCN0013,lane_outage,CDC07,CUSTOMER_DC,,,,2026-10-19,2026-11-01,1,1.0,nodes_offline,6,21,service,0.196,primary inbound lane down; requires failover RDC or lateral transfer
+SCN0014,lane_outage,CDC13,CUSTOMER_DC,,,,2026-08-10,2026-08-23,1,1.0,nodes_offline,6,18,service,0.062,primary inbound lane down; requires failover RDC or lateral transfer
+SCN0015,lane_outage,CDC12,CUSTOMER_DC,,,,2026-12-14,2026-12-27,1,1.0,nodes_offline,3,18,service,0.165,primary inbound lane down; requires failover RDC or lateral transfer
+SCN0016,lane_outage,CDC01,CUSTOMER_DC,,,,2026-04-13,2026-04-26,1,1.0,nodes_offline,5,22,service,0.061,primary inbound lane down; requires failover RDC or lateral transfer
+SCN0017,lane_outage,CDC06,CUSTOMER_DC,,,,2026-03-23,2026-04-05,1,1.0,nodes_offline,7,28,service,0.165,primary inbound lane down; requires failover RDC or lateral transfer
+SCN0018,leadtime_spike,RDC02,REGIONAL_DC,,,,2026-09-21,2026-10-18,3,6.94,days_added,0,23,service,0.152,carrier / rail delay on the inbound lane
+SCN0019,leadtime_spike,RDC08,REGIONAL_DC,,,,2026-02-16,2026-03-08,2,8.906,days_added,0,30,service,0.13,carrier / rail delay on the inbound lane
 SCN0020,leadtime_spike,RDC07,REGIONAL_DC,,,,2026-10-26,2026-11-22,3,5.556,days_added,0,18,service,0.25,carrier / rail delay on the inbound lane
 SCN0021,leadtime_spike,RDC07,REGIONAL_DC,,,,2026-02-02,2026-03-01,3,4.222,days_added,0,18,service,0.235,carrier / rail delay on the inbound lane
-SCN0022,leadtime_spike,RDC03,REGIONAL_DC,,,,2026-11-30,2026-12-27,3,9.615,days_added,0,19,service,0.251,carrier / rail delay on the inbound lane
+SCN0022,leadtime_spike,RDC03,REGIONAL_DC,,,,2026-11-30,2026-12-27,3,9.615,days_added,0,22,service,0.251,carrier / rail delay on the inbound lane
 SCN0023,plant_shortfall,PLANT04,PLANT,,,LIQUID_FILL,2026-03-09,2026-04-05,3,0.352,pct_shortfall,11,0,cost,0.132,schedule-attainment drop on one production family at this plant
 SCN0024,plant_shortfall,PLANT04,PLANT,,,LIQUID_FILL,2026-10-05,2026-10-18,1,0.367,pct_shortfall,12,0,cost,0.121,schedule-attainment drop on one production family at this plant
 SCN0025,plant_shortfall,PLANT01,PLANT,,,LIQUID_FILL,2026-11-02,2026-11-15,1,0.311,pct_shortfall,12,0,cost,0.195,schedule-attainment drop on one production family at this plant

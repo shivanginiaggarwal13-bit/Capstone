@@ -1,10 +1,22 @@
 # Supply Brain — Synthetic CPG Supply-Chain Dataset
 
-*Auto-generated 2026-09-10 22:37 by `supply_brain_generator_v4.py`.
+*Auto-generated 2026-09-16 17:49 by `supply_brain_generator_v5.py`.
 This document and the data are produced in the same run, so the figures below always describe the
 current instance. It supersedes the separate EDA report, whose content is folded in as Part 6.*
 
 ---
+
+## Scope
+
+This document covers **`input datasets/` only** — the given data: the
+network, the products and their economics, the commercial history, the
+published forecast, the disruption library, and the inventory record of
+what happened over the historical span.
+
+It does **not** cover the forward view. The digital twin documents its own
+mechanics and every artefact a run produces in
+`output datasets/OUTPUT_DOCUMENTATION.md`. `SCHEMA.md` at the project root
+explains how the two folders divide.
 
 ## How to read this document
 
@@ -129,12 +141,12 @@ portfolio is dual-sourced.
 
 Production plans are set from recent demand plus whatever it takes to restore about a week and a
 half of finished-goods cover, and they are **constrained by capacity** — first by the individual
-production line for that family, then by the plant as a whole. Around 7% of
-SKU-weeks get clipped, at a mean plant utilisation of about 60% and peaks near
-94%.
+production line for that family, then by the plant as a whole. Around 3% of
+SKU-weeks get clipped, at a mean plant utilisation of about 54% and peaks near
+99%.
 
 Plans are then not hit perfectly — schedule attainment runs around
-93%, and **misses do not silently disappear**. What a plant
+95%, and **misses do not silently disappear**. What a plant
 actually builds goes into a finished-goods pool, and plant DCs can only draw replenishment from
 that pool. Under-build shows up as a plant DC that cannot fill its regional DCs, which in turn
 becomes a delay further down the network.
@@ -234,15 +246,15 @@ replenishment — on every inventory row.
 
 When demand cannot be met from stock, the shortfall is recorded rather than discarded. Warehouse
 accounts backorder; direct-store-delivery accounts lose the sale. The customer-facing unit fill
-rate is about 96.1%, and internal replenishment between echelons fills about
-92.1%.
+rate is about 92.7%, and internal replenishment between echelons fills about
+89.6%.
 
 Plant DCs are supplied out of **finished goods that the plant actually produced**, and only for
 SKUs that plant is qualified to make. Plants build to a rolling plan — last week's demand signal
 plus whatever it takes to restore about a week and a half of finished-goods cover — and that plan is
 clipped by production-line and plant-wide capacity. Capacity therefore binds in peak weeks
-(roughly 7% of SKU-weeks are clipped, at a mean plant utilisation of about
-60%), instead of being a number nobody consumes.
+(roughly 3% of SKU-weeks are clipped, at a mean plant utilisation of about
+54%), instead of being a number nobody consumes.
 
 ### 2.10 Two demand forecasts
 
@@ -330,7 +342,8 @@ seasonality_master(subcategory, month)       demand seasonality
 regional_demand_index(region, subcategory)   regional consumption
 replenishment_receipts(sku_id, dc_id)        ordered vs received, promised vs actual lead time
 write_offs(sku_id, dc_id, period)            empty by design (§2.7)
-opening_inventory_2026(sku_id, dc_id)        forward starting state incl. in-transit
+sku_sourcing_map(dc_id, sku_id)              which parent serves each node, per SKU
+baseline_policy(dc_id, sku_id)               the (s,S) that ran the history (Part 5)
 ```
 
 All foreign keys are validated at generation time.
@@ -358,7 +371,8 @@ All foreign keys are validated at generation time.
 | inventory | SKU × DC × week | Opening, receipts, demand, shipments, unmet, lost margin, closing, safety stock, reorder point, order-up-to, and lead time. Demand and shortfall are **split into customer versus internal replenishment** — `demand_customer_qty` sums exactly to `orders`, while `demand_qty` is an echelon total and counts a unit once per tier it passes through. Lead time appears twice: `lead_time_mean_days` is the node's own inbound lane (what its safety stock covers) and `cum_lead_time_mean_days` is the plant-to-node total (for echelon work). |
 | replenishment_receipts | receipt | Promised versus actual lead time, an on-time flag, and `qty_ordered` versus `qty_received` with the `short_qty` balance — every line is a real shipment from a real parent, so internal fill rate is measurable |
 | write_offs | SKU × DC × period | Empty by design (§2.7) |
-| opening_inventory_2026 | SKU × DC | Forward starting position: on-hand plus the `in_transit_qty` still in the pipeline at the cut-over (with its ETA), summing to `inventory_position` — the figure an (s,S) or MEIO policy compares against its reorder point |
+| sku_sourcing_map | DC × SKU | The routing the twin executes: which parent serves each node for each SKU, and the `rule` that assigned it. Network structure, so it is an input — never recovered from simulated receipts |
+| baseline_policy | DC × SKU | Safety stock, reorder point and order-up-to level that ran the historical simulation, with the segment and service factor behind them. Full dictionary in Part 5 |
 | scenarios | scenario | 30 labelled disruptions in the forward year |
 
 ### Currency
@@ -367,9 +381,173 @@ All monetary fields are USD and suffixed `_usd`. `inventory_carrying_pct_annual`
 `stockout_cost_multiplier`, `cap_rate_pct` and the trade-term percentages are rates, not currency.
 `storage_cost_per_unit_year_usd` is USD per unit per year.
 
+
 ---
 
-## Part 5 — How each layer is generated
+## Part 5 — The policy table, in plain words
+
+`baseline_policy.csv` is one row per **(stocking location, SKU)** carrying three
+numbers: how much cushion to hold, when to reorder, and how far to top back up.
+That is the whole inventory decision, and it is the only thing an optimizer
+changes.
+
+The same shape appears three times in the project. Only the first is part of
+this dataset; the other two are forward artefacts and are described in
+`output datasets/OUTPUT_DOCUMENTATION.md`.
+
+| File | Rows | Sized on | Role |
+|---|---|---|---|
+| `baseline_policy.csv` (here) | 7,768 | the **order history** | ran the past, so it is part of the record |
+| `forward_policy.csv` | — | the **forecast** | runs forward scenarios |
+| `policy.csv` (inside a run) | — | whatever was fed in | audit trail of what a run executed |
+
+### Column by column
+
+**`dc_id`** — where the stock sits. The prefix tells you which kind of place:
+
+| Prefix | What it is | Policy rows |
+|---|---|---|
+| `PDC` | Plant DC — the warehouse at a factory | 658 |
+| `RDC` | Regional DC — serves big customers directly *and* restocks the customer DCs | 3,452 |
+| `CDC` | Customer DC — the last stop before the retailer | 3,658 |
+
+**`sku_id`** — which product. With `dc_id` this is the unique key; there are no
+duplicate pairs.
+
+**`safety_stock`** — the cushion. Stock held purely to absorb surprises: demand
+arriving higher than expected, or a delivery turning up late. In a perfectly
+predictable world it would be zero. Median 18 units, largest
+4,477 — the spread is wide because it scales with how much of a
+product a location sells. 158 rows are **zero**, 151 of them at
+customer DCs: products selling a unit or two a year there, where the arithmetic
+honestly says hold nothing.
+
+**`reorder_point`** — the trigger, often written `s`. When stock on hand plus
+anything already in transit falls to this number, order. It has to cover demand
+across the whole exposed window, which is *not* just the delivery time: reviews
+happen weekly, so a location that has just missed this week's review waits up to
+seven days before it can even order, and then still waits out transit. Median
+31 units. Always at least `safety_stock`, because it is the
+cushion plus expected demand over that window.
+
+**`order_up_to_level`** — the target, often written `S`. When you order, order
+enough to bring the position up to this; the order size is `S` minus what you
+have. Median 50 units, and always at least
+`reorder_point`.
+
+The gap `S - s` is the **order batch** — how much you buy at a time — and it
+differs by echelon on purpose:
+
+| Echelon | median `S - s` | median `S / s` |
+|---|---|---|
+| CDC | 5 u | 1.50 |
+| RDC | 26 u | 1.33 |
+| PDC | 632 u | 10.5 |
+
+Plant DCs look like outliers because they work differently — see below.
+
+**`production_family`** — which factory line makes it: `BEVERAGE_DRY`, `CHILLED`, `CONFECTIONERY`, `DRY_BLEND`, `FROZEN`, `LIQUID_FILL`. Carried for
+reference; lines have their own capacity limits, so this is how a shortage is
+traced back to a bottleneck.
+
+**`segment`** — how the product behaves, and the reason two SKUs at the same
+site get different protection:
+
+| Segment | Rows | Behaviour |
+|---|---|---|
+| `Fast-Moving` | 3,960 | sells steadily, high volume |
+| `Seasonal` | 2,320 | predictable peaks and troughs |
+| `Intermediate` | 1,488 | sporadic and lumpy, hard to forecast |
+
+**`z`** — how hard the product is protected: the service factor. Higher means a
+bigger cushion, fewer stockouts, and more cash tied up. It is set once per
+segment, which makes this single column the differentiated-service policy:
+
+| Segment | `z` | Protection a single-site formula implies |
+|---|---|---|
+| `Fast-Moving` | **2.05** | ~98% |
+| `Seasonal` | **1.64** | ~95% |
+| `Intermediate` | **1.28** | ~90% |
+
+Read "implies" carefully. Those are the targets a textbook single-location
+formula produces. Realised fill lands lower, because that formula cannot see
+shortfall arriving from upstream or the timing of demand inside a week.
+
+### How the three numbers are computed
+
+```
+protection window   P  = 1 week (the review) + lead time of the lane this SKU travels
+safety_stock           = z x sqrt( P x sigma_demand^2 + mu_demand^2 x sigma_leadtime^2 )
+reorder_point    s     = mu_demand x P + safety_stock
+order_up_to_level S    = s + mu_demand x 1.5 weeks
+```
+
+`mu` and `sigma` are that location's weekly demand mean and standard deviation
+for that SKU. The lane lead time comes from `sku_sourcing_map.csv` — the route
+the SKU actually travels, which matters a great deal: one plant-DC-to-regional-DC
+lane runs half a day and another nearly thirteen.
+
+Sigma is also uplifted upstream (PDC x1.45, RDC x1.25, CDC x1.0),
+because a parent absorbs its children's order lumpiness on top of its own demand.
+
+**Plant DCs are the exception.** They are not *pulled* by a reorder point —
+production *pushes* finished goods into them. Their `S` is therefore a holding
+ceiling sized on throughput (about 4.5 weeks of it), not a trigger,
+which is what the 10.5x `S / s` ratio above is showing.
+
+### Worked example — `SKU0167`, fast-moving, CONFECTIONERY
+
+One product, 25 locations, 25 different policies:
+
+| dc_id | safety_stock | reorder_point | order_up_to_level | z |
+|---|---|---|---|---|
+| PDC01 | 583 | 688 | 7,192 | 2.05 |
+| RDC01 | 2,122 | 3,260 | 4,196 | 2.05 |
+| PDC04 | 234 | 277 | 2,890 | 2.05 |
+| RDC02 | 1,352 | 2,058 | 2,745 | 2.05 |
+| RDC08 | 929 | 1,337 | 1,666 | 2.05 |
+| RDC06 | 569 | 874 | 1,155 | 2.05 |
+| RDC07 | 508 | 704 | 979 | 2.05 |
+| RDC03 | 453 | 696 | 951 | 2.05 |
+| RDC05 | 414 | 625 | 825 | 2.05 |
+| RDC04 | 297 | 417 | 542 | 2.05 |
+| CDC12 | 238 | 364 | 541 | 2.05 |
+| CDC08 | 214 | 346 | 485 | 2.05 |
+| CDC03 | 163 | 267 | 384 | 2.05 |
+| CDC01 | 168 | 260 | 354 | 2.05 |
+| CDC11 | 149 | 234 | 334 | 2.05 |
+| CDC10 | 139 | 224 | 321 | 2.05 |
+| CDC05 | 138 | 223 | 314 | 2.05 |
+| CDC02 | 95 | 152 | 217 | 2.05 |
+| CDC13 | 53 | 82 | 122 | 2.05 |
+| CDC07 | 46 | 73 | 103 | 2.05 |
+| CDC14 | 39 | 66 | 95 | 2.05 |
+| CDC15 | 15 | 24 | 37 | 2.05 |
+| CDC09 | 12 | 18 | 25 | 2.05 |
+| CDC04 | 9 | 15 | 21 | 2.05 |
+| CDC06 | 0 | 0 | 0 | 2.05 |
+
+`z` is identical everywhere, because it is a property of the product. Everything
+else varies with **local demand** and **lane length**. The largest regional DC
+carries orders of magnitude more than the smallest customer DC, because it serves
+big customers directly *and* restocks the customer DCs beneath it. A row of
+zeros, if one appears above, is a location that barely sells this product at all
+— it is stocked on paper but the arithmetic says hold nothing and never reorder.
+
+### What consumes it
+
+The digital twin reads exactly five columns — `dc_id`, `sku_id`,
+`safety_stock`, `reorder_point`, `order_up_to_level` — and ignores everything
+else, including `production_family`, `segment`, `z` and any extra columns an
+optimizer chooses to emit. A missing required column raises an error rather than
+quietly defaulting to zero.
+
+Echelon positioning needs no extra input either: "push buffer to the customer
+DCs" is simply higher CDC `S` and lower RDC `S` in this same table.
+
+---
+
+## Part 6 — How each layer is generated
 
 ### 5.1 Price elasticity — how to estimate it from `orders`
 
@@ -675,7 +853,7 @@ multi-temperature network, where refrigerated space costs roughly 2-3x ambient t
 
 ---
 
-## Part 6 — Data profile
+## Part 7 — Data profile
 
 *Computed from this instance in the same run. This replaces the separate EDA report.*
 
@@ -717,8 +895,8 @@ Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real 
 | orders | 738,833 | 23 | 601,889 |
 | promotions | 19,036 | 9 | 4,629 |
 | demand_forecast | 777,088 | 11 | 916,667 |
-| production | 98,732 | 11 | 0 |
-| inventory | 1,267,656 | 23 | 0 |
+| production | 102,648 | 11 | 0 |
+| inventory | 1,211,808 | 25 | 0 |
 | scenarios | 30 | 17 | 85 |
 | sku_customer_service_targets | 3 | 3 | 0 |
 | network_lanes | 76 | 11 | 0 |
@@ -906,18 +1084,18 @@ Forward 2026 total forecast units 13,242,327 vs 2025 actual 34,122,245, YoY -61.
 
 | Field | Value |
 | --- | --- |
-| Planned units | 35,598,062 |
-| Actual units | 33,223,636 |
-| Mean schedule adherence | 93.3 pct |
-| Weeks below 90 pct adherence | 10.9 pct |
+| Planned units | 35,908,338.0 |
+| Actual units | 34,108,978.0 |
+| Mean schedule adherence | 95.1 pct |
+| Weeks below 90 pct adherence | 0.0 pct |
 
 
 | plant_id | planned | actual | adherence |
 | --- | --- | --- | --- |
-| PLANT01 | 11,113,662 | 10,370,970 | 93.30 |
-| PLANT02 | 4,439,108 | 4,141,061 | 93.40 |
-| PLANT03 | 13,445,870 | 12,554,904 | 93.30 |
-| PLANT04 | 6,599,422 | 6,156,701 | 93.30 |
+| PLANT01 | 11,165,019.00 | 10,624,767.00 | 95.20 |
+| PLANT02 | 4,498,249.00 | 4,261,309.00 | 95.00 |
+| PLANT03 | 13,642,819.00 | 12,954,068.00 | 95.10 |
+| PLANT04 | 6,602,251.00 | 6,268,834.00 | 95.00 |
 
 
 ![adherence_hist.png](report_assets/adherence_hist.png)
@@ -926,14 +1104,14 @@ Forward 2026 total forecast units 13,242,327 vs 2025 actual 34,122,245, YoY -61.
 
 | ech | avg_closing | avg_safety | days_of_supply | stockout_wk_pct | avg_inv_value_usd |
 | --- | --- | --- | --- | --- | --- |
-| Customer DC | 20.20 | 7.90 | 13.70 | 23.40 | 93.50 |
-| Plant DC | 647.90 | 152.10 | 14.30 | 17.10 | 3,103.70 |
-| Regional DC | 156.80 | 82.00 | 19.90 | 6.00 | 736.60 |
+| Customer DC | 26.80 | 17.40 | 21.00 | 21.70 | 123.60 |
+| Plant DC | 841.60 | 99.90 | 18.10 | 0.00 | 3,909.10 |
+| Regional DC | 185.90 | 117.00 | 22.10 | 3.40 | 850.50 |
 
 
-Network-wide: avg inventory value ~ **$5,190,646** (working capital) against ~**$54,499,050** of annual COGS, so ~ **10.5x** turns -- the same unit is held at up to three echelons, so network turns sit well below the per-echelon figure above.
+Network-wide: avg inventory value ~ **$5,960,329** (working capital) against ~**$52,731,384** of annual COGS, so ~ **8.8x** turns -- the same unit is held at up to three echelons, so network turns sit well below the per-echelon figure above.
 
-Availability: **96.1 pct** customer-facing unit fill rate. On a raw DC-SKU-week basis 85.3 pct of cells hold stock, but that mixes customer service with internal replenishment -- use `unmet_customer_qty` for a service number.
+Availability: **92.7 pct** customer-facing unit fill rate. On a raw DC-SKU-week basis 88.3 pct of cells hold stock, but that mixes customer service with internal replenishment -- use `unmet_customer_qty` for a service number.
 
 
 ![days_of_supply.png](report_assets/days_of_supply.png)
@@ -977,19 +1155,19 @@ Dual-sourcing: 15/15 Customer DCs have >=2 inbound Regional DCs (failover); late
 
 ### 6.13 Capacity utilization
 
-DC storage utilization (whole-site on-hand / capacity, averaged over weeks): mean 7.5 pct, max 27.5 pct. Storage is not a binding constraint in this dataset.
+DC storage utilization (whole-site on-hand / capacity, averaged over weeks): mean 9.1 pct, max 32.3 pct. Storage is not a binding constraint in this dataset.
 
 
-Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): mean 0.7 pct, max 2.0 pct (approx).
+Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): mean 0.6 pct, max 1.7 pct (approx).
 
 
 **Plant production utilization (avg weekly output / capacity):**
 | plant_id | actual_qty | production_capacity_units_per_week | util_pct |
 | --- | --- | --- | --- |
-| PLANT01 | 66,480.58 | 105,501 | 63.00 |
-| PLANT02 | 26,545.26 | 43,484 | 61.00 |
-| PLANT03 | 80,480.15 | 136,187 | 59.10 |
-| PLANT04 | 39,466.03 | 67,116 | 58.80 |
+| PLANT01 | 68,107.48 | 121,327 | 56.10 |
+| PLANT02 | 27,316.08 | 50,007 | 54.60 |
+| PLANT03 | 83,038.90 | 156,616 | 53.00 |
+| PLANT04 | 40,184.83 | 77,184 | 52.10 |
 
 
 ![dc_utilization.png](report_assets/dc_utilization.png)
@@ -1001,9 +1179,9 @@ Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): me
 | Revenue | $291,618,560 |
 | COGS (units x unit cost) | $169,241,531 |
 | Gross margin | $122,377,029 (42.0 pct) |
-| Avg working capital (inventory value) | $5,190,646 |
-| Inventory turns (annualized) | 10.5x |
-| Est. last-mile logistics cost (approx/yr) | $2,281,374 |
+| Avg working capital (inventory value) | $5,960,329 |
+| Inventory turns (annualized) | 8.8x |
+| Est. last-mile logistics cost (approx/yr) | $1,980,940 |
 
 ### 6.15 Disruption scenario library (digital-twin / bandit input)
 
@@ -1011,11 +1189,11 @@ A labeled library of demand-side and supply-side disruptions with Time-to-Recove
 
 | scenario_type | count | avg_ttr_days | avg_tts_days |
 | --- | --- | --- | --- |
-| demand_surge | 6 | 0.00 | 12.00 |
+| demand_surge | 6 | 0.00 | 20.80 |
 | forecast_miss | 5 | 0.00 | 0.00 |
 | geographic_disruption | 4 | 16.00 | 0.00 |
-| lane_outage | 6 | 5.20 | 11.50 |
-| leadtime_spike | 5 | 0.00 | 19.40 |
+| lane_outage | 6 | 5.20 | 21.50 |
+| leadtime_spike | 5 | 0.00 | 22.20 |
 | plant_shortfall | 4 | 10.50 | 0.00 |
 
 
@@ -1026,15 +1204,15 @@ Total scenarios: 30 across 6 classes (supplier, geographic, systemic, market-dri
 - Revenue is led by Beverages (51.1 pct of sales); demand is steeply concentrated (top 20 pct SKUs ~ 84 pct of revenue).
 - Most price-elastic category (base): Frozen Foods (-3.77); least: Beverages (-1.12). Promo elasticity exceeds base in 3/5 categories.
 - Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~-61 pct YoY.
-- Network is fully dual-sourced (15/15 Customer DCs with failover) with 10 lateral lanes, but failover and lateral lanes carry no simulated flow; whole-site storage utilization averages 8 pct.
-- Customer-facing unit fill rate ~ 96.1 pct at $5,190,646 avg working capital and 10.5x annual turns; 15 pct of DC-SKU-weeks close at zero.
+- Network is fully dual-sourced (15/15 Customer DCs with failover) with 10 lateral lanes, but failover and lateral lanes carry no simulated flow; whole-site storage utilization averages 9 pct.
+- Customer-facing unit fill rate ~ 92.7 pct at $5,960,329 avg working capital and 8.8x annual turns; 12 pct of DC-SKU-weeks close at zero.
 - No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a 30-scenario disruption library covers demand- and supply-side stresses.
 
 
 
 ---
 
-## Part 7 — Known limitations
+## Part 8 — Known limitations
 
 Read these before drawing a conclusion the data cannot support.
 
@@ -1043,7 +1221,7 @@ Read these before drawing a conclusion the data cannot support.
 | **Synthetic data.** No real company's figures are in here. | The pipeline and the structure transfer; the specific numbers do not. Re-derive on live sell-through before committing to targets. |
 | **Shelf life cannot bind** (§2.7). | Zero write-offs. Waste is not measurable, and newsvendor service levels pin near 100%. |
 | **No special storage** (§2.3). | Holding-cost spread understates a real multi-temperature network, where refrigerated space costs roughly 2–3x ambient to build. |
-| **Production capacity binds, but only lightly.** It clips about 0.8% of the volume plants ask for, and the plan recovers most of it the following week. | Capacity is a real constraint you can model, but it is not yet the dominant driver of lost sales. Tighten `plant_master.production_capacity_units_per_week` if you want it to dominate. |
+| **Production capacity binds, but only lightly.** It clips about 5.1% of the volume plants ask for, and the plan recovers most of it the following week. | Capacity is a real constraint you can model, but it is not yet the dominant driver of lost sales. Tighten `plant_master.production_capacity_units_per_week` if you want it to dominate. |
 | **Warehouse and lane capacity never bind.** | Storage and transport impose no physical trade-off; add those limits before claiming a network plan is feasible. |
 | **Replenishment policy is static.** One safety stock, reorder point and order-up-to level per SKU-DC for all 156 weeks, fitted on the whole span. | The 2023 position already reflects 2025 demand. Refit on a rolling window before backtesting a policy. |
 | **Week 1 starts every location at its order-up-to level.** | The first weeks of 2023 are a warm-up artefact. The 104-week burn-in absorbs it; evaluate on 2025. |
@@ -1055,10 +1233,10 @@ Read these before drawing a conclusion the data cannot support.
 
 ---
 
-## Part 8 — Reproducing and modifying
+## Part 9 — Reproducing and modifying
 
 ```bash
-python supply_brain_generator_v4.py        # writes every table plus this document
+python supply_brain_generator_v5.py        # writes every table plus this document
 ```
 
 Seeds are fixed, so output is byte-identical run to run. Set `SUPPLY_BRAIN_OUTPUT` to write

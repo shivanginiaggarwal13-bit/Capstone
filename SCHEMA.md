@@ -12,9 +12,10 @@ input datasets/      THE PAST AND THE GIVENS — read-only
                      the disruption library, and the inventory record of what
                      actually happened. 26 tables.
 
-output datasets/     THE FORWARD VIEW — one folder per run
-                     The forward policy, the position the horizon opens on,
-                     and every scenario run with its summaries.
+output datasets/     THE FORWARD VIEW — organized by purpose
+                     projections/ contains forward scenario runs, including
+                     projections/baseline; segmentation/ contains the
+                     canonical SKU segmentation report and artifacts.
 ```
 
 The historical `inventory.csv`, `replenishment_receipts.csv` and
@@ -70,6 +71,18 @@ Score a forward scenario against it:
 ```bash
 python models/twin/digital_twin.py --mode forward --run-name baseline     --policy "output datasets/history/forward_policy.csv"     --state  "output datasets/history/opening_position.csv"
 ```
+
+The `baseline` run is written to `output datasets/projections/baseline/`.
+
+Run the canonical segmentation and its SHAP explanation:
+
+```bash
+python "Clustering & Segmentation/segmentation_v5/segmentation_v5.py"
+python "Clustering & Segmentation/segmentation_v5/shap_analysis_v5.py"
+```
+
+Segmentation artifacts are written to `output datasets/segmentation/report_artifacts/`; the
+two business reports stay at the parent folder root.
 
 Stages run independently: `--stage world` rebuilds the given data, `--stage
 history` re-simulates the past against it. `--skip-docs` omits validation,

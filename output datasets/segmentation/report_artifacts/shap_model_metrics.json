@@ -1,0 +1,18 @@
+{
+  "test_accuracy": 0.92,
+  "test_macro_f1": 0.9272133095662508,
+  "n_skus": 500,
+  "n_clusters": 6,
+  "features": [
+    "log_annual_net_margin",
+    "net_margin_pct",
+    "demand_cv_base",
+    "promo_depth_share",
+    "forecast_baseline_wmape",
+    "forecast_lift_wmape",
+    "lead_time_mean_days",
+    "lead_time_cv"
+  ],
+  "method": "XGBoost multiclass surrogate with native Tree SHAP contributions",
+  "random_state": 42
+}

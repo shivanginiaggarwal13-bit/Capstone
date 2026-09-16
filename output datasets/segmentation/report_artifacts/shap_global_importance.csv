@@ -1,0 +1,9 @@
+feature,mean_abs_shap,mean_signed_shap,block
+forecast_baseline_wmape,0.6618485,0.62810856,FORECASTABILITY
+promo_depth_share,0.55376786,0.45158902,VARIABILITY
+demand_cv_base,0.52553374,0.42977104,VARIABILITY
+lead_time_cv,0.47117057,0.3842059,SUPPLY_RISK
+forecast_lift_wmape,0.39020544,0.28638616,FORECASTABILITY
+net_margin_pct,0.3826138,0.2101375,VALUE
+log_annual_net_margin,0.30661845,0.16628857,VALUE
+lead_time_mean_days,0.20277123,0.077162944,SUPPLY_RISK

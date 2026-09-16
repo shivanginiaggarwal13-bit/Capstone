@@ -45,15 +45,17 @@ time the shared dataset gets regenerated with a different table shape --
 it detects what's available and falls back gracefully, documenting in
 dropped_features.csv whenever something genuinely can't be computed.
 
-Self-contained: reads the shared "input datasets" directory, writes every
-artifact into the current folder by default (so dropping this script into
-Clustering & Segmentation/segmentation_v5/ and running it there puts every
-output right next to it, ready to commit).
+Self-contained: reads the shared "input datasets" directory and writes the
+canonical segmentation output into ``output datasets/segmentation`` by
+default. The optimization-facing ``sku_clusters.csv`` and
+``cluster_service_levels.csv`` stay at that folder's root; diagnostics,
+metadata, and charts are placed in ``report_artifacts``.
 
-Run (from inside .../Clustering & Segmentation/segmentation_v5/):
+Run from the project root:
     python segmentation_v5.py
 Or explicitly:
-    python segmentation_v5.py --input "/path/to/input datasets" --outdir .
+    python segmentation_v5.py --input "/path/to/input datasets" \
+        --outdir "/path/to/output datasets/segmentation"
 """
 import argparse
 import json
@@ -578,15 +580,17 @@ def assign_csl(cluster_stats):
 # --------------------------------------------------------------------------- #
 def main(input_dir, outdir):
     os.makedirs(outdir, exist_ok=True)
+    artifact_dir = os.path.join(outdir, "report_artifacts")
+    os.makedirs(artifact_dir, exist_ok=True)
     print("[1/8] Loading tables ...")
     tables = load_tables(input_dir)
 
-    print("[2/8] Engineering candidate features (11 in 5 blocks) ...")
+    print("[2/8] Engineering candidate features (9 in 4 blocks) ...")
     feat_df = build_feature_table(tables)
 
     print("[3/8] Pruning (statistical + unavailable) ...")
     kept_blocks, dropped_df = prune_features(feat_df)
-    dropped_df.to_csv(os.path.join(outdir, "dropped_features.csv"), index=False)
+    dropped_df.to_csv(os.path.join(artifact_dir, "dropped_features.csv"), index=False)
     print(dropped_df.to_string(index=False))
 
     all_feats = [f for feats in kept_blocks.values() for f in feats]
@@ -594,11 +598,11 @@ def main(input_dir, outdir):
 
     print("[4/8] Block-balanced scaling ...")
     X_bal, X_std, balance_df = block_balanced_matrix(feat_df, kept_blocks)
-    balance_df.to_csv(os.path.join(outdir, "cluster_feature_block_balance.csv"), index=False)
+    balance_df.to_csv(os.path.join(artifact_dir, "cluster_feature_block_balance.csv"), index=False)
 
     print("[5/8] Selecting k (bootstrap stability, k in 4..8) ...")
     best_k, diag_df, labels = select_k(X_bal)
-    diag_df.to_csv(os.path.join(outdir, "cluster_k_diagnostics.csv"), index=False)
+    diag_df.to_csv(os.path.join(artifact_dir, "cluster_k_diagnostics.csv"), index=False)
     print(diag_df.to_string(index=False))
     print(f"    selected k = {best_k}")
 
@@ -606,7 +610,7 @@ def main(input_dir, outdir):
 
     print("[6/8] ANOVA per feature ...")
     anova_df = anova_table(feat_df, all_feats, labels)
-    anova_df.to_csv(os.path.join(outdir, "cluster_anova.csv"), index=False)
+    anova_df.to_csv(os.path.join(artifact_dir, "cluster_anova.csv"), index=False)
     print(anova_df.to_string(index=False))
 
     print("[7/8] Service ladder ...")
@@ -644,12 +648,12 @@ def main(input_dir, outdir):
         on="cluster")
     sku_out.to_csv(os.path.join(outdir, "sku_clusters.csv"), index=False)
 
-    make_charts(feat_df, X_bal, labels, cluster_service, outdir)
+    make_charts(feat_df, X_bal, labels, cluster_service, artifact_dir)
 
     meta = {"n_skus": int(len(feat_df)), "kept_features": all_feats,
             "kept_blocks": kept_blocks, "selected_k": best_k,
             "dropped_features": dropped_df.to_dict(orient="records")}
-    with open(os.path.join(outdir, "run_metadata.json"), "w") as f:
+    with open(os.path.join(artifact_dir, "run_metadata.json"), "w") as f:
         json.dump(meta, f, indent=2, default=str)
 
     print(f"\nDone. Outputs in {outdir}")
@@ -723,11 +727,10 @@ def make_charts(feat_df, X_bal, labels, cluster_service, outdir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default=os.path.join("..", "..", "input datasets"),
-                         help="Path to the shared input datasets folder "
-                              "(default assumes this script sits in "
-                              "'Clustering & Segmentation/segmentation_v5/').")
-    parser.add_argument("--outdir", default=".",
-                         help="Where outputs are written (default: this same folder).")
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    parser.add_argument("--input", default=os.path.join(project_root, "input datasets"),
+                         help="Path to the shared input datasets folder.")
+    parser.add_argument("--outdir", default=os.path.join(project_root, "output datasets", "segmentation"),
+                         help="Canonical segmentation output folder.")
     args = parser.parse_args()
     main(args.input, args.outdir)

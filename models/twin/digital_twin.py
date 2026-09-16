@@ -61,13 +61,13 @@ Usage
 -----
   # forward scenario, opening from the end of history
   python digital_twin.py --mode forward --run-name baseline_2026 \
-      --policy "output datasets/history_v5/forward_policy.csv" \
-      --state  "output datasets/history_v5/closing_position.csv"
+    --policy "output datasets/history/forward_policy.csv" \
+    --state  "output datasets/history/opening_position.csv"
 
   # score an optimized policy against the same opening position
   python digital_twin.py --mode forward --run-name meio_v2 \
       --policy "output datasets/meio_v2/policy.csv" \
-      --state  "output datasets/history_v5/closing_position.csv"
+    --state  "output datasets/history/closing_position.csv"
 """
 
 from __future__ import annotations
@@ -1545,7 +1545,10 @@ def main():
         Path(args.policy),
         Path(args.state) if args.state else None)
 
-    k, svc_node, costs = write_run(out_root / args.run_name, inv, rcpt, prod,
+    run_dir = (out_root / "projections" / args.run_name
+               if args.run_name == "baseline"
+               else out_root / args.run_name)
+    k, svc_node, costs = write_run(run_dir, inv, rcpt, prod,
                                    twin, inp, notes, args, t0)
     _n = write_output_documentation(out_root)
     print(f"  wrote OUTPUT_DOCUMENTATION.md ({_n:,} lines)")
@@ -1569,7 +1572,7 @@ def main():
     print(f"  TOTAL LANDED COST       "
           f"${k['total_landed_cost_usd']:>11,.0f}")
     print("=" * 62)
-    print(f"Wrote {out_root / args.run_name}  "
+    print(f"Wrote {run_dir}  "
           f"({time.time() - t0:.0f}s)")
 
 

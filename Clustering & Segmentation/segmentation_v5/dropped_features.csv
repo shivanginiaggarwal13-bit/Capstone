@@ -1,0 +1,3 @@
+feature,block,reason_type,reason
+shelf_life_days,PERISHABILITY,EXCLUDED_BY_DESIGN,"Speaks to obsolescence/overstock risk, not to the safety-stock / fill-rate decision a service-level target is meant to encode. Excluded from the v5 candidate set by design; no longer used in the newsvendor overstock term either (see service_ladder())."
+write_off_rate,PERISHABILITY,EXCLUDED_BY_DESIGN,Same reasoning as shelf_life_days -- both perishability features are out of scope for v5's narrower 'features that inform a service-level target' candidate set.

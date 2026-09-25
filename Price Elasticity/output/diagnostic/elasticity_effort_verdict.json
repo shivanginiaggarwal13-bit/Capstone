@@ -1,0 +1,52 @@
+{
+  "check1_variation": {
+    "promo_line_share": 0.0571,
+    "within_sku_baseprice_cv_median": 0.0247,
+    "median_promo_lines_per_sku": 24
+  },
+  "check2_signal": {
+    "category_r2": {
+      "Beverages": 0.0075,
+      "Dairy & Bakery": 0.0261,
+      "Frozen Foods": 0.0624,
+      "Grocery": 0.0204,
+      "Snacks & Confectionery": 0.0598
+    },
+    "per_sku_median_r2": 0.0019,
+    "per_sku_wrong_sign_share": 0.9697
+  },
+  "check3_grain": {
+    "distinct_elasticity_values_over_500_skus": 5,
+    "within_category_variance": {
+      "Beverages": 0.0,
+      "Dairy & Bakery": 0.0,
+      "Frozen Foods": 0.0,
+      "Grocery": 0.0,
+      "Snacks & Confectionery": 0.0
+    }
+  },
+  "check4_redundancy": {
+    "spearman_vs_features": {
+      "margin_pct": -0.369,
+      "demand_cv": -0.222,
+      "stockout_rate": -0.172,
+      "shelf_life_days": -0.171,
+      "list_price_usd": 0.022,
+      "revenue_total": 0.017,
+      "lead_time_mean_days": -0.014
+    },
+    "anova_f_elasticity_vs_clusters": 10.45
+  },
+  "check5_payoff": {
+    "exchange_rate_by_category": {
+      "Frozen Foods": 1.23,
+      "Snacks & Confectionery": 0.65,
+      "Dairy & Bakery": 0.44,
+      "Grocery": 0.4,
+      "Beverages": 0.21
+    },
+    "portfolio_exchange_rate": 0.329,
+    "meio_safety_stock_savings_usd_yr": 674154
+  },
+  "verdict": "Keep the one-time category estimate; skip per-SKU estimation, elasticity-weighted clustering, and a pricing loop for this dataset."
+}

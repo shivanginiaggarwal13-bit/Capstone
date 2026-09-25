@@ -14,6 +14,7 @@ buffering with inventory vs. buffering with price"* (the price–inventory excha
 | `output/findings.json` | Every number the deck cites, machine-readable. |
 | `output/elasticity_by_category.csv`, `elasticity_by_tier.csv`, `exchange_rate_by_category.csv` | Result tables. |
 | `output/fig_*.png` | The three figures. |
+| `elasticity_effort_diagnostic.ipynb` | **Cost/benefit check on this workstream.** EDA + 5 charts arguing that, beyond the one-time category estimate, deeper elasticity effort (per-SKU estimation, elasticity-weighted clustering, a pricing loop) is not repaid by this dataset. Built by `build_diag_nb.py`; figures + `elasticity_effort_verdict.json` in `output/diagnostic/`. |
 
 ## Reproduce
 
@@ -22,6 +23,9 @@ cd "Price Elasticity"
 python -m nbconvert --to notebook --execute --inplace price_elasticity_analysis.ipynb
 python -m nbconvert --to html --output-dir output price_elasticity_analysis.ipynb
 python build_deck.py
+# skeptical companion:
+python build_diag_nb.py
+python -m nbconvert --to notebook --execute --inplace elasticity_effort_diagnostic.ipynb
 ```
 
 Requires `pandas numpy statsmodels matplotlib python-pptx nbconvert`.

@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+
+# raw per-trial/per-round twin run detail (inventory.csv, replenishment
+# receipts, etc. per run) -- regenerable in minutes by re-running the
+# relevant *_model.py / *_rolling.py script. Only alt_output/ (the
+# summaries, charts, and each model's own final policy CSV) is tracked,
+# matching the lean-tree convention already used in MEIO_Weekly/.gitignore.
+# Caught right before a commit: these totalled ~11GB across one session.
+bandit_trials/
+bandit_rolling_trials/
+clark_scarf_v2_trials/
+clark_scarf_v2_rolling_trials/
+sim_optimize_trials/
+sim_optimize_rolling_trials/
+compare_twin_runs/
+cs_v2_robustness/
+final_rolling_compare/
+final_rolling_compare2/

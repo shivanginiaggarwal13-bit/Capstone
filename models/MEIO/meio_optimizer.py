@@ -137,13 +137,19 @@ demand["cv"] = demand["cv"].fillna(demand["cv"].median())
 demand["fwd_std"] = demand["fwd_mean"] * demand["cv"]
 
 # ------------------------------------------------- cost & service level ---
-sku_c = sku.merge(cost_p, on="category", how="left")
-sku_c["holding_per_unit_week"] = sku_c.holding_cost_per_unit_year_usd / 52.0
+# cost_parameters.csv is keyed by (dc_id, subcategory), not category -- this
+# join produces one row per (sku_id, dc_id), so holding/stockout cost is
+# DC-specific (a SKU can cost more to hold or stock out of at one DC than
+# another). Merges below join on ["sku_id", "dc_id"], not "sku_id" alone.
+sku_c = sku.merge(cost_p, on="subcategory", how="left")
+sku_c["holding_per_unit_week"] = (
+    sku_c.storage_cost_per_unit_year_usd + sku_c.unit_cost_usd * sku_c.inventory_carrying_pct_annual / 100.0
+) / 52.0
 sku_c["stockout_cost_unit"] = sku_c.margin_usd * sku_c.stockout_cost_multiplier
 
 demand = demand.merge(
-    sku_c[["sku_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    on="sku_id", how="left",
+    sku_c[["sku_id", "dc_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
+    on=["sku_id", "dc_id"], how="left",
 )
 
 # ---------------------------------------------- CDC-level recommendations ---
@@ -183,8 +189,8 @@ for rdc in active_rdc:
     rdc_rows.append(merged[["sku_id", "dc_id", "fwd_mean", "fwd_std", "lt_mean_wk", "lt_std_wk"]])
 rdc_demand = pd.concat(rdc_rows, ignore_index=True)
 rdc_demand = rdc_demand.merge(
-    sku_c[["sku_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
-    on="sku_id", how="left",
+    sku_c[["sku_id", "dc_id", "category", "unit_cost_usd", "holding_per_unit_week", "stockout_cost_unit"]],
+    on=["sku_id", "dc_id"], how="left",
 )
 
 # ------------------------------------------------------ combine & solve ---

@@ -3,11 +3,11 @@
   "run_name": "history",
   "label": "2023-W01..2025-W52 history",
   "mode": "history",
-  "generated_at": "2026-09-16T17:48:43",
+  "generated_at": "2026-09-25T13:59:24",
   "seed": 2026,
-  "policy_override": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone\\input datasets\\baseline_policy.csv",
+  "policy_override": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/input datasets/baseline_policy.csv",
   "margin_basis": "margin_usd",
-  "runtime_seconds": 82.7,
+  "runtime_seconds": 56.7,
   "assumptions": [
     "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
     "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
@@ -28,7 +28,7 @@
       "pairs_resolved": 11500,
       "pairs_on_fallback": 0
     },
-    "policy_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone\\input datasets\\baseline_policy.csv",
+    "policy_source": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/input datasets/baseline_policy.csv",
     "policy_rows": 7768,
     "state_source": "cold start (zero stock)",
     "demand_basis": "orders.csv replay at delivery_date",

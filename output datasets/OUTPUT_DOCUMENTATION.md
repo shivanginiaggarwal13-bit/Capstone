@@ -1,6 +1,6 @@
 # Supply Brain — output datasets
 
-*Auto-generated 2026-09-16 17:50 by
+*Auto-generated 2026-09-25 13:59 by
 `models/twin/digital_twin.py`. Do not edit by hand.*
 
 ## Scope
@@ -105,15 +105,8 @@ anything — can be handed over verbatim. A missing required column raises an
 error rather than quietly defaulting to zero.
 
 ```bash
-python models/twin/digital_twin.py --mode forward --run-name baseline \
-  --policy "output datasets/history/forward_policy.csv" \
-  --state "output datasets/history/opening_position.csv"
+python models/twin/digital_twin.py --mode forward --run-name meio_v2     --policy "output datasets/meio_v2/policy.csv"     --state  "output datasets/history/opening_position.csv"
 ```
-
-The baseline run is written to `output datasets/projections/baseline/`.
-Other explicitly named runs are written under `output datasets/<run-name>/`;
-segmentation is the separate analytical namespace at
-`output datasets/segmentation/`.
 
 **Comparison contract.** Two runs are comparable only when they share a seed
 and an opening state and differ solely in the policy. `--policy` and `--state`
@@ -138,8 +131,9 @@ The policy table's full column-by-column dictionary is Part 5 of
 
 | Folder | Mode | Seed | Label | Size |
 |---|---|---|---|---|
-| `baseline/` | forward | 2026 | baseline | 85.06 MB |
-| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.19 MB |
+| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.18 MB |
+| `projections/` | ? | ? | ? | 84.46 MB |
+| `segmentation/` | ? | ? | ? | 0.69 MB |
 
 A run folder is self-describing: `run_manifest.json` records the exact knobs,
 seed, input paths and assumption set, so two folders can be diffed without

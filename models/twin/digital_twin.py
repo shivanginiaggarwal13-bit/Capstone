@@ -169,9 +169,10 @@ class TwinInputs:
     cap_family: Dict[Tuple[int, str], float]
     sku_family: List[str]
 
-    reorder_point: np.ndarray
-    order_up_to: np.ndarray
-    safety_stock: np.ndarray
+    reorder_point: np.ndarray              # [n_nodes, n_skus], or
+    order_up_to: np.ndarray                # [n_weeks, n_nodes, n_skus] if
+    safety_stock: np.ndarray               # the policy CSV has a `period`
+                                            # column -- use _policy_at(inp, w)
     active: np.ndarray
 
     opening_stock: np.ndarray
@@ -327,7 +328,8 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
 
     # -------------------------------------------------------------- policy --
     policy, opening, active, notes_pol = _load_policy(
-        nodes, skus, node_idx, sku_idx, wk_dates[0], policy_csv, state_csv)
+        nodes, skus, node_idx, sku_idx, wk_dates[0], policy_csv, state_csv,
+        periods=periods)
     notes.update(notes_pol)
     rop, oul, ssk = policy
     opening_stock, op_it, op_eta = opening
@@ -424,7 +426,7 @@ POLICY_COLUMNS = ["dc_id", "sku_id", "safety_stock", "reorder_point",
 
 
 def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
-                 policy_csv, state_csv):
+                 policy_csv, state_csv, periods=None):
     """Load the policy and the opening state from two SEPARATE files.
 
     Policy is a standalone table — `dc_id, sku_id, safety_stock,
@@ -432,6 +434,17 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
     is deliberate: an optimizer's output is a drop-in replacement for this one
     file, either by overwriting it or by pointing `--policy` at it. Any extra
     columns are ignored, so a richer optimizer output can be passed verbatim.
+
+    EXCEPT one: an optional `period` column switches the policy to
+    time-varying — one row set per (period, dc_id, sku_id) instead of one
+    flat table for the whole run, for an optimizer whose premise is
+    periodic recompute (e.g. MEIO Weekly) rather than one static annual
+    policy. `reorder_point`/`order_up_to`/`safety_stock` become
+    [n_weeks, n_nodes, n_skus] instead of [n_nodes, n_skus] in that case; a
+    (node, sku) with no row for a given week keeps its most recently seen
+    week's values rather than dropping to zero. Without a `period` column,
+    behavior is identical to before this was added — every existing
+    single-policy call site is unaffected.
 
     Opening state (stock and in-transit) comes from a different file and is
     never taken from the policy table. Two runs of the same scenario therefore
@@ -461,16 +474,49 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
     notes["policy_source"] = str(pol_path)
     notes["policy_rows"] = len(pol)
 
-    rop, oul, ssk = (np.zeros((n_nodes, n_skus)) for _ in range(3))
+    time_varying = "period" in pol.columns and periods is not None
+    notes["policy_time_varying"] = time_varying
     active = np.zeros((n_nodes, n_skus), dtype=bool)
-    for r in pol[POLICY_COLUMNS].itertuples(index=False):
-        if r.sku_id not in sku_idx or r.dc_id not in node_idx:
-            continue
-        i, j = node_idx[r.dc_id], sku_idx[r.sku_id]
-        active[i, j] = True
-        ssk[i, j] = r.safety_stock
-        rop[i, j] = r.reorder_point
-        oul[i, j] = r.order_up_to_level
+
+    if time_varying:
+        n_weeks = len(periods)
+        period_pos = {p: w for w, p in enumerate(periods)}
+        rop, oul, ssk = (np.zeros((n_weeks, n_nodes, n_skus)) for _ in range(3))
+        seen = np.zeros((n_weeks, n_nodes, n_skus), dtype=bool)
+        unmatched = 0
+        for r in pol[["period"] + POLICY_COLUMNS].itertuples(index=False):
+            if r.sku_id not in sku_idx or r.dc_id not in node_idx:
+                continue
+            w = period_pos.get(r.period)
+            if w is None:
+                unmatched += 1
+                continue
+            i, j = node_idx[r.dc_id], sku_idx[r.sku_id]
+            active[i, j] = True
+            seen[w, i, j] = True
+            ssk[w, i, j] = r.safety_stock
+            rop[w, i, j] = r.reorder_point
+            oul[w, i, j] = r.order_up_to_level
+        if unmatched:
+            notes["policy_rows_unmatched_period"] = unmatched
+        # forward-fill: an active (node, sku) with no row this week keeps
+        # last week's policy rather than silently dropping to zero
+        for w in range(1, n_weeks):
+            carry = active & ~seen[w]
+            ssk[w] = np.where(carry, ssk[w - 1], ssk[w])
+            rop[w] = np.where(carry, rop[w - 1], rop[w])
+            oul[w] = np.where(carry, oul[w - 1], oul[w])
+            seen[w] |= seen[w - 1]
+    else:
+        rop, oul, ssk = (np.zeros((n_nodes, n_skus)) for _ in range(3))
+        for r in pol[POLICY_COLUMNS].itertuples(index=False):
+            if r.sku_id not in sku_idx or r.dc_id not in node_idx:
+                continue
+            i, j = node_idx[r.dc_id], sku_idx[r.sku_id]
+            active[i, j] = True
+            ssk[i, j] = r.safety_stock
+            rop[i, j] = r.reorder_point
+            oul[i, j] = r.order_up_to_level
 
     opening_stock, op_it = (np.zeros((n_nodes, n_skus)) for _ in range(2))
     op_eta = np.zeros((n_nodes, n_skus), dtype=int)
@@ -493,6 +539,18 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
         notes["state_source"] = "cold start (zero stock)"
 
     return (rop, oul, ssk), (opening_stock, op_it, op_eta), active, notes
+
+
+def _policy_at(inp, week_idx: int):
+    """(safety_stock, reorder_point, order_up_to) 2D [n_nodes, n_skus]
+    slices for week_idx. Transparently handles both a static policy
+    ([n_nodes, n_skus], the common case) and a time-varying one
+    ([n_weeks, n_nodes, n_skus], see _load_policy's `period` column
+    handling) so every call site looks the same either way."""
+    if inp.safety_stock.ndim == 3:
+        w = min(week_idx, inp.safety_stock.shape[0] - 1)
+        return inp.safety_stock[w], inp.reorder_point[w], inp.order_up_to[w]
+    return inp.safety_stock, inp.reorder_point, inp.order_up_to
 
 
 def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
@@ -716,8 +774,9 @@ class SupplyBrainTwin:
         inp = self.inp
         ip = self.on_hand - self.backlog + self.on_order
         pull = inp.echelon > 0                      # PDCs are pushed, not pulled
-        need = (ip <= inp.reorder_point) & inp.active & pull[:, None]
-        want = np.where(need, np.maximum(0.0, inp.order_up_to - ip), 0.0)
+        _ssk, rop, oul = _policy_at(inp, day // DAYS_PER_WEEK)
+        need = (ip <= rop) & inp.active & pull[:, None]
+        want = np.where(need, np.maximum(0.0, oul - ip), 0.0)
         self.open_orders = want
         self.wk_dem_rep += self._at_parent(want)
 
@@ -799,7 +858,8 @@ class SupplyBrainTwin:
         """
         avail = self.on_hand[origin].copy()
         if self.reserve_own_demand:
-            avail = np.maximum(0.0, avail - self.inp.safety_stock[origin])
+            ssk, _rop, _oul = _policy_at(self.inp, day // DAYS_PER_WEEK)
+            avail = np.maximum(0.0, avail - ssk[origin])
         return avail
 
     def _ship(self, day: int, origin: int, dest: int, qty: np.ndarray,
@@ -935,6 +995,7 @@ class SupplyBrainTwin:
         hold = avg * inp.holding_per_unit_week
         self.cum_holding += hold
 
+        ssk_w, rop_w, oul_w = _policy_at(inp, w)
         act = np.argwhere(inp.active)
         rec = np.empty((len(act), 21), dtype=object)
         for t, (n, s) in enumerate(act):
@@ -951,8 +1012,8 @@ class SupplyBrainTwin:
                 shipped, unm, self.wk_unmet_cust[n, s],
                 self.wk_unmet_rep[n, s], self.wk_lost_margin[n, s],
                 "lost_sale" if inp.lost_sale_node[n] else "backorder",
-                self.on_hand[n, s], inp.safety_stock[n, s],
-                inp.reorder_point[n, s], inp.order_up_to[n, s],
+                self.on_hand[n, s], ssk_w[n, s],
+                rop_w[n, s], oul_w[n, s],
                 avg[n, s], hold[n, s],
             )
         self.weekly_rows.append(rec)
@@ -1094,8 +1155,9 @@ def kpis(inv, twin, inp, costs) -> dict:
         "avg_units_on_hand_network": round(
             float(inv.groupby("period").avg_on_hand.sum().mean()), 1),
         "avg_inventory_value_usd": round(float(inv_val.mean()), 2),
-        "safety_stock_value_usd": round(
-            float((inp.safety_stock * inp.unit_cost[None, :]).sum()), 2),
+        "safety_stock_value_usd": round(float((
+            (inp.safety_stock.mean(axis=0) if inp.safety_stock.ndim == 3
+             else inp.safety_stock) * inp.unit_cost[None, :]).sum()), 2),
         "holding_cost_usd": round(float(twin.cum_holding.sum()), 2),
         "stockout_cost_usd": round(float(twin.cum_stockout.sum()), 2),
         "transport_cost_usd": round(float(twin.cum_transport.sum()), 2),
@@ -1151,9 +1213,13 @@ def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0):
     costs.to_csv(out / "cost_summary.csv", index=False)
     (out / "run_kpis.json").write_text(json.dumps(k, indent=2))
 
+    # For a time-varying policy this is a first-week snapshot, not the full
+    # picture -- the run's actual policy input (with its `period` column)
+    # is already recorded verbatim at notes["policy_source"] in
+    # run_manifest.json below.
+    ssk0, rop0, oul0 = _policy_at(inp, 0)
     pol = pd.DataFrame([
-        (inp.nodes[i], inp.skus[j], inp.safety_stock[i, j],
-         inp.reorder_point[i, j], inp.order_up_to[i, j])
+        (inp.nodes[i], inp.skus[j], ssk0[i, j], rop0[i, j], oul0[i, j])
         for i, j in np.argwhere(inp.active)],
         columns=["dc_id", "sku_id", "safety_stock", "reorder_point",
                  "order_up_to_level"])

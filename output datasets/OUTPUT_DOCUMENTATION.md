@@ -122,6 +122,27 @@ Vary `--seed` for replicates of one policy. A bandit layer needs this — it has
 to average reward over several demand and lead-time draws before it can tell
 two arms apart.
 
+### Standardized scenario runs
+
+Pass `--scenario-config` to create a self-describing scenario folder named
+`SCENARIO_####_Name`. The JSON file must contain `scenario_name` and a
+machine-readable `changes` object. It may also contain `scenario_number`,
+`description`, and a `details` object for ownership, hypotheses, assumptions,
+or other relevant context. If `scenario_number` is omitted, the next available
+number is assigned automatically.
+
+```bash
+python models/twin/digital_twin.py --mode forward \
+  --scenario-config models/twin/scenario_config.example.json \
+  --policy "output datasets/history/forward_policy.csv" \
+  --state "output datasets/history/opening_position.csv"
+```
+
+The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
+artefacts into the same standardized folder. The resolved execution settings
+are added to the saved scenario config, while the original `--run-name` flow
+continues to work for existing automation.
+
 The policy table's full column-by-column dictionary is Part 5 of
 `input datasets/DATASET_DOCUMENTATION.md`.
 
@@ -250,12 +271,20 @@ counts a week served 90% as 0.9 of a unit fill; in-full counts it as a failed
 order line. The two typically differ by about 5 points, and if the objective is
 on-time-in-full then in-full is the honest number.
 
+### `scenario_config.json`
+
+The normalized scenario contract. Required fields are `scenario_name` and
+`changes`; `details` is a JSON object for relevant scenario context. The
+`execution` object records the mode, seed, policy, state, horizon, and output
+folder actually used.
+
 ### `run_manifest.json`
 
 `schema_version`, `run_name`, `label`, `mode`, `generated_at`, `seed`,
 `policy_source`, `state_source`, `margin_basis`, `runtime_seconds`,
-`assumptions` in plain language, and `build_notes` (resolved routing counts,
-demand basis, realised-to-forecast ratio).
+`assumptions` in plain language, `build_notes` (resolved routing counts,
+demand basis, realised-to-forecast ratio), and the complete `scenario` object
+when the run was launched with `--scenario-config`.
 
 ### `acceptance.csv` — history runs only
 

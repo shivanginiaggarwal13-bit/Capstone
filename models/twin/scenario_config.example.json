@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "scenario_number": 1,
+  "scenario_name": "Demand Surge East",
+  "description": "Stress test for a regional demand increase.",
+  "changes": {
+    "demand_surge_pct": 25,
+    "affected_region": "Southeast",
+    "duration_weeks": 4
+  },
+  "details": {
+    "owner": "Supply Planning",
+    "hypothesis": "Additional safety stock improves customer fill rate without disproportionate inventory cost.",
+    "baseline": "history/opening_position.csv",
+    "notes": "Keep the same seed as the baseline for a comparable run."
+  }
+}

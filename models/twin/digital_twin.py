@@ -74,6 +74,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -1200,7 +1201,8 @@ ASSUMPTIONS = [
 ]
 
 
-def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0):
+def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0,
+              scenario_config: Optional[dict] = None):
     out.mkdir(parents=True, exist_ok=True)
     svc_sku, svc_node, costs = summarise(inv, twin, inp)
     k = kpis(inv, twin, inp, costs)
@@ -1225,7 +1227,7 @@ def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0):
                  "order_up_to_level"])
     pol.to_csv(out / "policy.csv", index=False)
 
-    (out / "run_manifest.json").write_text(json.dumps({
+    manifest = {
         "schema_version": SCHEMA_VERSION,
         "run_name": args.run_name, "label": args.label, "mode": args.mode,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -1234,7 +1236,13 @@ def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0):
         "runtime_seconds": round(time.time() - t0, 1),
         "assumptions": ASSUMPTIONS,
         "build_notes": _jsonable(notes),
-    }, indent=2))
+    }
+    if scenario_config is not None:
+        manifest["scenario"] = scenario_config
+        (out / "scenario_config.json").write_text(
+            json.dumps(scenario_config, indent=2) + "\n", encoding="utf-8")
+    (out / "run_manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return k, svc_node, costs
 
 
@@ -1400,6 +1408,27 @@ Vary `--seed` for replicates of one policy. A bandit layer needs this — it has
 to average reward over several demand and lead-time draws before it can tell
 two arms apart.
 
+### Standardized scenario runs
+
+Pass `--scenario-config` to create a self-describing scenario folder named
+`SCENARIO_####_Name`. The JSON file must contain `scenario_name` and a
+machine-readable `changes` object. It may also contain `scenario_number`,
+`description`, and a `details` object for ownership, hypotheses, assumptions,
+or other relevant context. If `scenario_number` is omitted, the next available
+number is assigned automatically.
+
+```bash
+python models/twin/digital_twin.py --mode forward \\
+    --scenario-config models/twin/scenario_config.example.json \\
+    --policy "output datasets/history/forward_policy.csv" \\
+    --state "output datasets/history/opening_position.csv"
+```
+
+The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
+artefacts into the same standardized folder. The resolved execution settings
+are added to the saved scenario config, while the original `--run-name` flow
+continues to work for existing automation.
+
 The policy table's full column-by-column dictionary is Part 5 of
 `input datasets/DATASET_DOCUMENTATION.md`.
 
@@ -1526,12 +1555,20 @@ counts a week served 90% as 0.9 of a unit fill; in-full counts it as a failed
 order line. The two typically differ by about 5 points, and if the objective is
 on-time-in-full then in-full is the honest number.
 
+### `scenario_config.json`
+
+The normalized scenario contract. Required fields are `scenario_name` and
+`changes`; `details` is a JSON object for relevant scenario context. The
+`execution` object records the mode, seed, policy, state, horizon, and output
+folder actually used.
+
 ### `run_manifest.json`
 
 `schema_version`, `run_name`, `label`, `mode`, `generated_at`, `seed`,
 `policy_source`, `state_source`, `margin_basis`, `runtime_seconds`,
-`assumptions` in plain language, and `build_notes` (resolved routing counts,
-demand basis, realised-to-forecast ratio).
+`assumptions` in plain language, `build_notes` (resolved routing counts,
+demand basis, realised-to-forecast ratio), and the complete `scenario` object
+when the run was launched with `--scenario-config`.
 
 ### `acceptance.csv` — history runs only
 
@@ -1568,6 +1605,71 @@ what move.
 # CLI
 # ---------------------------------------------------------------------------
 
+SCENARIO_CONFIG_SCHEMA_VERSION = "1.0"
+
+
+def _scenario_folder_name(number: int, name: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_") or "Unnamed"
+    return f"SCENARIO_{number:04d}_{slug}"
+
+
+def _next_scenario_number(out_root: Path) -> int:
+    numbers = []
+    for folder in out_root.glob("SCENARIO_*_*"):
+        match = re.match(r"^SCENARIO_(\d{4})_", folder.name)
+        if match:
+            numbers.append(int(match.group(1)))
+    return max(numbers, default=0) + 1
+
+
+def load_scenario_config(config_path: Path, out_root: Path) -> Tuple[dict, Path]:
+    """Load and normalize scenario metadata and return its standardized folder."""
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"scenario config {config_path} is not valid JSON: {exc}") from exc
+    if not isinstance(config, dict):
+        raise ValueError("scenario config must contain a JSON object")
+
+    name = config.get("scenario_name")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("scenario config requires a non-empty 'scenario_name'")
+    changes = config.get("changes")
+    if not isinstance(changes, dict):
+        raise ValueError("scenario config requires 'changes' as a JSON object")
+
+    number = config.get("scenario_number")
+    if number is None:
+        number = _next_scenario_number(out_root)
+    if isinstance(number, bool) or not isinstance(number, int) or not 0 < number <= 9999:
+        raise ValueError("scenario_number must be an integer from 1 to 9999")
+
+    normalized = dict(config)
+    normalized.update({
+        "schema_version": config.get("schema_version", SCENARIO_CONFIG_SCHEMA_VERSION),
+        "scenario_number": number,
+        "scenario_name": name.strip(),
+        "changes": changes,
+        "details": config.get("details", {}),
+    })
+    if not isinstance(normalized["details"], dict):
+        raise ValueError("scenario config 'details' must be a JSON object")
+    return normalized, out_root / _scenario_folder_name(number, name)
+
+
+def _scenario_execution(config: dict, args, run_dir: Path) -> dict:
+    resolved = dict(config)
+    resolved["execution"] = {
+        "mode": args.mode,
+        "seed": args.seed,
+        "horizon_weeks": args.horizon_weeks,
+        "policy": args.policy,
+        "state": args.state,
+        "output_folder": str(run_dir),
+    }
+    return resolved
+
+
 def run_twin(data_dir: Path, mode: str, seed: int,
              horizon_weeks: Optional[int] = None,
              policy_csv: Optional[Path] = None,
@@ -1594,6 +1696,8 @@ def main():
                     help="opening position CSV (opening_stock, "
                          "in_transit_qty). Omit for a cold start.")
     ap.add_argument("--label", default="")
+    ap.add_argument("--scenario-config", default=None,
+                    help="JSON metadata for a standardized SCENARIO_####_Name output folder")
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--out-root", default=None)
     args = ap.parse_args()
@@ -1603,6 +1707,16 @@ def main():
     out_root = (Path(args.out_root) if args.out_root
                 else root / "output datasets")
 
+    scenario_config = None
+    if args.scenario_config:
+        scenario_config, run_dir = load_scenario_config(
+            Path(args.scenario_config), out_root)
+        scenario_config = _scenario_execution(scenario_config, args, run_dir)
+    else:
+        run_dir = (out_root / "projections" / args.run_name
+                   if args.run_name == "baseline"
+                   else out_root / args.run_name)
+
     t0 = time.time()
     print(f"Supply Brain digital twin — '{args.run_name}' [{args.mode}]")
     print(f"  margin basis: {MARGIN_COLUMN}")
@@ -1611,11 +1725,9 @@ def main():
         Path(args.policy),
         Path(args.state) if args.state else None)
 
-    run_dir = (out_root / "projections" / args.run_name
-               if args.run_name == "baseline"
-               else out_root / args.run_name)
     k, svc_node, costs = write_run(run_dir, inv, rcpt, prod,
-                                   twin, inp, notes, args, t0)
+                                   twin, inp, notes, args, t0,
+                                   scenario_config)
     _n = write_output_documentation(out_root)
     print(f"  wrote OUTPUT_DOCUMENTATION.md ({_n:,} lines)")
     print("\n" + "=" * 62)

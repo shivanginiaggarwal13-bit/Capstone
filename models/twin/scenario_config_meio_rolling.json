@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "scenario_number": 999,
+  "scenario_name": "MEIO_Weekly_Rolling_52W",
+  "description": "Evaluate the fully rolling weekly MEIO policy against the same opening state used by the baseline forward run.",
+  "changes": {
+    "policy_type": "rolling_weekly_meio",
+    "weeks_covered": 52,
+    "as_of_week": "2025-W52",
+    "comparison_basis": "same_opening_state",
+    "baseline_policy": "output datasets/history/forward_policy.csv",
+    "candidate_policy": "models/MEIO/MEIO_Weekly/output/rolling_2026/meio_policy_rolling.csv"
+  },
+  "details": {
+    "owner": "MEIO Weekly",
+    "hypothesis": "A time-varying weekly policy should match or exceed baseline service while holding landed cost near parity.",
+    "baseline": "output datasets/history/opening_position.csv",
+    "notes": "This scenario is run without re-generating the dataset or segmentation artifacts. The baseline data already exists."
+  }
+}

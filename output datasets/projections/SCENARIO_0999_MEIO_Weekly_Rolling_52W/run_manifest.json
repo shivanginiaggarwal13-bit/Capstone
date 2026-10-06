@@ -1,0 +1,77 @@
+{
+  "schema_version": "3.0",
+  "run_name": "meio_rolling_52w",
+  "label": "",
+  "mode": "forward",
+  "generated_at": "2026-10-06T20:50:55",
+  "seed": 2026,
+  "policy_override": "models/MEIO/MEIO_Weekly/output/rolling_2026/meio_policy_rolling.csv",
+  "margin_basis": "margin_usd",
+  "runtime_seconds": 11.4,
+  "assumptions": [
+    "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
+    "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
+    "Lead times are drawn per order line from each lane's own mean and std in network_lanes.csv, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.",
+    "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following the fulfilment_type split in the dataset, which is clean by node type.",
+    "An internal replenishment order the parent cannot cover is cancelled, not backlogged; the child re-orders at the next weekly review.",
+    "A parent holds back its own expected demand for the remainder of the review period before releasing stock downstream, implementing 'customer orders served first'.",
+    "Routing comes from sku_sourcing_map.csv, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.",
+    "Holding cost = (storage_cost_per_unit_year + carrying_pct x unit_cost) / 52, keyed on (dc_id, subcategory).",
+    "No shelf life, obsolescence or write-offs; no warehouse or lane capacity limits. Production capacity DOES bind.",
+    "Demand, lead-time and production RNG streams are independent, so two runs at the same seed differ only by the policy under test."
+  ],
+  "build_notes": {
+    "mode": "forward",
+    "seed": 2026,
+    "sourcing": {
+      "rule": "sku_sourcing_map.csv (input table)",
+      "pairs_resolved": 11500,
+      "pairs_on_fallback": 0
+    },
+    "policy_source": "models\\MEIO\\MEIO_Weekly\\output\\rolling_2026\\meio_policy_rolling.csv",
+    "policy_rows": 403936,
+    "policy_time_varying": true,
+    "state_source": "output datasets\\history\\opening_position.csv",
+    "demand_basis": "forecast_qty x volume-weighted resampled forecast-error ratio",
+    "forecast_units": 13242327.0,
+    "realised_demand_units": 14159736.0,
+    "realised_over_forecast": 1.0693,
+    "margin_basis": "margin_usd",
+    "n_nodes": 27,
+    "n_skus": 500,
+    "n_plants": 4,
+    "n_active_pairs": 7768,
+    "horizon_weeks": 52,
+    "horizon_days": 364,
+    "first_period": "2026-W01",
+    "last_period": "2026-W52"
+  },
+  "scenario": {
+    "schema_version": "1.0",
+    "scenario_number": 999,
+    "scenario_name": "MEIO_Weekly_Rolling_52W",
+    "description": "Evaluate the fully rolling weekly MEIO policy against the same opening state used by the baseline forward run.",
+    "changes": {
+      "policy_type": "rolling_weekly_meio",
+      "weeks_covered": 52,
+      "as_of_week": "2025-W52",
+      "comparison_basis": "same_opening_state",
+      "baseline_policy": "output datasets/history/forward_policy.csv",
+      "candidate_policy": "models/MEIO/MEIO_Weekly/output/rolling_2026/meio_policy_rolling.csv"
+    },
+    "details": {
+      "owner": "MEIO Weekly",
+      "hypothesis": "A time-varying weekly policy should match or exceed baseline service while holding landed cost near parity.",
+      "baseline": "output datasets/history/opening_position.csv",
+      "notes": "This scenario is run without re-generating the dataset or segmentation artifacts. The baseline data already exists."
+    },
+    "execution": {
+      "mode": "forward",
+      "seed": 2026,
+      "horizon_weeks": null,
+      "policy": "models/MEIO/MEIO_Weekly/output/rolling_2026/meio_policy_rolling.csv",
+      "state": "output datasets/history/opening_position.csv",
+      "output_folder": "output datasets\\projections\\SCENARIO_0999_MEIO_Weekly_Rolling_52W"
+    }
+  }
+}

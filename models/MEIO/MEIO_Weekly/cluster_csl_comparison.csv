@@ -1,0 +1,6 @@
+run,z_source,customer_fill_rate,customer_fill_rate_cdc,customer_fill_rate_rdc,internal_replen_fill_rate,safety_stock_value_usd,holding_cost_usd,stockout_cost_usd,total_landed_cost_usd
+baseline,-,0.9097,0.7863,0.9364,0.8905,2573886.05,740517.84,4685042.58,36215502.05
+meio_weekly,segment (original),0.9275,0.8114,0.9526,0.812,2339573.65,810990.75,3917691.34,36721902.84
+meio_weekly,cluster (segmentation deliverable),0.9268,0.8118,0.9516,0.8134,2291137.77,810437.06,4026737.77,36819747.14
+clark_scarf_v2 (alpha=0.2),segment (original),0.9366,0.8392,0.9577,0.7547,2721618.89,876807.81,3415144.95,36888008.52
+clark_scarf_v2 (alpha=0.2),cluster (segmentation deliverable),0.937,0.8393,0.9581,0.7561,2652882.53,876387.04,3439794.22,36891903.19

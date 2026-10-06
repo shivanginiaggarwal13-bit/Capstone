@@ -221,6 +221,25 @@ Z_MIN, Z_MAX = 0.84, 3.10        # clip service level to [80%, 99.9%] (diagnosti
 SHORT_WINDOW_WEEKS = 13
 LONG_WINDOW_WEEKS = 52
 
+# Per-SKU z override, empty by default so every existing call site is
+# unaffected. Populated by callers that want to size against a different
+# service-level ladder than sku_master.csv's baked-in 3-way segment (e.g.
+# the Clustering & Segmentation deliverable's own 4-cluster CSL ladder,
+# which cuts across the original segment boundaries -- see
+# `rerun_with_cluster_csl.py`). Keyed by sku_id, not (sku_id, dc_id): the
+# ladder this overrides is itself a pure per-SKU attribute.
+Z_OVERRIDE_BY_SKU: dict = {}
+
+
+def assign_z(df: pd.DataFrame) -> pd.Series:
+    """z per row: Z_OVERRIDE_BY_SKU[sku_id] if set, else the segment-based
+    Z_BY_SEGMENT lookup (original behavior, unchanged when the override is
+    empty)."""
+    if Z_OVERRIDE_BY_SKU:
+        overridden = df.sku_id.map(Z_OVERRIDE_BY_SKU)
+        return overridden.fillna(df.segment.map(Z_BY_SEGMENT)).fillna(Z_DEFAULT)
+    return df.segment.map(Z_BY_SEGMENT).fillna(Z_DEFAULT)
+
 
 # --------------------------------------------------------------------- IO ---
 def load_period_index(data_dir: str) -> pd.DataFrame:
@@ -502,7 +521,7 @@ def solve_policy(demand: pd.DataFrame, leadtime_by_dc: dict, cost: pd.DataFrame,
     d["target_std_uplifted"] = d.target_std * d.sigma_uplift
 
     d = d.merge(cost, on=["sku_id", "dc_id"], how="left")
-    d["z"] = d.segment.map(Z_BY_SEGMENT).fillna(Z_DEFAULT)
+    d["z"] = assign_z(d)
 
     prot_wk = REVIEW_WEEKS + d.lt_mean_wk
     d["sigma_lt_demand"] = np.sqrt(
@@ -690,7 +709,7 @@ def solve_pdc_policy(rdc_demand: pd.DataFrame, data_dir: str, cost: pd.DataFrame
     thru["lt_std_wk"] = thru.lt_std_days / 7.0
 
     thru = thru.merge(cost, on=["sku_id", "dc_id"], how="left")
-    thru["z"] = thru.segment.map(Z_BY_SEGMENT).fillna(Z_DEFAULT)
+    thru["z"] = assign_z(thru)
 
     thru["safety_stock"] = (thru.z * np.sqrt(thru.lt_mean_wk) * thru.mu
                              * SIGMA_UPLIFT["PDC"] * 0.5).round(1)

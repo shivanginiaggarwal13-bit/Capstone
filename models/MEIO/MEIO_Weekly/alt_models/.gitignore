@@ -9,6 +9,8 @@ __pycache__/
 # Caught right before a commit: these totalled ~11GB across one session.
 bandit_trials/
 bandit_rolling_trials/
+cluster_bandit_trials/
+cluster_bandit_rolling_trials/
 clark_scarf_v2_trials/
 clark_scarf_v2_rolling_trials/
 sim_optimize_trials/
@@ -17,3 +19,6 @@ compare_twin_runs/
 cs_v2_robustness/
 final_rolling_compare/
 final_rolling_compare2/
+backtest_rolling_real_output/
+cluster_alpha_curve_output/
+bandit_v2_final_score/

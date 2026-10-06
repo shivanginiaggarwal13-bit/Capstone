@@ -1,0 +1,29 @@
+run,group_type,group,n_skus,customer_demand_units,customer_fill_rate,safety_stock_units_avg_week
+meio_weekly (segment),original_segment,Fast-Moving,250,10695546.0,0.938,380995.8
+meio_weekly (segment),original_segment,Intermediate,100,1318490.0,0.8627,36250.1
+meio_weekly (segment),original_segment,Seasonal,150,2145700.0,0.9149,83189.8
+meio_weekly (segment),new_cluster_archetype,Flagship Promo-Driven,189,8444088.0,0.9316,286483.9
+meio_weekly (segment),new_cluster_archetype,Long-Tail Erratic,105,111416.0,0.8537,13924.8
+meio_weekly (segment),new_cluster_archetype,Long-Tail Supply-Risk,16,830.0,0.8193,1708.1
+meio_weekly (segment),new_cluster_archetype,Mid-Tier Core,190,5603402.0,0.9229,198319.0
+meio_weekly (cluster),original_segment,Fast-Moving,250,10695546.0,0.9324,347980.1
+meio_weekly (cluster),original_segment,Intermediate,100,1318490.0,0.8876,51594.2
+meio_weekly (cluster),original_segment,Seasonal,150,2145700.0,0.9226,93021.9
+meio_weekly (cluster),new_cluster_archetype,Flagship Promo-Driven,189,8444088.0,0.9307,280374.3
+meio_weekly (cluster),new_cluster_archetype,Long-Tail Erratic,105,111416.0,0.8389,10650.0
+meio_weekly (cluster),new_cluster_archetype,Long-Tail Supply-Risk,16,830.0,0.7627,1498.5
+meio_weekly (cluster),new_cluster_archetype,Mid-Tier Core,190,5603402.0,0.9227,200073.5
+clark_scarf_v2 (segment),original_segment,Fast-Moving,250,10695546.0,0.9471,458396.5
+clark_scarf_v2 (segment),original_segment,Intermediate,100,1318490.0,0.8692,35597.4
+clark_scarf_v2 (segment),original_segment,Seasonal,150,2145700.0,0.9258,94249.0
+clark_scarf_v2 (segment),new_cluster_archetype,Flagship Promo-Driven,189,8444088.0,0.9403,336297.4
+clark_scarf_v2 (segment),new_cluster_archetype,Long-Tail Erratic,105,111416.0,0.8831,16826.1
+clark_scarf_v2 (segment),new_cluster_archetype,Long-Tail Supply-Risk,16,830.0,0.7759,1830.9
+clark_scarf_v2 (segment),new_cluster_archetype,Mid-Tier Core,190,5603402.0,0.9321,233288.6
+clark_scarf_v2 (cluster),original_segment,Fast-Moving,250,10695546.0,0.9415,403475.2
+clark_scarf_v2 (cluster),original_segment,Intermediate,100,1318490.0,0.9057,61361.0
+clark_scarf_v2 (cluster),original_segment,Seasonal,150,2145700.0,0.9337,111609.2
+clark_scarf_v2 (cluster),new_cluster_archetype,Flagship Promo-Driven,189,8444088.0,0.9407,328039.2
+clark_scarf_v2 (cluster),new_cluster_archetype,Long-Tail Erratic,105,111416.0,0.8278,10052.1
+clark_scarf_v2 (cluster),new_cluster_archetype,Long-Tail Supply-Risk,16,830.0,0.7458,1389.6
+clark_scarf_v2 (cluster),new_cluster_archetype,Mid-Tier Core,190,5603402.0,0.9337,236964.4

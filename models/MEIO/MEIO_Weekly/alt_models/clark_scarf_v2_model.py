@@ -66,6 +66,23 @@ TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")
 
 N_SIMS = 4000
 
+# Per-SKU alpha override, empty by default so every existing call site
+# (fixed scalar alpha) is unaffected. Populated by callers that want a
+# DIFFERENT pooling factor per SKU -- e.g. one per segmentation-deliverable
+# cluster, to test whether the pooling dial should vary by cluster rather
+# than being one portfolio-wide scalar. Keyed by sku_id (alpha governs RDC
+# sizing, a per-SKU decision, same granularity as Z_OVERRIDE_BY_SKU).
+ALPHA_OVERRIDE_BY_SKU: dict = {}
+
+
+def resolve_alpha(df: pd.DataFrame, default_alpha: float) -> np.ndarray:
+    """Per-row alpha: ALPHA_OVERRIDE_BY_SKU[sku_id] if set, else
+    default_alpha (original behavior, unchanged when the override is
+    empty)."""
+    if ALPHA_OVERRIDE_BY_SKU:
+        return df.sku_id.map(ALPHA_OVERRIDE_BY_SKU).fillna(default_alpha).to_numpy()
+    return np.full(len(df), default_alpha)
+
 
 def _gamma_params(mean, std):
     """Method-of-moments Gamma(shape, scale) from (mean, std), vectorized.
@@ -122,7 +139,7 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     cdc["lt_mean_wk"] = cdc.dc_id.map(lambda x: leadtime_by_dc[x][0] / 7.0)
     cdc["lt_std_wk"] = cdc.dc_id.map(lambda x: np.sqrt(leadtime_by_dc[x][1]) / 7.0)
     cdc = cdc.merge(cost, on=["sku_id", "dc_id"], how="left")
-    cdc["z"] = cdc.segment.map(lib.Z_BY_SEGMENT).fillna(lib.Z_DEFAULT)
+    cdc["z"] = lib.assign_z(cdc)
     cdc["target_csl"] = norm.cdf(cdc.z.clip(lib.Z_MIN, lib.Z_MAX))
     cdc["target_std_uplifted"] = cdc.target_std * lib.SIGMA_UPLIFT["CDC"]
 
@@ -154,7 +171,7 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     rdc["lt_mean_wk"] = rdc.dc_id.map(lambda x: leadtime_by_dc[x][0] / 7.0)
     rdc["lt_std_wk"] = rdc.dc_id.map(lambda x: np.sqrt(leadtime_by_dc[x][1]) / 7.0)
     rdc = rdc.merge(cost, on=["sku_id", "dc_id"], how="left")
-    rdc["z"] = rdc.segment.map(lib.Z_BY_SEGMENT).fillna(lib.Z_DEFAULT)
+    rdc["z"] = lib.assign_z(rdc)
     rdc["target_csl"] = norm.cdf(rdc.z.clip(lib.Z_MIN, lib.Z_MAX))
 
     # endpoint A: independent (alpha=0) -- RDC sized on its own direct demand only
@@ -170,13 +187,14 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
         rdc.lt_mean_wk.to_numpy(), rdc.lt_std_wk.to_numpy(), rdc.target_csl.to_numpy(), rng, n_sims=n_sims)
     ss_p = np.maximum(0.0, ss_p_raw - rdc.down_ss.to_numpy())  # netted against downstream CDC SS
 
-    rdc["safety_stock"] = alpha * ss_p + (1 - alpha) * ss_i
-    rdc["cycle_stock"] = alpha * cyc_p + (1 - alpha) * cyc_i
+    alpha_vec = resolve_alpha(rdc, alpha)
+    rdc["safety_stock"] = alpha_vec * ss_p + (1 - alpha_vec) * ss_i
+    rdc["cycle_stock"] = alpha_vec * cyc_p + (1 - alpha_vec) * cyc_i
     rdc["reorder_point"] = rdc.cycle_stock + rdc.safety_stock
     cover_wk = max(lib.REVIEW_WEEKS, lib.ORDER_COVER_WEEKS)
     s_endpoint_p = np.maximum(rdc.reorder_point + mu_echelon * cover_wk - rdc.down_S.to_numpy(), rdc.reorder_point)
     s_endpoint_i = np.maximum(rdc.reorder_point + rdc.own_mean * cover_wk, rdc.reorder_point * lib.MIN_S_MULTIPLE)
-    rdc["order_up_to_level"] = alpha * s_endpoint_p + (1 - alpha) * s_endpoint_i
+    rdc["order_up_to_level"] = alpha_vec * s_endpoint_p + (1 - alpha_vec) * s_endpoint_i
 
     keep = ["dc_id", "sku_id", "category", "subcategory", "segment", "safety_stock",
             "reorder_point", "order_up_to_level", "target_csl"]

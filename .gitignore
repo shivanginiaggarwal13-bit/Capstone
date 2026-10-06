@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+
+# Scratch duplicate of input/output datasets made during local MEIO Weekly
+# work -- the canonical copies are the repo's own "input datasets/" and
+# "output datasets/" at root, already tracked. This is a redundant local
+# snapshot (~400MB), not a deliverable.
+MEIO Weekly Data/

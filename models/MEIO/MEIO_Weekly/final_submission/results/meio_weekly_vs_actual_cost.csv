@@ -1,0 +1,5 @@
+metric,actual_full156wk,meio_weekly_full156wk,delta_attributable_to_test_window
+holding_cost_usd,2064572.46,2230612.4,166039.93999999994
+stockout_cost_usd,8886484.29,8937462.33,50978.04000000097
+transport_cost_usd,76815552.09,78264485.12,1448933.0300000012
+total_landed_cost_usd,87766608.84,89432559.85,1665951.0099999905

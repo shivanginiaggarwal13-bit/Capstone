@@ -1,0 +1,10 @@
+run,phase,period,seasonal_demand_units,fill_rate
+"baseline (flat annual mean, no seasonality)",peak,2026-W48,65087.0,0.7843
+"baseline (flat annual mean, no seasonality)",trough,2026-W03,32210.0,0.9267
+"baseline (flat annual mean, no seasonality)",full_year_avg,-,2145700.0,0.8918
+"meio_weekly (rolling, de-seasonalized)",peak,2026-W48,65087.0,0.8563
+"meio_weekly (rolling, de-seasonalized)",trough,2026-W03,32210.0,0.9254
+"meio_weekly (rolling, de-seasonalized)",full_year_avg,-,2145700.0,0.9149
+"clark_scarf_v2 alpha=0.2 (rolling, de-seasonalized)",peak,2026-W48,65087.0,0.8864
+"clark_scarf_v2 alpha=0.2 (rolling, de-seasonalized)",trough,2026-W03,32210.0,0.9301
+"clark_scarf_v2 alpha=0.2 (rolling, de-seasonalized)",full_year_avg,-,2145700.0,0.9258

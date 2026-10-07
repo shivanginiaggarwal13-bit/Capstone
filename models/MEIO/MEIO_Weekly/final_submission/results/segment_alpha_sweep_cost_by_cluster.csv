@@ -1,0 +1,25 @@
+cluster,alpha,holding_cost_usd,lost_margin_usd
+Flagship Promo-Driven,0.0,449272.68,720390.33
+Flagship Promo-Driven,0.2,445626.24,606051.03
+Flagship Promo-Driven,0.4,438682.3,502009.72
+Flagship Promo-Driven,0.6,434016.38,438392.02
+Flagship Promo-Driven,0.8,428951.19,379492.15
+Flagship Promo-Driven,1.0,423833.56,352846.68
+Mid-Tier Core,0.0,384055.45,1156355.11
+Mid-Tier Core,0.2,379353.48,940524.66
+Mid-Tier Core,0.4,375036.87,792570.8
+Mid-Tier Core,0.6,371374.59,672381.83
+Mid-Tier Core,0.8,367057.65,568030.79
+Mid-Tier Core,1.0,362811.85,543530.31
+Long-Tail Erratic,0.0,44646.06,6560.44
+Long-Tail Erratic,0.2,44348.2,5998.18
+Long-Tail Erratic,0.4,44073.97,4970.34
+Long-Tail Erratic,0.6,43752.45,3789.93
+Long-Tail Erratic,0.8,43226.94,3277.48
+Long-Tail Erratic,1.0,42961.22,2537.0
+Long-Tail Supply-Risk,0.0,9572.78,6.36
+Long-Tail Supply-Risk,0.2,9531.0,12.72
+Long-Tail Supply-Risk,0.4,9380.44,12.72
+Long-Tail Supply-Risk,0.6,9286.59,6.36
+Long-Tail Supply-Risk,0.8,9173.18,6.36
+Long-Tail Supply-Risk,1.0,8962.83,12.72

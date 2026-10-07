@@ -1,0 +1,7 @@
+cluster,alpha,seed,portfolio_fill_rate,own_fill_rate,internal_replen_fill_rate,fill_delta_vs_actual_pp,cost_delta_usd
+Flagship Promo-Driven,0.2,2026,0.9427,0.945,0.8199,1.19,2006007.3599999992
+Long-Tail Erratic,0.2,2026,0.9427,0.9389,0.8199,1.19,2006007.3599999992
+Long-Tail Supply-Risk,0.0,2026,0.943,0.924,0.8197,1.22,1976083.7099999934
+Long-Tail Supply-Risk,0.2,2026,0.9427,0.9189,0.8199,1.19,2006007.3599999992
+Long-Tail Supply-Risk,1.0,2026,0.9432,0.9089,0.8203,1.24,1976659.6899999976
+Mid-Tier Core,0.2,2026,0.9427,0.9397,0.8199,1.19,2006007.3599999992

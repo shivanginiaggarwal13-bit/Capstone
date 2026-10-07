@@ -172,9 +172,12 @@ def build_walkforward_policy_meio(data_dir, out_path):
 
 
 # --------------------------------------------------------- Clark-Scarf v2 walk-forward policy
-def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=None, alpha_override=None):
+def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=None, alpha_override=None,
+                                   netting_discount=1.0):
     """alpha_override: optional {sku_id: alpha} dict for a per-segment sweep
-    (see segment_alpha_explore.py); leave None for the single-alpha case."""
+    (see segment_alpha_explore.py); leave None for the single-alpha case.
+    netting_discount: see clark_scarf_v2.solve (1.0 = original full-netting
+    behavior)."""
     rng = rng if rng is not None else np.random.default_rng(SEED)
     dfc = lib.load_demand_forecast(data_dir)
     period_index = lib.load_period_index(data_dir)
@@ -202,7 +205,8 @@ def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=
             as_of_num = wn - 1
             target_period = period_index.loc[period_index.week_num == wn, "period"].iloc[0]
             policy = csv2.solve(dfc, as_of_num, period_index, seasonal_index, sku_subcat, leadtime_by_dc,
-                                 cost, active_rdc, active_cdc, cdc_primary_rdc, wn, alpha, rng, n_sims=1200)
+                                 cost, active_rdc, active_cdc, cdc_primary_rdc, wn, alpha, rng, n_sims=1200,
+                                 netting_discount=netting_discount)
             rdc_smoothed = lib.smoothed_rdc_demand_for_pdc(dfc, as_of_num, period_index, seasonal_index, sku_subcat,
                                                             active_rdc, wn)
             pdc_policy = lib.solve_pdc_policy(rdc_smoothed, data_dir, cost)
@@ -216,7 +220,7 @@ def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=
     rolling = pd.concat(frames, ignore_index=True)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     rolling.to_csv(out_path, index=False)
-    print(f"[clark_scarf_v2 alpha={alpha}] wrote {len(rolling):,} rows -> {out_path}")
+    print(f"[clark_scarf_v2 alpha={alpha} netting_discount={netting_discount}] wrote {len(rolling):,} rows -> {out_path}")
     return out_path
 
 

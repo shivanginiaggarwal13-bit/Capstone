@@ -7,22 +7,32 @@ but isn't required reading to evaluate the recommendation itself.
 
 ## The recommendation
 
-**Clark-Scarf v2 at alpha=0.2**, a continuous-pooling-factor, Monte Carlo-DDLT
-echelon model (`clark_scarf_v2.py`), chosen over the hand-tuned MEIO Weekly
-tool because it holds up better against **real replayed 2025 demand**, not
-just synthetic noise — and because its core mechanism (deciding how much
-safety stock an RDC pools with the CDCs it feeds) is a direct answer to the
-charter's own ask: decide not just how much buffer to hold, but **where**.
+**Clark-Scarf v2 at alpha=0.2, netting_discount=0.0**, a continuous-pooling-factor,
+Monte Carlo-DDLT echelon model (`clark_scarf_v2.py`), chosen over the
+hand-tuned MEIO Weekly tool because it holds up better against **real
+replayed 2025 demand**, not just synthetic noise — and because its core
+mechanism (deciding how much safety stock an RDC pools with the CDCs it
+feeds) is a direct answer to the charter's own ask: decide not just how much
+buffer to hold, but **where**.
+
+`netting_discount=0.0` is a fix validated this session (see "Netting-discount
+fix" below) — it removes the original model's assumption that an RDC's
+pooled safety stock can be credited against what its CDCs already hold, and
+it wins on every axis tested, 5/5 seeds, with no tradeoff found. The table
+below reflects it; the original `netting_discount=1.0` figures (what shipped
+before this fix) are in that section for comparison.
 
 | | Actual (as happened) | MEIO Weekly | **Clark-Scarf v2 (chosen)** |
 |---|---|---|---|
-| Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.27% (+1.19pp)** |
-| Total landed cost | $87.77M | +1.9% | +2.3% |
-| Internal replenishment fill | 93.21% | −4.60pp | **−11.22pp** |
+| Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.83% (+1.75pp)** |
+| Internal replenishment fill | 93.21% | −4.60pp | **82.11% (−11.10pp, still degraded, but better than nd=1.0's 81.99%)** |
+| Total landed cost delta, 5-seed mean | — | — | **+$1.83M (vs. +$1.95M at nd=1.0 — cheaper, not just better)** |
 
 Full detail: `results/headline_report.md`,
 `results/headline_clark_scarf_v2_vs_actual.csv`, `results/headline_cost_summary.csv`,
-`results/chart_headline.png`. MEIO Weekly's own real-data result (context for
+`results/chart_headline.png` (these still reflect the pre-fix `netting_discount=1.0`
+run — see "Netting-discount fix" below for the current recommended
+configuration's numbers). MEIO Weekly's own real-data result (context for
 why it wasn't chosen) is in `results/meio_weekly_vs_actual_report.md` and
 `results/meio_weekly_vs_actual.csv` (its own cost breakdown, computed
 separately, is in `results/meio_weekly_vs_actual_cost.csv`).
@@ -91,6 +101,48 @@ evenly across the year, and is still incomplete even where it shows up.
   claim — on cost alone, more pooling looks better for every cluster, for
   the same reason it's risky for internal supply.**
 
+## Netting-discount fix (validated this session)
+
+The pooled RDC endpoint's safety stock was `max(0, pooled_SS -
+downstream_CDC_SS)` — crediting the RDC with 100% of what its CDCs already
+hold, which assumes stock can move to wherever it's needed on no notice; the
+twin's real weekly-review-plus-lead-time physics don't support that
+instantly. `clark_scarf_v2.py::solve` now takes a `netting_discount`
+parameter: `ss_p = max(0, pooled_SS - netting_discount * downstream_CDC_SS)`.
+`netting_discount=1.0` reproduces the original behavior exactly (verified:
+byte-identical formula, and a fresh re-run matched the saved headline
+numbers to the decimal). `netting_discount=0.0` removes the netting
+entirely.
+
+Tested at alpha=0.2 (the chosen operating point) against real 2025 demand,
+with two methodology passes:
+- **First pass** (`netting_discount_sweep.py --alpha 0.2`) swept
+  `netting_discount` in {0.0, 0.25, 0.5, 0.75, 1.0}. First attempt shared one
+  RNG sequentially across all 5 builds and produced a misleading result —
+  `internal_replen_fill_rate` turned out to be far more sensitive to
+  RNG-stream position than customer fill rate (a 4pp swing from stream
+  position alone, bigger than the entire netting_discount effect). Fixed by
+  giving every value the same fresh seed instead (`netting_discount` only
+  changes post-hoc arithmetic on Monte Carlo draws, never the draws
+  themselves, so an identical seed isolates it as the only variable). With
+  that fix, `results/netting_discount_sweep_alpha0_2.csv` shows a smooth,
+  monotonic improvement as netting is reduced — 94.77%/82.14% fill at
+  `nd=0.0` vs. 94.27%/81.99% at `nd=1.0` (the original), at *lower* cost.
+- **Multi-seed confirmation** (`netting_discount_sweep.py --multiseed`, 5
+  seeds, `results/netting_discount_multiseed.csv`): `netting_discount=0.0`
+  beats `netting_discount=1.0` on every axis, 5/5 seeds, tight std:
+  customer-fill delta vs. actual +1.75pp (σ=0.07) vs. +1.22pp (σ=0.05);
+  internal replenishment fill 82.11% (σ=0.0007) vs. 81.94% (σ=0.001); cost
+  delta +$1.83M (σ=$51k) vs. +$1.95M (σ=$42k). No tradeoff found at this
+  alpha — **`netting_discount=0.0` is adopted as part of the recommended
+  configuration.**
+
+Caveats this does *not* resolve: internal replenishment fill is improved
+(82.11% vs. 81.99%) but still badly degraded relative to actual (93.21%) —
+removing the netting discount is not a full fix, just a real improvement.
+Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
+"Next steps."
+
 ## Known limitations — stated up front, not left for a reviewer to find
 
 - **Write-off minimization** (one of the charter's three named KPIs) is not
@@ -99,14 +151,10 @@ evenly across the year, and is still incomplete even where it shows up.
 - **Working capital** is a mixed result, not a clean win: safety stock value
   fell 9.1%, but total inventory value rose 9.1% (cycle stock grew faster
   than safety stock shrank).
-- **Internal replenishment fill degrades under every model tested**, worse
-  for Clark-Scarf v2 (−11.22pp) than MEIO Weekly (−4.60pp) — the leading
-  hypothesis is the pooled endpoint's netting step
-  (`ss_p = pooled_SS - downstream_CDC_SS` in `clark_scarf_v2.py::solve`)
-  assumes stock can move to wherever it's needed, which the twin's real
-  weekly-review-plus-lead-time physics don't support instantly. Not yet
-  fixed; a netting-discount parameter is the proposed next step (see Next
-  steps).
+- **Internal replenishment fill still degrades under every model tested**
+  even after the netting-discount fix above — improved (82.11% vs. the
+  original 81.99%) but nowhere near actual's 93.21%. The netting step was
+  only one contributor; something else is also at play (see "Next steps").
 - **One real year of validation data.** `demand_forecast.csv` only has rows
   from 2025 onward even though real orders go back to 2023, so every
   real-data result here is tested against a single year. As 2026 actuals
@@ -126,6 +174,10 @@ evenly across the year, and is still incomplete even where it shows up.
 - `segment_alpha_explore.py` — the per-segment alpha diagnostic described
   above. `--stage sweep` (portfolio-level, ~90 min) then `--stage own_fill`
   (re-slices the sweep's own output, seconds) are the two real stages.
+- `netting_discount_sweep.py` — the netting-discount fix's real-data test
+  (see "Netting-discount fix" above). `--alpha 0.2` or `--alpha 0.6` for the
+  single-seed sweep over `netting_discount`; `--multiseed` for the 5-seed
+  robustness check of `netting_discount` in {0.0, 1.0} at alpha=0.2.
 - `results/` — every CSV, chart, and report cited above. Already computed;
   you don't need to re-run anything to read the evidence. The CSVs and the
   `own_fill`/`sweep` numbers are the direct output of `validate_real_data.py`
@@ -140,12 +192,21 @@ evenly across the year, and is still incomplete even where it shows up.
 
 ## Next steps, in priority order
 
-1. **Netting-discount fix for internal replenishment fill** (see "Known
-   limitations"). Cheap to prototype on the infrastructure already here —
-   a second parameter in `clark_scarf_v2.py::solve`, tested the same way
-   alpha was.
-2. **Fresh-holdout confirmation of alpha 0.4/0.6** once more real weeks
-   (2026 actuals) are available.
-3. **Multi-seed validation of the per-segment alpha direction** before it's
+1. **Find the rest of the internal-replenishment-fill gap.** The
+   netting-discount fix closed some of it (82.11% vs. 81.99%) but 93.21% is
+   still 11pp away. The netting step wasn't the only cause — likely
+   candidates: the PDC real-variance formula fix (see below, also
+   unresolved), or the RDC's `order_up_to_level` sizing more generally.
+2. **Test netting_discount at alpha=0.6** (the real-data fill-optimal
+   alpha, not yet combined with this fix) and consider whether
+   netting_discount should itself vary by alpha or by segment.
+3. **Fresh-holdout confirmation of netting_discount=0.0 and alpha 0.4/0.6**
+   once more real weeks (2026 actuals) are available — everything here is
+   still one real year.
+4. **Multi-seed validation of the per-segment alpha direction** before it's
    anything more than a diagnostic — likely a 2-way (core vs. long-tail)
    split rather than the full 4-way, to limit overfitting risk.
+5. **PDC real-variance formula fix.** `meio_weekly_lib.py::solve_pdc_policy`
+   sizes PDC safety stock as `z * sqrt(lt_mean_wk) * mu * SIGMA_UPLIFT["PDC"]
+   * 0.5` — using throughput mean (`mu`) as a stand-in for variability
+   instead of a real measured σ from RDC pull-order history. Not started.

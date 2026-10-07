@@ -22,8 +22,10 @@ Order matters for cache reuse, not just correctness:
      of the real-data caches above)
   6. segment_alpha_real_data.py                (real data, parallel)
   7. service_level_real_data.py                (real data, parallel -- the
-     Feature 1 service-level-by-cluster sweep; runs last alongside step 6
-     since both are the longest steps, so a shorter night still finishes 1-5)
+     Feature 1 service-level-by-cluster sweep; runs alongside step 6 since
+     both are the longest steps, so a shorter night still finishes 1-5)
+  8. scenario_test.py                           (Feature 2 demand-surge
+     scenario test, ~10-15 min, fast enough to run last regardless)
 
 Resumable steps (segment_alpha_real_data.py, and anything reusing an
 already-cached baseline) pick up where they left off if this is re-run, so
@@ -50,6 +52,7 @@ STEPS = [
     ("segment_alpha_explore.py", []),
     ("segment_alpha_real_data.py", []),
     ("service_level_real_data.py", []),
+    ("scenario_test.py", ["--scenario", "../../../twin/scenario_config.example.json"]),
 ]
 
 

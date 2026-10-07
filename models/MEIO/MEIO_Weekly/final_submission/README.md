@@ -148,6 +148,64 @@ removing the netting discount is not a full fix, just a real improvement.
 Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
 "Next steps."
 
+## Scenario testing (Feature 2, front-end agent — demand surge only so far)
+
+`digital_twin.py --scenario-config` previously only saved a scenario's
+`changes` object as metadata — it was never actually applied to anything
+(confirmed directly in the code: `_scenario_execution()` only copied it
+into the saved manifest). This session wired one scenario type —
+**demand surge** — end to end, into both halves a "test this scenario"
+front-end feature needs:
+
+- **The simulator** (`models/twin/digital_twin.py` + new
+  `scenario_engine.py`): `_build_demand()`'s output tensor is scaled for
+  the affected region/nodes over the affected weeks, after the normal
+  demand is built, before the twin runs. Region resolution reuses
+  `customer_dc_master.csv`/`regional_dc_master.csv`'s own `region` column
+  — no new data needed.
+- **The policy generator** (`clark_scarf_v2.py::solve`): the SAME scaling
+  is applied to `target_week_demand()`'s output (`target_mean`/
+  `target_std`) for weeks inside the scenario's window, so a
+  scenario-aware policy build actually recommends different stocking, not
+  just simulates a fixed one differently.
+
+Both are opt-in parameters, `None` by default — **regression safety
+verified by direct comparison, not just review**: a baseline run (the
+`ms_actual_s2026` arm from earlier in this session) was rerun after these
+changes and matched every KPI to the decimal, and a Clark-Scarf v2 build
+was independently rerun and matched its own prior run exactly too.
+
+**Tested with the example scenario** (`scenario_config.example.json`: 25%
+demand surge, Southeast, 4 weeks) via `scenario_test.py`, which runs three
+arms — A) baseline policy/normal demand, B) baseline policy/scenario
+demand ("if we don't prepare"), C) scenario-reoptimized policy/scenario
+demand ("if we do"):
+
+| Arm | Customer fill | Total landed cost |
+|---|---|---|
+| A: baseline | 93.99% | $36.69M |
+| B: unprepared (scenario hits, no prep) | 93.93% | $36.91M |
+| C: prepared (scenario-aware policy) | **94.02%** | $36.94M |
+
+The recommended stocking change landed in **exactly** the 6 nodes actually
+in the Southeast (CDC03/04/05/06, RDC02/03) — no false positives or
+negatives among 23 total nodes — each getting +1.4–2.0% more safety stock,
+every other node within noise (±0.2%) of unchanged. B→C (the value of
+preparing) is +0.09pp fill at roughly flat cost; A→B (the scenario's raw
+impact if ignored) is −0.06pp fill, +$226K cost.
+
+**Known gaps, stated directly:**
+- **Only CDC/RDC policy is scenario-aware — PDC sizing is not wired.**
+  Confirmed in the test run: every PDC showed exactly 0.00% stocking
+  change. `meio_weekly_lib.py::solve_pdc_policy` would need the same
+  treatment.
+- **Only demand surge is implemented.** Lead-time and capacity disruption
+  types are scoped (see memory) but not built — `digital_twin.py`'s own
+  "Known limitations" section says so explicitly.
+- **Single seed, synthetic basis, one scenario tested.** This is a
+  working-example validation, not a multi-seed/multi-scenario one — treat
+  it as "the mechanism works," not "this exact 0.09pp number is robust."
+
 ## Known limitations — stated up front, not left for a reviewer to find
 
 - **Write-off minimization** (one of the charter's three named KPIs) is not
@@ -207,9 +265,24 @@ Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
   `--summarize-only`. ~1.5-2 hours for a full run. **Just started as of
   this commit (one correctness-check combo only) — not yet a complete
   sweep; see `results/service_level_real_data_summary.csv`.**
-- `run_all.py` — runs the five scripts above back to back, in an order
-  chosen for cache reuse (`validate_real_data.py` first, since its baseline
-  caches are reused by the netting-discount, segment-alpha-real-data and
+- `scenario_test.py` — Feature 2 (front-end scenario-testing agent): given
+  a scenario (`models/twin/scenario_config.example.json`'s schema -- so
+  far only `demand_surge_pct` + `affected_region`/`affected_nodes` +
+  `duration_weeks`/`start_week_offset` actually does anything; see
+  `models/twin/scenario_engine.py`), builds a NEW stocking recommendation
+  that anticipates it and runs three arms: A) baseline policy, normal
+  demand; B) baseline policy, SCENARIO demand ("if we don't prepare");
+  C) scenario-reoptimized policy, SCENARIO demand ("if we do"). Verified
+  with the example config (25% Southeast demand surge, 4 weeks): the
+  policy recommended MORE safety stock in EXACTLY the 6 nodes actually in
+  that region (no false positives/negatives among 23 total nodes), and the
+  prepared arm beat the unprepared one by +0.09pp fill at roughly flat
+  cost. `python scenario_test.py --scenario <path-to-config.json>`.
+  **Known gap: only CDC/RDC policy is scenario-aware; PDC sizing isn't
+  wired yet** (confirmed in the test run -- PDCs showed exactly 0% change).
+- `run_all.py` — runs the scripts above back to back, in an order chosen
+  for cache reuse (`validate_real_data.py` first, since its baseline caches
+  are reused by the netting-discount, segment-alpha-real-data and
   service-level steps). For an unattended/overnight run: logs each step to
   its own file under `run_logs/`, continues past a failed step instead of
   aborting, prints a final pass/fail summary. `--from N` to skip ahead
@@ -254,3 +327,17 @@ Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
    sizes PDC safety stock as `z * sqrt(lt_mean_wk) * mu * SIGMA_UPLIFT["PDC"]
    * 0.5` — using throughput mean (`mu`) as a stand-in for variability
    instead of a real measured σ from RDC pull-order history. Not started.
+6. **Finish Feature 1's service-level sweep** (`service_level_real_data.py`
+   — see that section above and its own "not yet run" note).
+7. **Wire PDC policy into the scenario engine.** `scenario_test.py`'s test
+   run confirmed PDCs don't respond to a scenario at all (`solve_pdc_policy`
+   isn't touched) — a demand surge big/long enough to matter at the plant
+   level would currently be invisible to PDC sizing.
+8. **Build the lead-time and capacity disruption scenario types.** Only
+   demand surge exists; `scenario_engine.py`'s docstring and
+   `digital_twin.py`'s "Known limitations" section both say so. Same
+   pattern as demand surge (scale an already-computed value, don't touch
+   RNG draws) should apply to both.
+9. **Multi-seed / multi-scenario validation of the scenario-testing
+   feature** before the +0.09pp "value of preparing" number (or any future
+   scenario's number) is treated as more than a single working example.

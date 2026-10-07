@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.DS_Store
 
 # Scratch duplicate of input/output datasets made during local MEIO Weekly
 # work -- the canonical copies are the repo's own "input datasets/" and

@@ -14,14 +14,16 @@ each step took.
 Order matters for cache reuse, not just correctness:
   1. validate_real_data.py   -- also builds the "actual" (single-seed) and
      "ms_actual_s{2026,7,42,123,2027}" (5-seed) baseline caches that steps
-     2, 3, 4 and 6 below reuse for free instead of rebuilding from scratch.
+     2, 3, 4, 6 and 7 below reuse for free instead of rebuilding from scratch.
   2. netting_discount_sweep.py --alpha 0.2
   3. netting_discount_sweep.py --alpha 0.6     (not yet run as of this file)
   4. netting_discount_sweep.py --multiseed
   5. segment_alpha_explore.py                  (synthetic basis, independent
      of the real-data caches above)
-  6. segment_alpha_real_data.py                (real data, parallel -- the
-     single biggest step, runs last so a shorter night still finishes 1-5)
+  6. segment_alpha_real_data.py                (real data, parallel)
+  7. service_level_real_data.py                (real data, parallel -- the
+     Feature 1 service-level-by-cluster sweep; runs last alongside step 6
+     since both are the longest steps, so a shorter night still finishes 1-5)
 
 Resumable steps (segment_alpha_real_data.py, and anything reusing an
 already-cached baseline) pick up where they left off if this is re-run, so
@@ -47,6 +49,7 @@ STEPS = [
     ("netting_discount_sweep.py", ["--multiseed"]),
     ("segment_alpha_explore.py", []),
     ("segment_alpha_real_data.py", []),
+    ("service_level_real_data.py", []),
 ]
 
 

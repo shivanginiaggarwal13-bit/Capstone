@@ -6,7 +6,7 @@ fixed) lives in `..` and `../alt_models/` for anyone who wants the full process,
 but isn't required reading to evaluate the recommendation itself.
 
 **To reproduce everything end to end** (not required — `results/` already
-has the computed evidence): `python run_all.py`, ~7-8 hours, meant for an
+has the computed evidence): `python run_all.py`, ~9-10 hours, meant for an
 overnight/unattended run. See "Files" below for what it runs and in what
 order.
 
@@ -192,13 +192,29 @@ Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
   to just re-aggregate. ~1.5-2 hours for a full run at the default worker
   count; **partially run as of this commit (a handful of combos only) —
   not yet a complete sweep.**
-- `run_all.py` — runs the four scripts above back to back, in an order
+- `service_level_real_data.py` — Feature 1 (front-end service-planning
+  agent): a twin-validated, real-data, multi-seed answer to "what service
+  level should each cluster target?" A per-cluster recommendation already
+  existed (`Clustering & Segmentation/segmentation_v4/sku_clusters.csv`'s
+  `recommended_csl`/`safety_factor_z`) and had been tested before
+  (`rerun_with_cluster_csl.py`, `alt_models/cluster_bandit.py`), but both
+  were synthetic-basis, single-seed, and predate the netting-discount fix.
+  This sweeps each cluster's target CSL over {90%, 95%, 97%, 99%} against
+  real demand, 5 seeds, holding the other three clusters at the
+  segmentation team's own recommended z, at the current config (alpha=0.2,
+  netting_discount=0.0). Same parallel/resumable infrastructure as
+  `segment_alpha_real_data.py`. `--workers N`, `--cluster "<name>"`,
+  `--summarize-only`. ~1.5-2 hours for a full run. **Just started as of
+  this commit (one correctness-check combo only) — not yet a complete
+  sweep; see `results/service_level_real_data_summary.csv`.**
+- `run_all.py` — runs the five scripts above back to back, in an order
   chosen for cache reuse (`validate_real_data.py` first, since its baseline
-  caches are reused by the netting-discount and segment-alpha-real-data
-  steps). For an unattended/overnight run: logs each step to its own file
-  under `run_logs/`, continues past a failed step instead of aborting,
-  prints a final pass/fail summary. `--from N` to skip ahead (e.g. `--from
-  6` to just finish `segment_alpha_real_data.py`). ~7-8 hours end to end.
+  caches are reused by the netting-discount, segment-alpha-real-data and
+  service-level steps). For an unattended/overnight run: logs each step to
+  its own file under `run_logs/`, continues past a failed step instead of
+  aborting, prints a final pass/fail summary. `--from N` to skip ahead
+  (e.g. `--from 6` to just finish the two real-data sweeps). ~9-10 hours
+  end to end.
 - `results/` — every CSV, chart, and report cited above. Already computed;
   you don't need to re-run anything to read the evidence. The CSVs and the
   `own_fill`/`sweep` numbers are the direct output of `validate_real_data.py`

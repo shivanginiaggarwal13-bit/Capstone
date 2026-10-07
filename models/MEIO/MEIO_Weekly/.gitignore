@@ -1,10 +1,6 @@
 __pycache__/
 *.pyc
 
-# per-run dated recommendation dumps (regenerable in seconds)
-output/2*-W*/
-output/rolling_2026/
-
 # large backtest/simulation detail (regenerable; only summaries are tracked)
 backtest_output/
 simulation_output/

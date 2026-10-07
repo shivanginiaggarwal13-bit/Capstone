@@ -36,14 +36,14 @@ call site is unaffected.
 
     python roll_forward_policy.py
 
-Output: output/rolling_2026/meio_policy_rolling.csv (or `out_path` if
-    passed to `run()` directly -- added after `alt_models/sim_optimize_
-    rolling.py` and `alt_models/bandit_rolling.py` were run IN PARALLEL,
-    both hardcoded to this same default path, and silently overwrote each
-    other's output mid-run. Caught it because two supposedly-different
-    final policies scored identically; anything calling `run()` from a
-    process that might overlap another caller in time MUST pass its own
-    `out_path`.)
+Output: <repo-root>/output datasets/MEIO/rolling_2026/meio_policy_rolling.csv
+    (or `out_path` if passed to `run()` directly -- added after
+    `alt_models/sim_optimize_rolling.py` and `alt_models/bandit_rolling.py`
+    were run IN PARALLEL, both hardcoded to this same default path, and
+    silently overwrote each other's output mid-run. Caught it because two
+    supposedly-different final policies scored identically; anything
+    calling `run()` from a process that might overlap another caller in
+    time MUST pass its own `out_path`.)
     (period, dc_id, sku_id, safety_stock, reorder_point, order_up_to_level)
 """
 import argparse
@@ -57,6 +57,8 @@ import meio_weekly_lib as lib
 import meio_optimizer_weekly as weekly
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+OUTPUT_DATASETS_DIR = os.path.join(REPO_ROOT, "output datasets", "MEIO")
 
 
 def run(data_dir: str, as_of_week: str, out_path: str = None):
@@ -99,7 +101,7 @@ def run(data_dir: str, as_of_week: str, out_path: str = None):
 
     rolling = pd.concat(all_weeks, ignore_index=True)
     if out_path is None:
-        out_dir = os.path.join(SCRIPT_DIR, "output", "rolling_2026")
+        out_dir = os.path.join(OUTPUT_DATASETS_DIR, "rolling_2026")
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, "meio_policy_rolling.csv")
     else:

@@ -31,12 +31,14 @@ that was found underperforming):
     5. Newsvendor critical ratio -> z -> safety stock -> reorder point ->
        order-up-to, using DC-specific holding/stockout cost.
 
-Outputs:
-    output/<target_week>/meio_recommendations_weekly.csv   SKU x DC lines
-    output/<target_week>/meio_policy_weekly.csv             dc_id,sku_id,safety_stock,
-                                                              reorder_point,order_up_to_level
-                                                              (digital_twin.py --policy contract)
-    output/<target_week>/meio_summary_by_dc_weekly.csv       "stock to maintain" rollup per DC
+Outputs (under the repo's tracked `output datasets/MEIO/<target_week>/`,
+alongside the other deliverables' own `output datasets/<name>/` folders):
+    meio_recommendations_weekly.csv   SKU x DC lines
+    meio_policy_weekly.csv             dc_id,sku_id,safety_stock,
+                                         reorder_point,order_up_to_level
+                                         (digital_twin.py --policy contract)
+    meio_summary_by_dc_weekly.csv      "stock to maintain" rollup per DC
+Also (unchanged, next to this script):
     meio_weekly_history.csv   (repo-tracked) one row appended per run
     chart_ss_trend.png        (repo-tracked) total recommended SS $ across runs
 """
@@ -54,7 +56,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DATA = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", "input datasets"))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+DEFAULT_DATA = os.path.join(REPO_ROOT, "input datasets")
+OUTPUT_DATASETS_DIR = os.path.join(REPO_ROOT, "output datasets", "MEIO")
 
 
 def run(data_dir: str, as_of_week: str | None, short_window: int, long_window: int):
@@ -93,7 +97,7 @@ def run(data_dir: str, as_of_week: str | None, short_window: int, long_window: i
 
     policy = policy.sort_values(["dc_id", "sku_id"]).reset_index(drop=True)
 
-    run_dir = os.path.join(SCRIPT_DIR, "output", target_period)
+    run_dir = os.path.join(OUTPUT_DATASETS_DIR, target_period)
     os.makedirs(run_dir, exist_ok=True)
 
     reco_cols = ["dc_id", "sku_id", "category", "subcategory", "target_mean", "target_std",

@@ -5,6 +5,11 @@ the broader exploration history (5 models, 10 tuning rounds, bugs found and
 fixed) lives in `..` and `../alt_models/` for anyone who wants the full process,
 but isn't required reading to evaluate the recommendation itself.
 
+**To reproduce everything end to end** (not required — `results/` already
+has the computed evidence): `python run_all.py`, ~7-8 hours, meant for an
+overnight/unattended run. See "Files" below for what it runs and in what
+order.
+
 ## The recommendation
 
 **Clark-Scarf v2 at alpha=0.2, netting_discount=0.0**, a continuous-pooling-factor,
@@ -178,6 +183,22 @@ Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
   (see "Netting-discount fix" above). `--alpha 0.2` or `--alpha 0.6` for the
   single-seed sweep over `netting_discount`; `--multiseed` for the 5-seed
   robustness check of `netting_discount` in {0.0, 1.0} at alpha=0.2.
+- `segment_alpha_real_data.py` — the real-data, multi-seed version of
+  `segment_alpha_explore.py`'s diagnostic (see "Next steps" #4). Same
+  4-cluster x 6-alpha sweep, but against real replayed demand and across 5
+  seeds instead of 1. Parallel (`ProcessPoolExecutor`, default 4 workers)
+  and resumable — a combo already on disk is skipped on restart.
+  `--workers N`, `--cluster "<name>"` for one cluster, `--summarize-only`
+  to just re-aggregate. ~1.5-2 hours for a full run at the default worker
+  count; **partially run as of this commit (a handful of combos only) —
+  not yet a complete sweep.**
+- `run_all.py` — runs the four scripts above back to back, in an order
+  chosen for cache reuse (`validate_real_data.py` first, since its baseline
+  caches are reused by the netting-discount and segment-alpha-real-data
+  steps). For an unattended/overnight run: logs each step to its own file
+  under `run_logs/`, continues past a failed step instead of aborting,
+  prints a final pass/fail summary. `--from N` to skip ahead (e.g. `--from
+  6` to just finish `segment_alpha_real_data.py`). ~7-8 hours end to end.
 - `results/` — every CSV, chart, and report cited above. Already computed;
   you don't need to re-run anything to read the evidence. The CSVs and the
   `own_fill`/`sweep` numbers are the direct output of `validate_real_data.py`
@@ -204,8 +225,15 @@ Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
    once more real weeks (2026 actuals) are available — everything here is
    still one real year.
 4. **Multi-seed validation of the per-segment alpha direction** before it's
-   anything more than a diagnostic — likely a 2-way (core vs. long-tail)
-   split rather than the full 4-way, to limit overfitting risk.
+   anything more than a diagnostic. `segment_alpha_real_data.py` now exists
+   to do exactly this (real demand, 5 seeds, same 4-way split as the
+   synthetic diagnostic) but is only partially run — finish it with
+   `python segment_alpha_real_data.py` (resumable, ~1.5-2 hrs for the rest)
+   or `run_all.py --from 6`, then re-read `results/
+   segment_alpha_real_data_summary.csv` before trusting any per-cluster
+   alpha claim. A 2-way (core vs. long-tail) split rather than the full
+   4-way may still be the better final call, to limit overfitting risk —
+   the full run will show whether the 4-way direction holds up or not.
 5. **PDC real-variance formula fix.** `meio_weekly_lib.py::solve_pdc_policy`
    sizes PDC safety stock as `z * sqrt(lt_mean_wk) * mu * SIGMA_UPLIFT["PDC"]
    * 0.5` — using throughput mean (`mu`) as a stand-in for variability

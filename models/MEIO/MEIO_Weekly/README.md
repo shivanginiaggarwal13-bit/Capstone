@@ -18,7 +18,9 @@ python meio_optimizer_weekly.py --as-of-week 2025-W52
 ```
 
 With no `--as-of-week`, it defaults to the latest week that has actual
-demand on record. Output goes to `output/<target_week>/`:
+demand on record. Output goes to the repo-tracked
+`../../../output datasets/MEIO/<target_week>/` (alongside the other
+deliverables' own `output datasets/<name>/` folders):
 
 - `meio_recommendations_weekly.csv` — SKU x DC lines with target demand,
   lead time, service level, safety stock, reorder point, order-up-to.
@@ -27,6 +29,9 @@ demand on record. Output goes to `output/<target_week>/`:
   `models/twin/digital_twin.py --policy` expects.
 - `meio_summary_by_dc_weekly.csv` — **the "stock to maintain" rollup by
   DC** that answers the top-level question.
+
+To run this and `roll_forward_policy.py` (below) together, once each:
+`python run_weekly_tools.py`.
 
 Every run also appends one row to `meio_weekly_history.csv` (repo-tracked)
 and redraws `chart_ss_trend.png` (repo-tracked) so you can see the

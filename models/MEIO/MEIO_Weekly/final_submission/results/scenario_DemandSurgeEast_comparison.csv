@@ -1,0 +1,4 @@
+arm,customer_fill_rate,internal_replen_fill_rate,avg_inventory_value_usd,holding_cost_usd,stockout_cost_usd,total_landed_cost_usd
+A: baseline (normal demand),0.9399,0.7544,7437277.06,887311.32,3120186.57,36687600.21
+"B: unprepared (scenario demand, baseline policy)",0.9393,0.7546,7416717.73,884987.15,3214500.26,36913898.89
+"C: prepared (scenario demand, scenario-aware policy)",0.9402,0.7528,7508630.28,895655.73,3240936.76,36938669.74

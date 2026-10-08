@@ -45,6 +45,7 @@ unaffected.
 """
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -52,6 +53,9 @@ from scipy.stats import norm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
+
+sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "twin")))
+import scenario_engine
 
 N_SIMS = 4000
 
@@ -100,7 +104,8 @@ def monte_carlo_ddlt(target_mean, target_std, lt_mean_wk, lt_std_wk, target_csl,
 
 def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtime_by_dc,
           cost, active_rdc, active_cdc, cdc_primary_rdc, target_week_num, alpha: float, rng,
-          n_sims: int = N_SIMS, netting_discount: float = 1.0):
+          n_sims: int = N_SIMS, netting_discount: float = 1.0,
+          scenario_changes: dict = None, scenario_affected_nodes: list = None):
     """One target week's RDC+CDC policy. Call directly for a walk-forward
     loop (advancing as_of_week_num each call); see `build_rolling_policy`
     for the fixed-as-of 52-week build.
@@ -108,9 +113,21 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     netting_discount in [0, 1]: how much of a CDC's own safety stock the
     pooled RDC endpoint nets against (1.0 = full netting, today's original
     behavior; 0.0 = no netting -- the RDC holds its full pooled SS on top of
-    whatever the CDCs already hold). See the netting comment below."""
+    whatever the CDCs already hold). See the netting comment below.
+
+    scenario_changes/scenario_affected_nodes (both None by default -- a
+    complete no-op for every existing call site): a Feature-2 scenario's
+    `changes` object and its already-resolved affected-node list (resolve
+    once per build in `build_rolling_policy`, not once per target week --
+    see scenario_engine.py). If given and `target_week_num` falls in the
+    scenario's affected window, the demand this week's policy is SIZED
+    against is bumped the same way the twin bumps what it SIMULATES, so a
+    scenario-aware policy actually recommends different stocking."""
     demand = lib.target_week_demand(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat,
                                      target_week_num=target_week_num)
+    if scenario_changes and scenario_affected_nodes:
+        demand = scenario_engine.apply_demand_surge_to_target_demand(
+            demand, scenario_affected_nodes, scenario_changes, as_of_week_num, target_week_num)
 
     # --- CDC base echelon: Monte Carlo DDLT instead of z*sigma ---
     cdc = demand[demand.dc_id.isin(active_cdc)].copy()
@@ -189,12 +206,18 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     return out
 
 
-def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, netting_discount: float = 1.0):
+def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, netting_discount: float = 1.0,
+                          scenario_changes: dict = None):
     """Full 52-week rolling policy from a SINGLE fixed as-of point (used for
     the synthetic-2026 basis -- there's no real future data past as_of_week
     to refit on). For the real-data walk-forward's week-by-week refit with
     an ADVANCING as-of, call `solve()` directly in a loop instead (see
-    `validate_real_data.py`)."""
+    `validate_real_data.py`).
+
+    scenario_changes: None by default (a complete no-op). If given, affected
+    nodes are resolved ONCE here (not once per target week -- see
+    scenario_engine.py) and threaded into every solve() call, so the
+    recommended policy for weeks inside the scenario's window reflects it."""
     dfc = lib.load_demand_forecast(data_dir)
     period_index = lib.load_period_index(data_dir)
     seasonal_index = lib.build_seasonal_index(data_dir)
@@ -204,6 +227,9 @@ def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, net
     leadtime_by_dc = {**rdc_lt, **cdc_lt}
     cost = lib.load_sku_cost(data_dir)
 
+    scenario_affected_nodes = (scenario_engine.resolve_affected_nodes(Path(data_dir), scenario_changes)
+                                if scenario_changes else None)
+
     as_of_num = int(period_index.loc[period_index.period == as_of_week, "week_num"].iloc[0])
     forward_weeks = sorted(period_index[period_index.week_num > as_of_num]["week_num"].tolist())
 
@@ -212,7 +238,8 @@ def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, net
         target_period = period_index.loc[period_index.week_num == wk_num, "period"].iloc[0]
         policy = solve(dfc, as_of_num, period_index, seasonal_index, sku_subcat, leadtime_by_dc,
                        cost, active_rdc, active_cdc, cdc_primary_rdc, wk_num, alpha, rng, n_sims=n_sims,
-                       netting_discount=netting_discount)
+                       netting_discount=netting_discount, scenario_changes=scenario_changes,
+                       scenario_affected_nodes=scenario_affected_nodes)
         rdc_smoothed = lib.smoothed_rdc_demand_for_pdc(dfc, as_of_num, period_index, seasonal_index, sku_subcat,
                                                         active_rdc, wk_num)
         pdc_policy = lib.solve_pdc_policy(rdc_smoothed, data_dir, cost)

@@ -86,6 +86,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import scenario
+import scenario_engine
 
 # ---------------------------------------------------------------------------
 # Conventions
@@ -203,9 +204,15 @@ class TwinInputs:
 def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
                  horizon_weeks: Optional[int] = None,
                  policy_csv: Optional[Path] = None,
-                 state_csv: Optional[Path] = None
+                 state_csv: Optional[Path] = None,
+                 scenario_changes: Optional[dict] = None
                  ) -> Tuple[TwinInputs, dict]:
-    """Assemble everything the engine needs, indexed and array-shaped."""
+    """Assemble everything the engine needs, indexed and array-shaped.
+
+    scenario_changes: the `changes` object from a --scenario-config file
+    (see scenario_engine.py). None (the default -- every existing call site
+    that doesn't pass this) is a complete no-op, byte-identical to before
+    this parameter existed."""
     # Independent RNG streams. Keeping them separate is what makes common
     # random numbers possible: changing the policy must not shift the demand
     # or lead-time draws, or two runs are not comparable.
@@ -344,6 +351,12 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
                                      node_idx, sku_idx, n_nodes, n_skus, T,
                                      rng_demand)
     notes.update(dn)
+
+    if scenario_changes:
+        affected = scenario_engine.resolve_affected_nodes(data_dir, scenario_changes)
+        daily_demand = scenario_engine.apply_demand_surge_to_tensor(
+            daily_demand, node_idx, affected, scenario_changes)
+        notes["scenario_applied"] = {"affected_nodes": affected, **scenario_changes}
 
     # ----------------------------------------------------------- economics --
     # Holding = (storage + carrying% x unit cost) / 52, keyed on
@@ -1421,6 +1434,13 @@ machine-readable `changes` object. It may also contain `scenario_number`,
 or other relevant context. If `scenario_number` is omitted, the next available
 number is assigned automatically.
 
+If `changes` contains `demand_surge_pct`, it is actually APPLIED to the
+simulated demand (see `scenario_engine.py` and Part 5's known limitations) --
+scaled for `affected_region` (or an explicit `affected_nodes` list) over
+`duration_weeks` weeks starting `start_week_offset` weeks into the horizon
+(both optional; default to the whole horizon starting immediately). Any
+other `changes` key is saved for context but has no simulation effect yet.
+
 ```bash
 python models/twin/digital_twin.py --mode forward \\
     --scenario-config models/twin/scenario_config.example.json \\
@@ -1594,8 +1614,13 @@ what move.
   routed across them.
 - **Single-sourcing per (node, SKU).** Routing is one parent per pair, taken
   from `sku_sourcing_map.csv`.
-- **Disruption scenarios are not applied.** The library is generated but no run
-  currently overlays it.
+- **Only a demand-surge scenario type is applied.** `--scenario-config`'s
+  `changes` object is read and actually affects the simulation when it
+  contains `demand_surge_pct` (optionally `affected_region`/`affected_nodes`,
+  `duration_weeks`, `start_week_offset` -- see `scenario_engine.py`). Any
+  other key in `changes` is still saved to the self-describing scenario
+  folder for context but has no simulation effect -- lead-time and capacity
+  disruption types are not implemented yet.
 - **Demand is aggregated to (node, SKU, day).** Forward mode synthesises demand
   from the forecast, so there are no discrete order lines and no true
   order-level on-time-in-full; `pct_demand_weeks_in_full` is measured at
@@ -1678,10 +1703,12 @@ def _scenario_execution(config: dict, args, run_dir: Path) -> dict:
 def run_twin(data_dir: Path, mode: str, seed: int,
              horizon_weeks: Optional[int] = None,
              policy_csv: Optional[Path] = None,
-             state_csv: Optional[Path] = None, verbose: bool = True):
+             state_csv: Optional[Path] = None, verbose: bool = True,
+             scenario_changes: Optional[dict] = None):
     inp, notes, rng_lt, rng_prod = build_inputs(
         data_dir, mode=mode, seed=seed, horizon_weeks=horizon_weeks,
-        policy_csv=policy_csv, state_csv=state_csv)
+        policy_csv=policy_csv, state_csv=state_csv,
+        scenario_changes=scenario_changes)
     twin = SupplyBrainTwin(inp, rng_lt, rng_prod)
     inv, rcpt, prod = twin.run(verbose=verbose)
     return inp, notes, twin, inv, rcpt, prod
@@ -1747,7 +1774,8 @@ def main():
     inp, notes, twin, inv, rcpt, prod = run_twin(
         data_dir, args.mode, args.seed, args.horizon_weeks,
         Path(args.policy),
-        Path(args.state) if args.state else None)
+        Path(args.state) if args.state else None,
+        scenario_changes=(scenario_config.get("changes") if scenario_config else None))
 
     k, svc_node, costs = write_run(run_dir, inv, rcpt, prod,
                                    twin, inp, notes, args, t0,

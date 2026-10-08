@@ -31,7 +31,7 @@ that was found underperforming):
     5. Newsvendor critical ratio -> z -> safety stock -> reorder point ->
        order-up-to, using DC-specific holding/stockout cost.
 
-Outputs (under the repo's tracked `output datasets/MEIO/<target_week>/`,
+Outputs (under the repo's tracked `output datasets/MEIO/Scenario/<scenario>/<target_week>/`,
 alongside the other deliverables' own `output datasets/<name>/` folders):
     meio_recommendations_weekly.csv   SKU x DC lines
     meio_policy_weekly.csv             dc_id,sku_id,safety_stock,
@@ -45,6 +45,7 @@ Also (unchanged, next to this script):
 import argparse
 import os
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -56,12 +57,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 DEFAULT_DATA = os.path.join(REPO_ROOT, "input datasets")
-OUTPUT_DATASETS_DIR = os.path.join(REPO_ROOT, "output datasets", "MEIO")
+DEFAULT_SCENARIO_CONFIG = os.path.join(REPO_ROOT, "scenario_config.json")
+sys.path.insert(0, os.path.join(REPO_ROOT, "models"))
+import scenario
 
 
-def run(data_dir: str, as_of_week: str | None, short_window: int, long_window: int):
+def run(data_dir: str | None, as_of_week: str | None, short_window: int, long_window: int,
+    scenario_config_path: str = DEFAULT_SCENARIO_CONFIG, output_root: str | None = None):
+    config_path = os.path.abspath(scenario_config_path)
+    config = scenario.load_config(Path(config_path))
+    data_dir = data_dir or str(scenario.resolve_path(
+    Path(config_path), config, "meio", "data_dir"))
     dfc = lib.load_demand_forecast(data_dir)
     period_index = lib.load_period_index(data_dir)
 
@@ -97,8 +105,12 @@ def run(data_dir: str, as_of_week: str | None, short_window: int, long_window: i
 
     policy = policy.sort_values(["dc_id", "sku_id"]).reset_index(drop=True)
 
-    run_dir = os.path.join(OUTPUT_DATASETS_DIR, target_period)
+    output_root = output_root or str(scenario.resolve_path(
+        Path(config_path), config, "meio", "output_root"))
+    scenario_dir = os.path.join(output_root, scenario.scenario_folder_name(config))
+    run_dir = os.path.join(scenario_dir, target_period)
     os.makedirs(run_dir, exist_ok=True)
+    scenario.copy_config(Path(config_path), Path(scenario_dir), config)
 
     reco_cols = ["dc_id", "sku_id", "category", "subcategory", "target_mean", "target_std",
                  "lt_mean_wk", "lt_std_wk", "target_csl", "z", "cycle_stock", "safety_stock",
@@ -166,11 +178,13 @@ def main():
     ap.add_argument("--as-of-week", default=None,
                      help="e.g. 2025-W52. Recommendation is produced for the following week. "
                           "Default: latest week with actual demand on record.")
-    ap.add_argument("--data-dir", default=DEFAULT_DATA)
+    ap.add_argument("--data-dir", default=None)
     ap.add_argument("--short-window", type=int, default=lib.SHORT_WINDOW_WEEKS)
     ap.add_argument("--long-window", type=int, default=lib.LONG_WINDOW_WEEKS)
+    ap.add_argument("--scenario-config", default=DEFAULT_SCENARIO_CONFIG,
+                    help="Shared root scenario JSON used for this run.")
     args = ap.parse_args()
-    run(args.data_dir, args.as_of_week, args.short_window, args.long_window)
+    run(args.data_dir, args.as_of_week, args.short_window, args.long_window, args.scenario_config)
 
 
 if __name__ == "__main__":

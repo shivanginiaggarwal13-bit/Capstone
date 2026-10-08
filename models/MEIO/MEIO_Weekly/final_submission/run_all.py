@@ -31,6 +31,7 @@ it's safe to stop (Ctrl-C) overnight and resume the next night.
 
     python run_all.py                  # everything, in order
     python run_all.py --from 6         # skip 1-5, go straight to step 6
+    python run_all.py --steps 5,6,7    # run only selected steps
 """
 import argparse
 import os
@@ -71,12 +72,20 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--from", dest="start", type=int, default=1,
                      help="1-indexed step to start from (skip earlier steps).")
+    ap.add_argument("--steps", default=None,
+                     help="Comma-separated 1-indexed steps to run, e.g. 5,6,7.")
     args = ap.parse_args()
+    selected = {int(step) for step in args.steps.split(",")} if args.steps else None
+    if selected and not selected.issubset(range(1, len(STEPS) + 1)):
+        ap.error(f"--steps must contain values from 1 to {len(STEPS)}")
     os.makedirs(LOG_DIR, exist_ok=True)
 
     t0 = time.time()
     results = []
     for i, (script, step_args) in enumerate(STEPS, 1):
+        if selected is not None and i not in selected:
+            print(f"=== [{i}/{len(STEPS)}] {script} -- skipped (--steps {args.steps}) ===")
+            continue
         if i < args.start:
             print(f"=== [{i}/{len(STEPS)}] {script} -- skipped (--from {args.start}) ===")
             continue

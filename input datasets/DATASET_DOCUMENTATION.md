@@ -1,6 +1,6 @@
 # Supply Brain — Synthetic CPG Supply-Chain Dataset
 
-*Auto-generated 2026-09-25 13:59 by `supply_brain_generator_v5.py`.
+*Auto-generated 2026-10-08 00:11 by `supply_brain_generator_v5.py`.
 This document and the data are produced in the same run, so the figures below always describe the
 current instance. It supersedes the separate EDA report, whose content is folded in as Part 6.*
 
@@ -755,9 +755,9 @@ Facilities sit in **20 metros across 5 regions**. Population is the MSA resident
 | Minneapolis, MN | Midwest | 1 | 3.7 | 1.03 | 6.4% | 0.115 | Upper-Midwest reach; long inbound lanes |
 | Tampa, FL | Southeast | 1 | 3.4 | 0.97 | 5.9% | 0.122 | Florida west-coast distribution; hurricane hardening premium |
 | Denver, CO | West | 2 | 3.0 | 1.04 | 6.0% | 0.108 | Mountain-West hub; long thin lanes, high inbound freight |
-| Orlando, FL | Southeast | 1 | 2.8 | 0.97 | 6.0% | 0.120 | Central Florida; foodservice and tourism demand skew |
 | Charlotte, NC | Southeast | 1 | 2.8 | 0.94 | 5.9% | 0.090 | Cheapest power in the network; Carolinas growth corridor |
 | St. Louis, MO | Midwest | 1 | 2.8 | 0.94 | 6.8% | 0.092 | Low-cost Midwest node; barge and rail access |
+| Orlando, FL | Southeast | 1 | 2.8 | 0.97 | 6.0% | 0.120 | Central Florida; foodservice and tourism demand skew |
 | Sacramento, CA | West | 1 | 2.4 | 1.15 | 5.7% | 0.212 | Northern California inland alternative to the LA basin |
 | Nashville, TN | Southeast | 1 | 2.1 | 0.95 | 6.1% | 0.112 | Fast-growing Southeast secondary; strong road reach |
 

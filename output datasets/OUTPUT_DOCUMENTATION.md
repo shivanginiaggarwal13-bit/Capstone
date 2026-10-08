@@ -1,6 +1,6 @@
 # Supply Brain — output datasets
 
-*Auto-generated 2026-09-25 13:59 by
+*Auto-generated 2026-10-08 17:01 by
 `models/twin/digital_twin.py`. Do not edit by hand.*
 
 ## Scope
@@ -133,13 +133,14 @@ number is assigned automatically.
 
 ```bash
 python models/twin/digital_twin.py --mode forward \
-  --scenario-config models/twin/scenario_config.example.json \
-  --policy "output datasets/history/forward_policy.csv" \
-  --state "output datasets/history/opening_position.csv"
+    --scenario-config models/twin/scenario_config.example.json \
+    --policy "output datasets/history/forward_policy.csv" \
+    --state "output datasets/history/opening_position.csv"
 ```
 
 The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
-artefacts into the same standardized folder. The resolved execution settings
+artefacts into `output datasets/projections/SCENARIO_####_Name/<run-name>`.
+The resolved execution settings
 are added to the saved scenario config, while the original `--run-name` flow
 continues to work for existing automation.
 
@@ -152,8 +153,10 @@ The policy table's full column-by-column dictionary is Part 5 of
 
 | Folder | Mode | Seed | Label | Size |
 |---|---|---|---|---|
-| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.18 MB |
-| `projections/` | ? | ? | ? | 84.46 MB |
+| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.19 MB |
+| `MEIO/` | ? | ? | ? | 15.63 MB |
+| `MEIO artifacts/` | ? | ? | ? | 0.00 MB |
+| `projections/` | ? | ? | ? | 174.89 MB |
 | `segmentation/` | ? | ? | ? | 0.69 MB |
 
 A run folder is self-describing: `run_manifest.json` records the exact knobs,

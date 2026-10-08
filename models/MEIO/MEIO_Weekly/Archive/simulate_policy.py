@@ -52,7 +52,7 @@ def df_to_md(df):
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")
 TWIN_OUT = os.path.join(SCRIPT_DIR, "simulation_output", "twin_runs")
 
@@ -75,7 +75,7 @@ def main():
     args = ap.parse_args()
 
     sys.path.insert(0, SCRIPT_DIR)
-    import meio_optimizer_weekly as weekly
+    import models.MEIO.MEIO_Weekly.meio_optimizer_weekly as weekly
 
     print("=== 1. Regenerating weekly MEIO policy ===")
     weekly.run(weekly.DEFAULT_DATA, args.as_of_week, weekly.lib.SHORT_WINDOW_WEEKS,

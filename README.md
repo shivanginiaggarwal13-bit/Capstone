@@ -24,6 +24,8 @@ Clustering & Segmentation/segmentation_v5/
 output datasets/
   history/                               Historical replay outputs and opening state
   projections/baseline/                  Forward baseline projection
+  projections/SCENARIO_####_Name/        Digital Twin scenario runs
+  MEIO/Scenario/SCENARIO_####_Name/      MEIO policies and validation outputs
   segmentation/                          Canonical segmentation reports and artifacts
   OUTPUT_DOCUMENTATION.md               Forward-output schema
 
@@ -47,6 +49,80 @@ python -m pip install numpy pandas scipy scikit-learn matplotlib xgboost
 ```
 
 Run commands from the project root, or use absolute paths when working from another directory. Paths containing spaces must be quoted in PowerShell.
+
+## Shared scenario runs
+
+Create or edit the single root-level `scenario_config.json` before rerunning a
+scenario. The same file drives MEIO Weekly and the Digital Twin; both use its
+`scenario_number` and `scenario_name` to derive the identical folder name.
+
+```bash
+python models/MEIO/MEIO_Weekly/final_submission/run_weekly_tools.py
+python models/twin/digital_twin.py
+```
+
+To build the MEIO policy across the entire forward horizon and immediately score that policy in the
+Digital Twin, use the config-driven runner:
+
+```powershell
+python run_meio_then_twin.py
+```
+
+The runner invokes the configured `meio.runner_entrypoint`, which runs the
+MEIO production tools, then finds the generated
+`meio_policy_rolling.csv` under the configured MEIO policy scenario folder, and
+passes that time-varying policy to the configured Digital Twin entrypoint. It
+does not run the research artefact sweeps. Those are separate and configured
+under `artifacts.entrypoint`, with their exact scenario destination in
+`artifacts.scenario`:
+
+```powershell
+python models/MEIO/MEIO_Weekly/final_submission/run_all.py --steps 5,6,7
+```
+
+If the scenario already
+has outputs, it asks for approval before clearing only that scenario; use
+`--yes` for an explicit non-interactive approval.
+
+MEIO policy outputs are written below
+`output datasets/MEIO/SCENARIO_####_Name/`; research and validation artefacts
+are written below
+`output datasets/MEIO artifacts/SCENARIO_####_Name/`. Twin artefacts are
+written below `output datasets/projections/SCENARIO_####_Name/`. Each scenario
+folder receives a copy of `scenario_config.json` for auditability. The config
+also names the model entrypoints, data directory, policy, state, and output
+roots, so reruns do not require path arguments.
+
+### Regenerate the baseline
+
+Run these commands from the project root in PowerShell. The first command is
+only needed when the input/history dataset itself must be rebuilt. The second
+clears generated MEIO and Twin projections without touching inputs or history.
+The final command reads the policy, opening state, seed, and output locations
+from `scenario_config.json`.
+
+```powershell
+python supply_brain_generator_v5.py --stage all --run-name history
+Remove-Item -LiteralPath 'output datasets/MEIO','output datasets/projections' -Recurse -Force -ErrorAction SilentlyContinue
+python models/twin/digital_twin.py
+```
+
+With the checked-in config, the regenerated baseline is written to:
+
+```text
+output datasets/projections/SCENARIO_0002_MEIO_CLARK_SCARF_V2/baseline/
+```
+
+The MEIO weekly tools use the same scenario config and write to:
+
+```powershell
+python models/MEIO/MEIO_Weekly/Archive/run_weekly_tools.py
+```
+
+Their policy output is under
+`output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/`; alpha sweeps,
+validation reports, and supporting artefacts are under
+`output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/`.
 
 ## Data lifecycle
 
@@ -79,18 +155,16 @@ The history stage creates the historical inventory record in `input datasets/` a
 
 The twin is the shared physics engine. It simulates daily events across plant, plant DC, regional DC, and customer DC echelons, then writes weekly summaries.
 
-Run the baseline forward projection:
+Run the baseline forward projection using the scenario config:
 
 ```bash
-python models/twin/digital_twin.py --mode forward --run-name baseline \
-  --policy "output datasets/history/forward_policy.csv" \
-  --state "output datasets/history/opening_position.csv"
+python models/twin/digital_twin.py
 ```
 
 The baseline output is written to:
 
 ```text
-output datasets/projections/baseline/
+output datasets/projections/SCENARIO_0002_MEIO_CLARK_SCARF_V2/baseline/
 ```
 
 Score another policy from the identical opening state:

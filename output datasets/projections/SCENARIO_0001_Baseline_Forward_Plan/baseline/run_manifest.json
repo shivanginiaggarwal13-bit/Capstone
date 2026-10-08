@@ -3,11 +3,11 @@
   "run_name": "baseline",
   "label": "",
   "mode": "forward",
-  "generated_at": "2026-09-16T17:50:34",
+  "generated_at": "2026-10-08T00:28:50",
   "seed": 2026,
-  "policy_override": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone\\output datasets\\history\\forward_policy.csv",
+  "policy_override": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\forward_policy.csv",
   "margin_basis": "margin_usd",
-  "runtime_seconds": 10.2,
+  "runtime_seconds": 11.4,
   "assumptions": [
     "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
     "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
@@ -28,9 +28,10 @@
       "pairs_resolved": 11500,
       "pairs_on_fallback": 0
     },
-    "policy_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone\\output datasets\\history\\forward_policy.csv",
+    "policy_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\forward_policy.csv",
     "policy_rows": 7476,
-    "state_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone\\output datasets\\history\\opening_position.csv",
+    "policy_time_varying": false,
+    "state_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\opening_position.csv",
     "demand_basis": "forecast_qty x volume-weighted resampled forecast-error ratio",
     "forecast_units": 13242327.0,
     "realised_demand_units": 14159736.0,
@@ -44,5 +45,40 @@
     "horizon_days": 364,
     "first_period": "2026-W01",
     "last_period": "2026-W52"
+  },
+  "scenario": {
+    "schema_version": "1.0",
+    "scenario_number": 1,
+    "scenario_name": "Baseline Forward Plan",
+    "description": "Shared scenario input for MEIO and Digital Twin runs.",
+    "changes": {},
+    "digital_twin": {
+      "entrypoint": "models/twin/digital_twin.py",
+      "mode": "forward",
+      "run_name": "baseline",
+      "seed": 2026,
+      "data_dir": "input datasets",
+      "policy": "output datasets/history/forward_policy.csv",
+      "state": "output datasets/history/opening_position.csv",
+      "output_root": "output datasets"
+    },
+    "meio": {
+      "weekly_entrypoint": "models/MEIO/MEIO_Weekly/Archive/meio_optimizer_weekly.py",
+      "rolling_entrypoint": "models/MEIO/MEIO_Weekly/Archive/roll_forward_policy.py",
+      "data_dir": "input datasets",
+      "output_root": "output datasets/MEIO/Scenario"
+    },
+    "details": {
+      "owner": "Supply Planning",
+      "notes": "Copy this file into each scenario output folder as the audit input."
+    },
+    "execution": {
+      "mode": "forward",
+      "seed": 2026,
+      "horizon_weeks": null,
+      "policy": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\forward_policy.csv",
+      "state": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\opening_position.csv",
+      "output_folder": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\projections\\SCENARIO_0001_Baseline_Forward_Plan\\baseline"
+    }
   }
 }

@@ -36,6 +36,7 @@ import validate_real_data as vrd
 
 RESULTS_DIR = vrd.RESULTS_DIR
 RUN_OUT_DIR = vrd.RUN_OUT_DIR
+TWIN_OUT_DIR = vrd.TWIN_OUT_DIR
 TEST_START, TEST_END = vrd.TEST_START, vrd.TEST_END
 
 NETTING_DISCOUNTS = (0.0, 0.25, 0.5, 0.75, 1.0)
@@ -83,7 +84,7 @@ def multiseed_check(alpha=vrd.HEADLINE_ALPHA, discounts=(0.0, 1.0), seeds=vrd.MU
         for seed in seeds:
             tag = f"nd{nd:.2f}_s{seed}".replace(".", "")
             actual_run = f"ms_actual_s{seed}"
-            actual_out = os.path.join(RUN_OUT_DIR, actual_run)
+            actual_out = os.path.join(TWIN_OUT_DIR, actual_run)
             if os.path.exists(os.path.join(actual_out, "run_kpis.json")):
                 import json
                 with open(os.path.join(actual_out, "run_kpis.json")) as f:

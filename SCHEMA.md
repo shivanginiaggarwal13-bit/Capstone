@@ -1,6 +1,6 @@
 # Supply Brain — data layout
 
-*Auto-generated 2026-09-25 13:59 by
+*Auto-generated 2026-10-08 00:11 by
 `supply_brain_generator_v5.py`. Do not edit by hand.*
 
 The line between the two folders is **time**.

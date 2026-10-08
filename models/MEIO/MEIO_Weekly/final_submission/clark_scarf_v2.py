@@ -50,7 +50,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
 
 N_SIMS = 4000

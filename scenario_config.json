@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "scenario_number": 2,
+  "scenario_name": "MEIO_CLARK_SCARF_V2",
+  "description": "Shared scenario input for MEIO and Digital Twin runs.",
+  "changes": {},
+  "digital_twin": {
+    "entrypoint": "models/twin/digital_twin.py",
+    "mode": "forward",
+    "run_name": "meio_policy",
+    "seed": 2026,
+    "data_dir": "input datasets",
+    "policy": "output datasets/history/forward_policy.csv",
+    "state": "output datasets/history/opening_position.csv",
+    "output_root": "output datasets"
+  },
+  "meio": {
+    "runner_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/run_weekly_tools.py",
+    "weekly_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/meio_optimizer_weekly.py",
+    "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/roll_forward_policy.py",
+    "data_dir": "input datasets",
+    "as_of_week": "2025-W52",
+    "policy_filename": "meio_policy_rolling.csv",
+    "output_root": "output datasets/MEIO"
+  },
+  "artifacts": {
+    "entrypoint": "models/MEIO/MEIO_Weekly/final_submission/run_all.py",
+    "scenario": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2"
+  },
+  "details": {
+    "owner": "Supply Planning",
+    "notes": "Copy this file into each scenario output folder as the audit input."
+  }
+}

@@ -39,6 +39,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -49,12 +50,25 @@ import clark_scarf_v2 as csv2
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 DEFAULT_DATA = os.path.normpath(os.path.join(REPO_ROOT, "input datasets"))
+sys.path.insert(0, os.path.join(REPO_ROOT, "models"))
+import scenario
+
+SCENARIO_CONFIG = Path(REPO_ROOT) / "scenario_config.json"
+SCENARIO_SETTINGS = scenario.load_config(SCENARIO_CONFIG)
+SCENARIO_NAME = scenario.scenario_folder_name(SCENARIO_SETTINGS)
+DEFAULT_DATA = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "meio", "data_dir"))
 CLUSTER_CSV = os.path.join(REPO_ROOT, "Clustering & Segmentation", "segmentation_v4", "sku_clusters.csv")
-TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")
-RUN_OUT_DIR = os.path.join(SCRIPT_DIR, "validation_output")
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
-STATE_CSV = os.path.join(REPO_ROOT, "output datasets", "history", "opening_position.csv")
-BASELINE_POLICY_CSV = os.path.join(DEFAULT_DATA, "baseline_policy.csv")
+TWIN = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "entrypoint"))
+SCENARIO_OUT_DIR = str(scenario.resolve_scenario_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "scenario"))
+TWIN_OUT_ROOT = str(scenario.resolve_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "output_root"))
+RUN_OUT_DIR = os.path.join(SCENARIO_OUT_DIR, "validation_output")
+RESULTS_DIR = os.path.join(SCENARIO_OUT_DIR, "results")
+STATE_CSV = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "state"))
+BASELINE_POLICY_CSV = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "policy"))
+os.makedirs(SCENARIO_OUT_DIR, exist_ok=True)
+scenario.copy_config(SCENARIO_CONFIG, Path(SCENARIO_OUT_DIR))
 
 CLUSTERS = ["Flagship Promo-Driven", "Mid-Tier Core", "Long-Tail Erratic", "Long-Tail Supply-Risk"]
 ALPHAS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
@@ -71,10 +85,11 @@ def load_cluster_map():
 
 def run_twin_forward(run_name, policy_csv, seed=SEED):
     """Synthetic 2026 rolling basis (--mode forward, default 52-week horizon)."""
-    out_dir = os.path.join(RUN_OUT_DIR, run_name)
+    out_dir = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME, run_name)
     cmd = [sys.executable, TWIN, "--mode", "forward", "--run-name", run_name,
            "--policy", policy_csv, "--state", STATE_CSV, "--seed", str(seed),
-           "--out-root", RUN_OUT_DIR, "--label", run_name]
+           "--out-root", TWIN_OUT_ROOT, "--scenario-config", SCENARIO_CONFIG,
+           "--label", run_name]
     subprocess.run(cmd, check=True, cwd=REPO_ROOT, capture_output=True, text=True)
     with open(os.path.join(out_dir, "run_kpis.json")) as f:
         kpi = json.load(f)
@@ -85,7 +100,7 @@ def run_twin_forward(run_name, policy_csv, seed=SEED):
 def stage_baseline():
     """Synthetic-basis baseline (dataset's own forward_policy.csv). Cached
     after first run."""
-    out_dir = os.path.join(RUN_OUT_DIR, "synthetic_baseline")
+    out_dir = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME, "synthetic_baseline")
     if os.path.exists(os.path.join(out_dir, "run_kpis.json")):
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
             kpi = json.load(f)
@@ -146,7 +161,8 @@ def stage_own_fill():
     for cluster in CLUSTERS:
         for alpha in ALPHAS:
             tag = f"{cluster.replace(' ', '')}_a{alpha:.1f}".replace(".", "")
-            inv_path = os.path.join(RUN_OUT_DIR, tag, "inventory.csv")
+            inv_path = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME,
+                                    tag, "inventory.csv")
             if not os.path.exists(inv_path):
                 print(f"  SKIP {tag}: run the 'sweep' stage first")
                 continue

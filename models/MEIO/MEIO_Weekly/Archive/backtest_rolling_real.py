@@ -96,7 +96,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 DEFAULT_DATA = os.path.normpath(os.path.join(REPO_ROOT, "input datasets"))
 BASELINE_POLICY_CSV = os.path.join(DEFAULT_DATA, "baseline_policy.csv")
 TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")

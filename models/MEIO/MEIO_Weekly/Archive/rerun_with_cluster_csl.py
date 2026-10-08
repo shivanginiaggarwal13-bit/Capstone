@@ -50,7 +50,7 @@ import roll_forward_policy
 import clark_scarf_v2_rolling as csv2r
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 DEFAULT_DATA = os.path.normpath(os.path.join(REPO_ROOT, "input datasets"))
 CLUSTER_CSV = os.path.join(REPO_ROOT, "Clustering & Segmentation", "segmentation_v4", "sku_clusters.csv")
 TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")

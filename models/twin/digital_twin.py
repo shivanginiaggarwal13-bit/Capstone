@@ -75,6 +75,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -82,6 +83,9 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import scenario
 
 # ---------------------------------------------------------------------------
 # Conventions
@@ -1425,7 +1429,8 @@ python models/twin/digital_twin.py --mode forward \\
 ```
 
 The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
-artefacts into the same standardized folder. The resolved execution settings
+artefacts into `output datasets/projections/SCENARIO_####_Name/<run-name>`.
+The resolved execution settings
 are added to the saved scenario config, while the original `--run-name` flow
 continues to work for existing automation.
 
@@ -1654,7 +1659,7 @@ def load_scenario_config(config_path: Path, out_root: Path) -> Tuple[dict, Path]
     })
     if not isinstance(normalized["details"], dict):
         raise ValueError("scenario config 'details' must be a JSON object")
-    return normalized, out_root / _scenario_folder_name(number, name)
+    return normalized, out_root / "projections" / _scenario_folder_name(number, name)
 
 
 def _scenario_execution(config: dict, args, run_dir: Path) -> dict:
@@ -1684,12 +1689,12 @@ def run_twin(data_dir: Path, mode: str, seed: int,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run-name", default="baseline_asis")
+    ap.add_argument("--run-name", default=None)
     ap.add_argument("--mode", choices=["forward", "history"],
-                    default="forward")
-    ap.add_argument("--seed", type=int, default=2026)
+                    default=None)
+    ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--horizon-weeks", type=int, default=None)
-    ap.add_argument("--policy", required=True,
+    ap.add_argument("--policy", default=None,
                     help="CSV of dc_id,sku_id,safety_stock,reorder_point,"
                          "order_up_to_level - the optimization seam")
     ap.add_argument("--state", default=None,
@@ -1703,14 +1708,33 @@ def main():
     args = ap.parse_args()
 
     root = Path(__file__).resolve().parent.parent.parent
-    data_dir = Path(args.data_dir) if args.data_dir else root / "input datasets"
-    out_root = (Path(args.out_root) if args.out_root
-                else root / "output datasets")
+    config_path = Path(args.scenario_config) if args.scenario_config else root / "scenario_config.json"
+    config = scenario.load_config(config_path)
+    twin_config = config["digital_twin"]
+    args.run_name = args.run_name or twin_config.get("run_name", "baseline")
+    args.mode = args.mode or twin_config.get("mode", "forward")
+    args.seed = args.seed if args.seed is not None else int(twin_config.get("seed", 2026))
+    args.data_dir = str(args.data_dir or scenario.resolve_path(
+        config_path, config, "digital_twin", "data_dir"))
+    args.policy = str(args.policy or scenario.resolve_path(
+        config_path, config, "digital_twin", "policy"))
+    configured_state = scenario.resolve_path(config_path, config, "digital_twin", "state")
+    args.state = str(args.state or configured_state)
+    args.out_root = str(args.out_root or scenario.resolve_path(
+        config_path, config, "digital_twin", "output_root"))
+    args.scenario_config = str(config_path)
+
+    data_dir = Path(args.data_dir)
+    out_root = Path(args.out_root)
 
     scenario_config = None
     if args.scenario_config:
         scenario_config, run_dir = load_scenario_config(
             Path(args.scenario_config), out_root)
+        run_dir = run_dir / args.run_name
+        run_dir.parent.mkdir(parents=True, exist_ok=True)
+        (run_dir.parent / "scenario_config.json").write_text(
+            Path(args.scenario_config).read_text(encoding="utf-8"), encoding="utf-8")
         scenario_config = _scenario_execution(scenario_config, args, run_dir)
     else:
         run_dir = (out_root / "projections" / args.run_name

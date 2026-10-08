@@ -45,22 +45,40 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
 import clark_scarf_v2 as csv2
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
-DEFAULT_DATA = os.path.normpath(os.path.join(REPO_ROOT, "input datasets"))
-BASELINE_POLICY_CSV = os.path.join(DEFAULT_DATA, "baseline_policy.csv")
-TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")
-RUN_OUT_DIR = os.path.join(SCRIPT_DIR, "validation_output")   # gitignored; full twin run detail
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")              # repo-tracked summaries/charts/reports
-STATE_CSV = os.path.join(REPO_ROOT, "output datasets", "history", "opening_position.csv")
+sys.path.insert(0, os.path.join(REPO_ROOT, "models"))
+import scenario
+
+SCENARIO_CONFIG = Path(REPO_ROOT) / "scenario_config.json"
+SCENARIO_SETTINGS = scenario.load_config(SCENARIO_CONFIG)
+SCENARIO_NAME = scenario.scenario_folder_name(SCENARIO_SETTINGS)
+DEFAULT_DATA = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "meio", "data_dir"))
+BASELINE_POLICY_CSV = str(scenario.resolve_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "policy"))
+TWIN = str(scenario.resolve_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "entrypoint"))
+SCENARIO_OUT_DIR = scenario.resolve_scenario_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "scenario")
+TWIN_OUT_ROOT = str(scenario.resolve_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "output_root"))
+TWIN_OUT_DIR = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME)
+RUN_OUT_DIR = os.path.join(SCENARIO_OUT_DIR, "validation_output")  # full validation detail
+RESULTS_DIR = os.path.join(SCENARIO_OUT_DIR, "results")             # summaries/charts/reports
+STATE_CSV = str(scenario.resolve_path(
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "state"))
+
+os.makedirs(SCENARIO_OUT_DIR, exist_ok=True)
+scenario.copy_config(SCENARIO_CONFIG, SCENARIO_OUT_DIR)
 
 WARMUP_START = "2023-W01"
 WARMUP_END = "2025-W01"
@@ -90,10 +108,11 @@ def _all_periods(data_dir):
 def run_twin_history(run_name, policy_csv, seed=SEED):
     """Run the twin in --mode history over the full 156-week horizon
     (105-week warm-up + 51-week real test window)."""
-    out_dir = os.path.join(RUN_OUT_DIR, run_name)
+    out_dir = os.path.join(TWIN_OUT_DIR, run_name)
     cmd = [sys.executable, TWIN, "--mode", "history", "--horizon-weeks", str(HISTORY_WEEKS),
            "--run-name", run_name, "--policy", policy_csv, "--seed", str(seed),
-           "--data-dir", DEFAULT_DATA, "--out-root", RUN_OUT_DIR, "--label", run_name]
+            "--data-dir", DEFAULT_DATA, "--out-root", TWIN_OUT_ROOT,
+            "--scenario-config", SCENARIO_CONFIG, "--label", run_name]
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     with open(os.path.join(out_dir, "run_kpis.json")) as f:
         kpi = json.load(f)
@@ -227,7 +246,7 @@ def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=
 # --------------------------------------------------------------------------------- stages
 def stage_actual(seed=SEED):
     """Cached after first run -- every other stage reuses this arm."""
-    out_dir = os.path.join(RUN_OUT_DIR, "actual")
+    out_dir = os.path.join(TWIN_OUT_DIR, "actual")
     if os.path.exists(os.path.join(out_dir, "run_kpis.json")):
         print("[actual] already built, reusing cache")
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
@@ -311,7 +330,7 @@ def stage_multiseed():
             rng = np.random.default_rng(seed)
             tag = f"a{alpha:.1f}_s{seed}".replace(".", "")
             actual_run = f"ms_actual_s{seed}"
-            actual_out = os.path.join(RUN_OUT_DIR, actual_run)
+            actual_out = os.path.join(TWIN_OUT_DIR, actual_run)
             if os.path.exists(os.path.join(actual_out, "run_kpis.json")):
                 with open(os.path.join(actual_out, "run_kpis.json")) as f:
                     actual_kpi = json.load(f)
@@ -346,7 +365,7 @@ def stage_multiseed():
 def stage_segments():
     print("=== Stage: segments (Fast-Moving/Seasonal/Intermediate breakdown of the headline result) ===")
     actual_kpi, inv_actual = stage_actual()
-    headline_dir = os.path.join(RUN_OUT_DIR, "csv2_headline")
+    headline_dir = os.path.join(TWIN_OUT_DIR, "csv2_headline")
     if not os.path.exists(os.path.join(headline_dir, "inventory.csv")):
         print("  headline stage hasn't run yet -- running it now")
         stage_headline()

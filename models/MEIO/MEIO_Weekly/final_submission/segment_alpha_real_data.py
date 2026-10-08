@@ -75,6 +75,7 @@ import segment_alpha_explore as sae
 
 RESULTS_DIR = vrd.RESULTS_DIR
 RUN_OUT_DIR = vrd.RUN_OUT_DIR
+TWIN_OUT_DIR = vrd.TWIN_OUT_DIR
 TEST_START, TEST_END = vrd.TEST_START, vrd.TEST_END
 
 CLUSTERS = sae.CLUSTERS
@@ -123,7 +124,7 @@ def _actual_arm(seed):
     multiseed checks -- reuses their cached baselines when present. Called only
     from the serial pre-flight (see run_all) to avoid a build race between workers."""
     run_name = f"ms_actual_s{seed}"
-    out_dir = os.path.join(RUN_OUT_DIR, run_name)
+    out_dir = os.path.join(TWIN_OUT_DIR, run_name)
     if os.path.exists(os.path.join(out_dir, "run_kpis.json")):
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
             kpi = json.load(f)

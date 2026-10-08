@@ -32,7 +32,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 TWIN = os.path.join(REPO_ROOT, "models", "twin", "digital_twin.py")
 TWIN_OUT = os.path.join(SCRIPT_DIR, "simulation_output", "twin_runs", "robustness")
 

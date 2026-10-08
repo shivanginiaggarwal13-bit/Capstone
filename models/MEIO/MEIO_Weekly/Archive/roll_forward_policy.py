@@ -36,7 +36,7 @@ call site is unaffected.
 
     python roll_forward_policy.py
 
-Output: <repo-root>/output datasets/MEIO/rolling_2026/meio_policy_rolling.csv
+Output: <repo-root>/output datasets/MEIO/<scenario>/rolling_2026/meio_policy_rolling.csv
     (or `out_path` if passed to `run()` directly -- added after
     `alt_models/sim_optimize_rolling.py` and `alt_models/bandit_rolling.py`
     were run IN PARALLEL, both hardcoded to this same default path, and
@@ -49,6 +49,7 @@ Output: <repo-root>/output datasets/MEIO/rolling_2026/meio_policy_rolling.csv
 import argparse
 import os
 import sys
+from pathlib import Path
 
 import pandas as pd
 
@@ -57,11 +58,18 @@ import meio_weekly_lib as lib
 import meio_optimizer_weekly as weekly
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 OUTPUT_DATASETS_DIR = os.path.join(REPO_ROOT, "output datasets", "MEIO")
+DEFAULT_SCENARIO_CONFIG = os.path.join(REPO_ROOT, "scenario_config.json")
+sys.path.insert(0, os.path.join(REPO_ROOT, "models"))
+import scenario
 
 
-def run(data_dir: str, as_of_week: str, out_path: str = None):
+def run(data_dir: str | None, as_of_week: str, out_path: str = None,
+    scenario_config_path: str = DEFAULT_SCENARIO_CONFIG):
+    config_path = Path(os.path.abspath(scenario_config_path))
+    config = scenario.load_config(config_path)
+    data_dir = data_dir or str(scenario.resolve_path(config_path, config, "meio", "data_dir"))
     dfc = lib.load_demand_forecast(data_dir)
     period_index = lib.load_period_index(data_dir)
     as_of_week_num = int(period_index.loc[period_index.period == as_of_week, "week_num"].iloc[0])
@@ -101,9 +109,11 @@ def run(data_dir: str, as_of_week: str, out_path: str = None):
 
     rolling = pd.concat(all_weeks, ignore_index=True)
     if out_path is None:
-        out_dir = os.path.join(OUTPUT_DATASETS_DIR, "rolling_2026")
+        output_root = scenario.resolve_path(config_path, config, "meio", "output_root")
+        out_dir = output_root / scenario.scenario_folder_name(config) / "rolling_2026"
         os.makedirs(out_dir, exist_ok=True)
-        out_path = os.path.join(out_dir, "meio_policy_rolling.csv")
+        scenario.copy_config(config_path, out_dir.parent, config)
+        out_path = str(out_dir / "meio_policy_rolling.csv")
     else:
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     rolling.to_csv(out_path, index=False)
@@ -118,8 +128,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--as-of-week", default="2025-W52")
     ap.add_argument("--data-dir", default=weekly.DEFAULT_DATA)
+    ap.add_argument("--scenario-config", default=DEFAULT_SCENARIO_CONFIG,
+                    help="Shared root scenario JSON used for this run.")
     args = ap.parse_args()
-    run(args.data_dir, args.as_of_week)
+    run(args.data_dir, args.as_of_week, scenario_config_path=args.scenario_config)
 
 
 if __name__ == "__main__":

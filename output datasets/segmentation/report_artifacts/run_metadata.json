@@ -1,0 +1,52 @@
+{
+  "n_skus": 500,
+  "kept_features": [
+    "log_annual_net_margin",
+    "net_margin_pct",
+    "demand_cv_base",
+    "promo_depth_share",
+    "forecast_baseline_wmape",
+    "forecast_lift_wmape",
+    "lead_time_mean_days",
+    "lead_time_cv"
+  ],
+  "kept_blocks": {
+    "VALUE": [
+      "log_annual_net_margin",
+      "net_margin_pct"
+    ],
+    "VARIABILITY": [
+      "demand_cv_base",
+      "promo_depth_share"
+    ],
+    "FORECASTABILITY": [
+      "forecast_baseline_wmape",
+      "forecast_lift_wmape"
+    ],
+    "SUPPLY_RISK": [
+      "lead_time_mean_days",
+      "lead_time_cv"
+    ]
+  },
+  "selected_k": 6,
+  "dropped_features": [
+    {
+      "feature": "shelf_life_days",
+      "block": "PERISHABILITY",
+      "reason_type": "EXCLUDED_BY_DESIGN",
+      "reason": "Speaks to obsolescence/overstock risk, not to the safety-stock / fill-rate decision a service-level target is meant to encode. Excluded from the v5 candidate set by design; no longer used in the newsvendor overstock term either (see service_ladder())."
+    },
+    {
+      "feature": "write_off_rate",
+      "block": "PERISHABILITY",
+      "reason_type": "EXCLUDED_BY_DESIGN",
+      "reason": "Same reasoning as shelf_life_days -- both perishability features are out of scope for v5's narrower 'features that inform a service-level target' candidate set."
+    },
+    {
+      "feature": "otd_pct",
+      "block": "SUPPLY_RISK",
+      "reason_type": "STATISTICAL",
+      "reason": "Near-constant by construction (CV=0.0159)."
+    }
+  ]
+}

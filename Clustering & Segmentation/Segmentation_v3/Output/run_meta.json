@@ -1,0 +1,9 @@
+{
+  "segmentation_v3": {
+    "k_used": 4,
+    "k_auto": 4,
+    "n_sig": 10,
+    "n_feat": 10,
+    "pca_var": 0.40922990801894055
+  }
+}

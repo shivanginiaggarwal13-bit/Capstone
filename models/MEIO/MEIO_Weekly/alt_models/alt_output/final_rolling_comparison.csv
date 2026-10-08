@@ -1,0 +1,5 @@
+model,fill_rate,fill_rate_cdc,fill_rate_rdc,internal_replen_fill,total_landed_cost_usd
+baseline,0.9097,0.7863,0.9364,0.8905,36215502.05
+meio_weekly_rolling_v10,0.9275,0.8114,0.9526,0.812,36721902.84
+sim_optimize_rolling,0.9275,0.8114,0.9526,0.812,36721902.84
+bandit_rolling,0.9279,0.8106,0.9533,0.806,36746461.61

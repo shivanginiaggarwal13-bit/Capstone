@@ -1,0 +1,2 @@
+input[[:space:]]datasets/inventory.csv filter=lfs diff=lfs merge=lfs -text
+input[[:space:]]datasets/orders.csv filter=lfs diff=lfs merge=lfs -text

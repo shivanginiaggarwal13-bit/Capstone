@@ -1,0 +1,7 @@
+metric,observed,lo,hi,pass
+customer_fill_rate,0.9273,0.9,0.96,True
+internal_replen_fill_rate,0.8955,0.85,0.96,True
+avg_units_on_hand_network,1260323.9,800000.0,1300000.0,True
+receipt_on_time_rate,0.8994,0.85,0.95,True
+pct_receipts_short,0.205,0.1,0.3,True
+pct_skuweeks_capacity_limited,0.0314,0.02,0.15,True

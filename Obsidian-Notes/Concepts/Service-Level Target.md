@@ -1,0 +1,9 @@
+A **Service-Level Target** is the policy decision of how often a SKU should be in stock when demanded — the probability of *not* stocking out during a replenishment cycle. In [[Supply Brain]] it replaces a single blanket ~99% target applied to the whole portfolio with differentiated targets per [[SKU Segmentation|segment]]: roughly 97%+ for the top tier, tapering to ~90% for the tail.
+
+**Why the blanket target is the wrong default.** A uniform 99% target sounds safe, but it means low-margin, substitutable, steady-demand SKUs are protected at the same cost as high-margin, critical, hard-to-substitute ones. That's not conservatism — it's misallocated working capital: capital gets locked up protecting SKUs that don't need it, while genuinely critical SKUs get no better protection than the rest.
+
+**The benchmark reality check.** The target should be calibrated against real achieved performance, not an aspirational ceiling. A GMA/BCG study of 30+ US CPG manufacturers found a median *achieved* on-time [[Case Fill Rate|case fill rate]] of only **89.7%** — meaning ~88–91% is closer to a realistic current-state baseline than 99%, which is the aspirational number, not the achieved one. Differentiated targets (97%+ top tier, ~90% tail) represent the improvement *opportunity*, not a starting assumption.
+
+**Connection to the self-recalibration story.** A fixed target, set once, is exactly the "static policy" pattern the whole project exists to break. In the **[[Multi-Armed Bandits — Supply Brain Strategy|bandit track]]**, service-level target selection is modeled as its own decision point — arms are discrete tiers (`90% / 95% / 97% / 99%`) per segment, and the system re-checks which tier is actually paying off rather than treating the target as a fixed policy assumption forever.
+
+Related: [[Supply Brain]], [[Safety Stock]]

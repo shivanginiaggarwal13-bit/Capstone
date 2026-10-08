@@ -1,0 +1,11 @@
+feature,block,f_statistic,p_value,significant (p<0.05)
+forecast_baseline_wmape,FORECASTABILITY,348.64,1.0174286861459317e-121,True
+forecast_lift_wmape,FORECASTABILITY,282.37,2.98696669268088e-105,True
+lead_time_cv,SUPPLY_RISK,185.78,9.858975097262239e-81,True
+lead_time_mean_days,SUPPLY_RISK,172.52,1.3626749416354511e-76,True
+shelf_life_days,PERISHABILITY,108.38,5.671929318094947e-54,True
+demand_cv_base,VARIABILITY,50.8,1.2081623448065554e-28,True
+log_annual_net_margin,VALUE,49.5,5.35097210533075e-28,True
+otd_pct,SUPPLY_RISK,41.18,8.899626588453473e-24,True
+net_margin_pct,VALUE,5.05,0.0018579181708756709,True
+promo_depth_share,VARIABILITY,3.7,0.011720370843046713,True

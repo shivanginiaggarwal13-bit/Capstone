@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+run_logs/
+
+# large backtest/simulation detail (regenerable; only summaries are tracked)
+backtest_output/
+simulation_output/
+backtest_rolling_output/
+cluster_csl_output/

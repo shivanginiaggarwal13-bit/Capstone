@@ -1,0 +1,9 @@
+**Epsilon-Greedy** is the simplest [[Multi-Armed Bandit]] algorithm: play the arm with the best average reward so far *most* of the time, and play a uniformly random arm with a small fixed probability ε (epsilon) the rest of the time.
+
+**How it resolves the exploration/exploitation split.** Crudely — by a coin flip with fixed odds, not by reasoning about how uncertain the model actually is about each arm. If ε = 0.1, the algorithm explores randomly 10% of the time regardless of whether an arm has been tried once or a thousand times. See **[[Exploration-Exploitation Trade-off]]** for why that's a meaningfully cruder mechanism than what **[[Thompson Sampling]]** or **[[Upper Confidence Bound (UCB)]]** do instead.
+
+**Why it's considered but not chosen for [[Supply Brain]].** It's the baseline every bandit comparison starts from — simple to implement, easy to reason about, and useful as a sanity-check benchmark. But it "explores blindly": an arm that's been tried 50 times and consistently underperformed gets exactly the same random-exploration chance as an arm tried once. It has no sense of *confidence*, which matters for this project on two fronts — it can't naturally answer "how sure are we?" for the **[[Agentic Interface]]**'s explainability requirement, and it doesn't adapt its exploration rate as an arm's uncertainty shrinks or grows, which matters for handling **[[Non-Stationarity (Bandits)|seasonal shifts]]** gracefully.
+
+**Where it's still useful in this project.** As a baseline to benchmark Thompson Sampling against during Phase 3 engine development — if the more sophisticated approach can't beat plain epsilon-greedy on twin-simulated reward, that's a signal something is wrong with the implementation, not evidence that epsilon-greedy is the better choice.
+
+Related: [[Multi-Armed Bandit]], [[Multi-Armed Bandits — Supply Brain Strategy]]

@@ -1,0 +1,4 @@
+run,Flagship Promo-Driven,Mid-Tier Core,Long-Tail Erratic,Long-Tail Supply-Risk,ALL
+cluster_bandit_rolling (twin-optimized),0.9309,0.9314,0.8334,0.7554,0.9303
+meio_cluster (segmentation ladder as-is),0.9307,0.9227,0.8389,0.7627,0.9268
+meio_segment (original 3-way),0.9316,0.9229,0.8537,0.8193,0.9275

@@ -1,0 +1,2 @@
+run_generated_at,as_of_week,target_week,short_window_weeks,long_window_weeks,sku_dc_lines,total_safety_stock_units,total_safety_stock_usd,total_reorder_point_units,avg_target_csl
+2026-10-08T11:25:00.526166+00:00,2025-W52,2026-W01,13,52,7768,497790.5,2493468.41,913962.2999999999,0.9554205525511432

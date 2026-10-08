@@ -1,0 +1,7 @@
+cluster,alpha,n_seeds,own_fill_mean,own_fill_std,portfolio_fill_mean,internal_replen_mean,cost_delta_mean,cost_delta_std
+Flagship Promo-Driven,0.2,1,0.945,,0.9427,0.8199,2006007.3599999992,
+Mid-Tier Core,0.2,1,0.9397,,0.9427,0.8199,2006007.3599999992,
+Long-Tail Erratic,0.2,1,0.9389,,0.9427,0.8199,2006007.3599999992,
+Long-Tail Supply-Risk,0.0,1,0.924,,0.943,0.8197,1976083.7099999934,
+Long-Tail Supply-Risk,0.2,1,0.9189,,0.9427,0.8199,2006007.3599999992,
+Long-Tail Supply-Risk,1.0,1,0.9089,,0.9432,0.8203,1976659.6899999976,

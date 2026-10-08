@@ -1,0 +1,9 @@
+regional_dc_id,dc_name,city,state,region,storage_capacity_units
+RDC01,Northeast RDC,Newark,NJ,Northeast,593035
+RDC02,Southeast RDC,Charlotte,NC,Southeast,506475
+RDC03,Florida RDC,Tampa,FL,Southeast,649318
+RDC04,Midwest RDC,Chicago,IL,Midwest,637155
+RDC05,South-Central RDC,Dallas,TX,Southwest,611328
+RDC06,Mountain RDC,Denver,CO,West,671543
+RDC07,West Coast RDC,Los Angeles,CA,West,616362
+RDC08,Pacific NW RDC,Seattle,WA,West,453205

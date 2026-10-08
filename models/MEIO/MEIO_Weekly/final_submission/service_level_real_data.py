@@ -57,7 +57,6 @@ import validate_real_data as vrd
 lib = vrd.lib   # the exact meio_weekly_lib module instance validate_real_data.py (and clark_scarf_v2.py
                 # via its own import) use -- mutating Z_OVERRIDE_BY_SKU here affects their z-sizing.
 
-RESULTS_DIR = vrd.RESULTS_DIR
 RUN_OUT_DIR = vrd.RUN_OUT_DIR
 TEST_START, TEST_END = vrd.TEST_START, vrd.TEST_END
 SEEDS = vrd.MULTISEED_SEEDS
@@ -66,14 +65,15 @@ NETTING_DISCOUNT = 0.0   # the fix validated this session; current recommended c
 
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", ".."))
 CLUSTER_CSV = os.path.join(REPO_ROOT, "Clustering & Segmentation", "segmentation_v4", "sku_clusters.csv")
+AGENT_OUTPUT_DIR = os.path.join(REPO_ROOT, "output datasets", "agent output")
 
 CLUSTERS = ["Flagship Promo-Driven", "Mid-Tier Core", "Long-Tail Erratic", "Long-Tail Supply-Risk"]
 CANDIDATE_CSL = [0.90, 0.95, 0.97, 0.99]
 DEFAULT_WORKERS = 4
 
 PARTIAL_DIR = os.path.join(RUN_OUT_DIR, "service_level_partial")   # gitignored scratch, one file/combo
-OUT_CSV = os.path.join(RESULTS_DIR, "service_level_real_data_multiseed.csv")   # tracked, aggregated
-SUMMARY_CSV = os.path.join(RESULTS_DIR, "service_level_real_data_summary.csv")
+OUT_CSV = os.path.join(AGENT_OUTPUT_DIR, "service_level_real_data_multiseed.csv")   # tracked, agent-facing
+SUMMARY_CSV = os.path.join(AGENT_OUTPUT_DIR, "service_level_real_data_summary.csv")
 
 
 def candidate_z(csl):
@@ -118,7 +118,7 @@ def _aggregate_partials():
                 with open(os.path.join(PARTIAL_DIR, fn)) as f:
                     rows.append(json.load(f))
     out = pd.DataFrame(rows)
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(AGENT_OUTPUT_DIR, exist_ok=True)
     out.to_csv(OUT_CSV, index=False)
     return out
 
@@ -290,7 +290,7 @@ def main():
     ap.add_argument("--summarize-only", action="store_true",
                      help="Skip running; just (re)aggregate whatever's already on disk.")
     args = ap.parse_args()
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(AGENT_OUTPUT_DIR, exist_ok=True)
 
     if not args.summarize_only:
         clusters_to_run = [args.cluster] if args.cluster else CLUSTERS

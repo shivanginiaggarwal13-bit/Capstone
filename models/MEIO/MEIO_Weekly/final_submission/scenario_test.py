@@ -47,7 +47,7 @@ DEFAULT_DATA = sae.DEFAULT_DATA
 STATE_CSV = sae.STATE_CSV
 TWIN = sae.TWIN
 RUN_OUT_DIR = sae.RUN_OUT_DIR
-RESULTS_DIR = sae.RESULTS_DIR
+AGENT_OUTPUT_DIR = os.path.join(sae.REPO_ROOT, "output datasets", "agent output")
 
 ALPHA = 0.2                 # current recommended config
 NETTING_DISCOUNT = 0.0      # current recommended config (this session's fix)
@@ -133,7 +133,7 @@ def run_scenario(scenario_path):
         {"arm": "B: unprepared (scenario demand, baseline policy)", **{k: kpi_b[k] for k in KPI_KEYS}},
         {"arm": "C: prepared (scenario demand, scenario-aware policy)", **{k: kpi_c[k] for k in KPI_KEYS}},
     ])
-    out_csv = os.path.join(RESULTS_DIR, f"scenario_{tag}_comparison.csv")
+    out_csv = os.path.join(AGENT_OUTPUT_DIR, f"scenario_{tag}_comparison.csv")
     summary.to_csv(out_csv, index=False)
     print("\n" + summary.to_string(index=False))
 
@@ -150,7 +150,7 @@ def run_scenario(scenario_path):
     by_dc["safety_stock_delta"] = by_dc.scenario_safety_stock - by_dc.baseline_safety_stock
     by_dc["safety_stock_delta_pct"] = (
         by_dc.safety_stock_delta / by_dc.baseline_safety_stock.replace(0, np.nan) * 100).round(2)
-    by_dc_csv = os.path.join(RESULTS_DIR, f"scenario_{tag}_stocking_by_dc.csv")
+    by_dc_csv = os.path.join(AGENT_OUTPUT_DIR, f"scenario_{tag}_stocking_by_dc.csv")
     by_dc.to_csv(by_dc_csv, index=False)
     print(f"\nRecommended stocking change by DC (scenario-aware vs baseline):\n{by_dc.to_string(index=False)}")
 
@@ -167,7 +167,7 @@ def main():
     ap.add_argument("--scenario", required=True,
                      help="Path to a scenario-config JSON (see models/twin/scenario_config.example.json)")
     args = ap.parse_args()
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(AGENT_OUTPUT_DIR, exist_ok=True)
     run_scenario(args.scenario)
 
 

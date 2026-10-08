@@ -264,7 +264,8 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   `segment_alpha_real_data.py`. `--workers N`, `--cluster "<name>"`,
   `--summarize-only`. ~1.5-2 hours for a full run. **Just started as of
   this commit (one correctness-check combo only) — not yet a complete
-  sweep; see `results/service_level_real_data_summary.csv`.**
+  sweep; see `output datasets/agent output/service_level_real_data_
+  summary.csv`.**
 - `scenario_test.py` — Feature 2 (front-end scenario-testing agent): given
   a scenario (`models/twin/scenario_config.example.json`'s schema -- so
   far only `demand_surge_pct` + `affected_region`/`affected_nodes` +
@@ -299,6 +300,15 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   change, so they're still accurate).
 - `validation_output/` — gitignored. Full twin run detail (inventory.csv,
   receipts, etc.) per run; regenerate by re-running the scripts above.
+- `../../../../output datasets/agent output/` (i.e. the repo's
+  `output datasets/agent output/`) — the subset of results that directly
+  feed the two front-end agent features (service-level recommendation,
+  scenario testing), kept separate from the broader research `results/`
+  above: `segment_alpha_real_data_{multiseed,summary}.csv`,
+  `service_level_real_data_{multiseed,summary}.csv`, and
+  `scenario_<name>_{comparison,stocking_by_dc}.csv` per scenario tested.
+  `segment_alpha_real_data.py`, `service_level_real_data.py` and
+  `scenario_test.py` all write here directly.
 
 ## Next steps, in priority order
 
@@ -318,7 +328,7 @@ impact if ignored) is −0.06pp fill, +$226K cost.
    to do exactly this (real demand, 5 seeds, same 4-way split as the
    synthetic diagnostic) but is only partially run — finish it with
    `python segment_alpha_real_data.py` (resumable, ~1.5-2 hrs for the rest)
-   or `run_all.py --from 6`, then re-read `results/
+   or `run_all.py --from 6`, then re-read `output datasets/agent output/
    segment_alpha_real_data_summary.csv` before trusting any per-cluster
    alpha claim. A 2-way (core vs. long-tail) split rather than the full
    4-way may still be the better final call, to limit overfitting risk —

@@ -73,8 +73,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import validate_real_data as vrd
 import segment_alpha_explore as sae
 
-RESULTS_DIR = vrd.RESULTS_DIR
 RUN_OUT_DIR = vrd.RUN_OUT_DIR
+AGENT_OUTPUT_DIR = os.path.join(vrd.REPO_ROOT, "output datasets", "agent output")
 TEST_START, TEST_END = vrd.TEST_START, vrd.TEST_END
 
 CLUSTERS = sae.CLUSTERS
@@ -85,8 +85,8 @@ DEFAULT_WORKERS = 4   # 8 physical cores / 8GB RAM measured on this machine; ~85
                        # worker, so 4 leaves headroom for the OS and each worker's twin subprocess.
 
 PARTIAL_DIR = os.path.join(RUN_OUT_DIR, "segment_alpha_partial")   # gitignored scratch, one file/combo
-OUT_CSV = os.path.join(RESULTS_DIR, "segment_alpha_real_data_multiseed.csv")   # tracked, aggregated
-SUMMARY_CSV = os.path.join(RESULTS_DIR, "segment_alpha_real_data_summary.csv")
+OUT_CSV = os.path.join(AGENT_OUTPUT_DIR, "segment_alpha_real_data_multiseed.csv")   # tracked, agent-facing
+SUMMARY_CSV = os.path.join(AGENT_OUTPUT_DIR, "segment_alpha_real_data_summary.csv")
 
 
 def _partial_path(cluster, alpha, seed):
@@ -113,7 +113,7 @@ def _aggregate_partials():
                 with open(os.path.join(PARTIAL_DIR, fn)) as f:
                     rows.append(json.load(f))
     out = pd.DataFrame(rows)
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(AGENT_OUTPUT_DIR, exist_ok=True)
     out.to_csv(OUT_CSV, index=False)
     return out
 
@@ -278,7 +278,7 @@ def main():
     ap.add_argument("--summarize-only", action="store_true",
                      help="Skip running; just (re)aggregate whatever's already on disk.")
     args = ap.parse_args()
-    os.makedirs(RESULTS_DIR, exist_ok=True)
+    os.makedirs(AGENT_OUTPUT_DIR, exist_ok=True)
 
     if not args.summarize_only:
         clusters_to_run = [args.cluster] if args.cluster else CLUSTERS

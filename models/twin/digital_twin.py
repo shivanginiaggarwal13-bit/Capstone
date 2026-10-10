@@ -77,7 +77,7 @@ import json
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -88,6 +88,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import scenario
 import scenario_engine
+import overrides as override_engine
 
 # ---------------------------------------------------------------------------
 # Conventions
@@ -201,19 +202,36 @@ class TwinInputs:
     sku_category: List[str]
     horizon_days: int
 
+    # Scenario overrides (models/overrides/twin.py), keyed by forward week index; all
+    # empty unless a scenario changes them, in which case the engine's lookups below
+    # fall back to the static values for every lane, plant and week not listed.
+    lane_week: Dict = field(default_factory=dict)        # (week, lane) -> (mean, std) days
+    promise_week: Dict = field(default_factory=dict)     # (week, lane) -> committed lead days
+    lane_blocks: Dict = field(default_factory=dict)      # lane -> [(first day, last day) closed]
+    cap_plant_week: Dict = field(default_factory=dict)   # (week, plant) -> units/week
+    cap_family_week: Dict = field(default_factory=dict)  # (week, plant, family) -> units/week
+    adherence_week: Dict = field(default_factory=dict)   # (week, plant) -> {family|None: multiplier}
+
 
 def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
                  horizon_weeks: Optional[int] = None,
                  policy_csv: Optional[Path] = None,
                  state_csv: Optional[Path] = None,
-                 scenario_changes: Optional[dict] = None
+                 scenario_changes: Optional[dict] = None,
+                 overrides=None,
                  ) -> Tuple[TwinInputs, dict]:
     """Assemble everything the engine needs, indexed and array-shaped.
 
-    scenario_changes: the `changes` object from a --scenario-config file
+    scenario_changes: the legacy `changes` object from a --scenario-config file
     (see scenario_engine.py). None (the default -- every existing call site
     that doesn't pass this) is a complete no-op, byte-identical to before
-    this parameter existed."""
+    this parameter existed.
+
+    overrides: the ACTUAL side of a scenario's override set (models/overrides;
+    `OverrideSet.side("actual")`). Applied at fixed seams below -- economics after
+    the tables load, demand on the forward forecast rows, the opening state, lane
+    lead times / outages and plant capacity / attainment by week. An empty or None
+    set leaves every array byte-identical."""
     # Independent RNG streams. Keeping them separate is what makes common
     # random numbers possible: changing the policy must not shift the demand
     # or lead-time draws, or two runs are not comparable.
@@ -233,6 +251,8 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
     plant_dc = pd.read_csv(data_dir / "plant_dc_master.csv")
     plant_master = pd.read_csv(data_dir / "plant_master.csv")
     plant_cap = pd.read_csv(data_dir / "plant_capability.csv")
+    if overrides:   # unit cost, margin, carrying/storage rates, freight -- static for the run
+        sku_master, cost_p, lanes = override_engine.twin.economics(overrides, sku_master, cost_p, lanes)
 
     # ------------------------------------------------------------- horizon --
     if mode == "history":
@@ -339,10 +359,22 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
 
     cum_lt = _cumulative_lead_times(nodes, node_idx, supplier_of, lane_lt)
 
+    # ------------------------------------------- scenario supply overrides --
+    # Lead times by dispatch week, closed lanes, and plant capacity / attainment
+    # by production week. Empty dicts unless the scenario changes them.
+    lane_week, promise_week, lane_blocks = {}, {}, {}
+    cap_plant_week, cap_family_week, adherence_week = {}, {}, {}
+    if overrides:
+        lane_week, promise_week = override_engine.twin.lane_weeks(overrides, node_idx, lane_lt, periods, PROMISE_Z)
+        lane_blocks = override_engine.twin.lane_blocks(overrides, node_idx, periods)
+        cap_plant_week, cap_family_week = override_engine.twin.capacity_weeks(
+            overrides, plant_i, cap_plant, cap_family, periods)
+        adherence_week = override_engine.twin.adherence_weeks(overrides, plant_i, periods)
+
     # -------------------------------------------------------------- policy --
     policy, opening, active, notes_pol = _load_policy(
         nodes, skus, node_idx, sku_idx, wk_dates[0], policy_csv, state_csv,
-        periods=periods)
+        periods=periods, overrides=overrides)
     notes.update(notes_pol)
     rop, oul, ssk = policy
     opening_stock, op_it, op_eta = opening
@@ -350,7 +382,7 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
     # -------------------------------------------------------------- demand --
     daily_demand, dn = _build_demand(data_dir, mode, periods, week_index,
                                      node_idx, sku_idx, n_nodes, n_skus, T,
-                                     rng_demand)
+                                     rng_demand, overrides=overrides)
     notes.update(dn)
 
     if scenario_changes:
@@ -401,7 +433,12 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
         holding_per_unit_week=holding, margin_per_unit=margin,
         unit_cost=unit_cost, logistics_cost=logistics,
         sku_category=sm.category.reindex(skus).tolist(), horizon_days=T,
+        lane_week=lane_week, promise_week=promise_week, lane_blocks=lane_blocks,
+        cap_plant_week=cap_plant_week, cap_family_week=cap_family_week,
+        adherence_week=adherence_week,
     )
+    if overrides:
+        notes["overrides_applied"] = overrides.receipts.as_dict()["overrides"]
     notes.update({
         "margin_basis": MARGIN_COLUMN, "n_nodes": n_nodes, "n_skus": n_skus,
         "n_plants": n_plants, "n_active_pairs": int(active.sum()),
@@ -445,7 +482,7 @@ POLICY_COLUMNS = ["dc_id", "sku_id", "safety_stock", "reorder_point",
 
 
 def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
-                 policy_csv, state_csv, periods=None):
+                 policy_csv, state_csv, periods=None, overrides=None):
     """Load the policy and the opening state from two SEPARATE files.
 
     Policy is a standalone table — `dc_id, sku_id, safety_stock,
@@ -542,6 +579,8 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
     if state_csv is not None:
         w0 = pd.Timestamp(w0_date)
         state = pd.read_csv(state_csv)
+        if overrides:   # write-offs, injections, pre-builds, lost pipeline -- the opening position
+            state = override_engine.twin.opening_state(overrides, state)
         for r in state.itertuples(index=False):
             if r.sku_id not in sku_idx or r.dc_id not in node_idx:
                 continue
@@ -573,8 +612,13 @@ def _policy_at(inp, week_idx: int):
 
 
 def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
-                  n_nodes, n_skus, T, rng):
-    """Realised daily external demand tensor [T, n_nodes, n_skus]."""
+                  n_nodes, n_skus, T, rng, overrides=None):
+    """Realised daily external demand tensor [T, n_nodes, n_skus].
+
+    Scenario demand overrides act in forward mode only: demand.volume on the
+    forecast rows (customer lines) before the error ratio is drawn, and
+    demand.volatility on the drawn ratios. Neither changes how many random
+    numbers are consumed."""
     notes = {}
     daily = np.zeros((T, n_nodes, n_skus), dtype=np.int32)
 
@@ -609,7 +653,10 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
     dfc = pd.read_csv(data_dir / "demand_forecast.csv")
     n_weeks = len(periods)
     pidx = {p: k for k, p in enumerate(periods)}
-    fwd = (dfc[dfc.period.isin(set(periods))]
+    fwd_rows = dfc[dfc.period.isin(set(periods))]
+    if overrides:
+        fwd_rows = override_engine.twin.forecast_rows(overrides, fwd_rows)
+    fwd = (fwd_rows
            .groupby(["period", "dc_id", "sku_id"], as_index=False)
            .forecast_qty.sum())
     fcst = np.zeros((n_nodes, n_skus, n_weeks))
@@ -644,6 +691,10 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
                       max_obs - 1)
     ratios = np.where(has[:, :, None],
                       np.take_along_axis(pool, pick, axis=2), 1.0)
+    if overrides:
+        spread = override_engine.twin.volatility(overrides, node_idx, sku_idx, periods)
+        if spread is not None:      # demand.volatility: r -> 1 + k (r - 1), never below zero
+            ratios = np.maximum(0.0, 1.0 + spread * (ratios - 1.0))
     weekly = np.maximum(0.0, np.round(fcst * ratios))
 
     for w in range(n_weeks):
@@ -732,10 +783,12 @@ class SupplyBrainTwin:
 
     # -- lead times ----------------------------------------------------------
 
-    def _lead_times(self, origin: int, dest: int, n: int) -> np.ndarray:
+    def _lead_times(self, origin: int, dest: int, n: int, day: int = 0) -> np.ndarray:
         """One realised transit time per order line, drawn from the lane's own
-        parameters. Each receipt arrives on its own draw, not the average."""
-        m, sd = self.inp.lane_lt.get((origin, dest), (3.0, 1.0))
+        parameters -- this dispatch week's, when a scenario changes them. Each
+        receipt arrives on its own draw, not the average."""
+        key = (origin, dest)
+        m, sd = self.inp.lane_week.get((day // DAYS_PER_WEEK, key)) or self.inp.lane_lt.get(key, (3.0, 1.0))
         return np.maximum(0.5, self.rng_lt.normal(m, max(sd, 0.05), size=n))
 
     # -- step ----------------------------------------------------------------
@@ -889,11 +942,15 @@ class SupplyBrainTwin:
         idx = np.where(qty > 0)[0]
         if len(idx) == 0:
             return
-        lts = self._lead_times(origin, dest, len(idx))
-        arrd = np.minimum(day + np.maximum(1, np.ceil(lts)).astype(int),
+        lts = self._lead_times(origin, dest, len(idx), day)
+        depart = day
+        for first, last in inp.lane_blocks.get((origin, dest), ()):
+            if first <= day <= last:          # lane closed: the shipment leaves when it reopens
+                depart = last + 1
+        arrd = np.minimum(depart + np.maximum(1, np.ceil(lts)).astype(int),
                           inp.horizon_days + PIPELINE_PAD - 1)
-        promise = inp.lt_promise.get((origin, dest),
-                                     float(np.mean(lts) * 1.4))
+        promise = inp.promise_week.get((day // DAYS_PER_WEEK, (origin, dest))) or \
+            inp.lt_promise.get((origin, dest), float(np.mean(lts) * 1.4))
 
         for k_, s in enumerate(idx):
             self.pipeline[arrd[k_], dest, s] += qty[s]
@@ -952,9 +1009,9 @@ class SupplyBrainTwin:
                                     0.0, FG_COVER_WEEKS * sig - pos)), 0.0)
             planned = plan_unc.copy()
 
-            # family line capacity
+            # family line capacity (this week's, when a scenario changes it)
             for fam in set(np.array(inp.sku_family)[made]):
-                cap = inp.cap_family.get((p, fam))
+                cap = inp.cap_family_week.get((wk, p, fam), inp.cap_family.get((p, fam)))
                 if cap is None:
                     continue
                 m = made & (np.array(inp.sku_family) == fam)
@@ -963,13 +1020,22 @@ class SupplyBrainTwin:
                     planned[m] *= cap / tot
 
             # plant-wide capacity
+            cap_p = inp.cap_plant_week.get((wk, p), inp.cap_plant[p])
             tot = planned.sum()
-            capped = tot > inp.cap_plant[p]
+            capped = tot > cap_p
             if capped and tot > 0:
-                planned *= inp.cap_plant[p] / tot
+                planned *= cap_p / tot
 
             adh = self.rng_prod.uniform(*ADHERENCE_RANGE)
-            actual = np.floor(planned * adh)
+            shortfall = inp.adherence_week.get((wk, p))
+            if shortfall:                     # scenario attainment loss, on the same draw
+                mult = np.full(len(planned), shortfall.get(None, 1.0))
+                for fam, k in shortfall.items():
+                    if fam is not None:
+                        mult[np.array(inp.sku_family) == fam] *= k
+                actual = np.floor(planned * np.minimum(adh * mult, 1.0))
+            else:
+                actual = np.floor(planned * adh)
 
             idx = np.where(actual > 0)[0]
             if len(idx):
@@ -1435,12 +1501,18 @@ machine-readable `changes` object. It may also contain `scenario_number`,
 or other relevant context. If `scenario_number` is omitted, the next available
 number is assigned automatically.
 
-If `changes` contains `demand_surge_pct`, it is actually APPLIED to the
-simulated demand (see `scenario_engine.py` and Part 5's known limitations) --
-scaled for `affected_region` (or an explicit `affected_nodes` list) over
-`duration_weeks` weeks starting `start_week_offset` weeks into the horizon
-(both optional; default to the whole horizon starting immediately). Any
-other `changes` key is saved for context but has no simulation effect yet.
+Scenario changes live in `changes.overrides` and are applied by the override
+engine (`models/overrides/`; contract `override.schema.json`, meaning
+`catalog.py`). The Twin applies each override's ACTUAL side: demand on the
+forward forecast lines before the error draw, forecast-error spread, the
+opening position, unit economics, lane lead times and outages by dispatch week,
+and plant capacity and attainment by production week. MEIO applies the PLAN
+side to the policy this run executes. An override the engine cannot apply
+exactly stops the run instead of being skipped, and every application is
+recorded in `output datasets/overrides/SCENARIO_####_Name/receipts/` and in
+`run_manifest.json`. A legacy `changes` object (`demand_surge_pct` with
+`affected_region` / `affected_nodes`, `duration_weeks`, `start_week_offset`)
+still takes the `scenario_engine.py` path; any other key is refused.
 
 ```bash
 python models/twin/digital_twin.py --mode forward \\
@@ -1615,13 +1687,11 @@ what move.
   routed across them.
 - **Single-sourcing per (node, SKU).** Routing is one parent per pair, taken
   from `sku_sourcing_map.csv`.
-- **Only a demand-surge scenario type is applied.** `--scenario-config`'s
-  `changes` object is read and actually affects the simulation when it
-  contains `demand_surge_pct` (optionally `affected_region`/`affected_nodes`,
-  `duration_weeks`, `start_week_offset` -- see `scenario_engine.py`). Any
-  other key in `changes` is still saved to the self-describing scenario
-  folder for context but has no simulation effect -- lead-time and capacity
-  disruption types are not implemented yet.
+- **Scenario overrides have stated limits.** A lane outage holds dispatches
+  until the lane reopens (no failover routing); inventory overrides change the
+  opening position only (no mid-horizon shocks); economics overrides are static
+  for the run; demand can only be scaled where a SKU is already carried. See
+  `models/overrides/catalog.py` for every measure's exact semantics.
 - **Demand is aggregated to (node, SKU, day).** Forward mode synthesises demand
   from the forecast, so there are no discrete order lines and no true
   order-level on-time-in-full; `pct_demand_weeks_in_full` is measured at
@@ -1705,11 +1775,11 @@ def run_twin(data_dir: Path, mode: str, seed: int,
              horizon_weeks: Optional[int] = None,
              policy_csv: Optional[Path] = None,
              state_csv: Optional[Path] = None, verbose: bool = True,
-             scenario_changes: Optional[dict] = None):
+             scenario_changes: Optional[dict] = None, overrides=None):
     inp, notes, rng_lt, rng_prod = build_inputs(
         data_dir, mode=mode, seed=seed, horizon_weeks=horizon_weeks,
         policy_csv=policy_csv, state_csv=state_csv,
-        scenario_changes=scenario_changes)
+        scenario_changes=scenario_changes, overrides=overrides)
     twin = SupplyBrainTwin(inp, rng_lt, rng_prod)
     inv, rcpt, prod = twin.run(verbose=verbose)
     return inp, notes, twin, inv, rcpt, prod
@@ -1771,18 +1841,32 @@ def main():
                    if args.run_name == "baseline"
                    else out_root / args.run_name)
 
+    # The scenario's overrides: the Twin lives through the ACTUAL side. A legacy
+    # `changes` object (demand_surge_pct & co.) keeps its scenario_engine path.
+    full = override_engine.load(config, data_dir=data_dir, state_csv=args.state) if args.mode == "forward" else None
+    actual = full.side("actual", f"twin_{args.run_name}") if full else None
+    legacy = scenario_config.get("changes") if (scenario_config and full is None) else None
+    if args.mode != "forward" and (config.get("changes") or {}):
+        raise SystemExit("scenario overrides apply to forward runs only")
+
     t0 = time.time()
     print(f"Supply Brain digital twin — '{args.run_name}' [{args.mode}]")
     print(f"  margin basis: {MARGIN_COLUMN}")
+    if full:
+        print(f"  override engine {override_engine.ENGINE_VERSION}: {len(actual)} actual-side override(s) of {len(full)}")
     inp, notes, twin, inv, rcpt, prod = run_twin(
         data_dir, args.mode, args.seed, args.horizon_weeks,
         Path(args.policy),
         Path(args.state) if args.state else None,
-        scenario_changes=(scenario_config.get("changes") if scenario_config else None))
+        scenario_changes=legacy, overrides=actual or None)
 
     k, svc_node, costs = write_run(run_dir, inv, rcpt, prod,
                                    twin, inp, notes, args, t0,
                                    scenario_config)
+    if full:
+        receipt = override_engine.write_receipts(scenario.overrides_dir(config_path, config),
+                                                 f"twin_{args.run_name}", actual, full)
+        print(f"  override receipts: {receipt}")
     if not args.skip_output_documentation:
         _n = write_output_documentation(out_root)
         print(f"  wrote OUTPUT_DOCUMENTATION.md ({_n:,} lines)")

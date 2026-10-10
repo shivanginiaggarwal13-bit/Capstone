@@ -348,7 +348,7 @@ def stage_multiseed():
             fr_actual = fill_rate_kpis(test_actual, "actual")
             fr_csv2 = fill_rate_kpis(test_csv2, "csv2")
             rows.append({
-                "alpha": alpha, "seed": seed,
+                "alpha": alpha, "seed": seed, "netting_discount": 1.0,   # build_walkforward_policy_csv2 default
                 "actual_fill": fr_actual["customer_fill_rate"], "csv2_fill": fr_csv2["customer_fill_rate"],
                 "fill_delta_pp": (fr_csv2["customer_fill_rate"] - fr_actual["customer_fill_rate"]) * 100,
                 "cost_delta_usd": kpi["total_landed_cost_usd"] - actual_kpi["total_landed_cost_usd"],

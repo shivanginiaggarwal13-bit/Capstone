@@ -1733,6 +1733,8 @@ def main():
                     help="JSON metadata for a standardized SCENARIO_####_Name output folder")
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--out-root", default=None)
+    ap.add_argument("--skip-output-documentation", action="store_true",
+                    help="Do not rewrite the shared OUTPUT_DOCUMENTATION.md (for parallel runs).")
     args = ap.parse_args()
 
     root = Path(__file__).resolve().parent.parent.parent
@@ -1781,8 +1783,9 @@ def main():
     k, svc_node, costs = write_run(run_dir, inv, rcpt, prod,
                                    twin, inp, notes, args, t0,
                                    scenario_config)
-    _n = write_output_documentation(out_root)
-    print(f"  wrote OUTPUT_DOCUMENTATION.md ({_n:,} lines)")
+    if not args.skip_output_documentation:
+        _n = write_output_documentation(out_root)
+        print(f"  wrote OUTPUT_DOCUMENTATION.md ({_n:,} lines)")
     print("\n" + "=" * 62)
     print(f"{args.label or args.run_name}")
     print("=" * 62)

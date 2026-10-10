@@ -33,6 +33,26 @@ Clark-Scarf echelon model:
    crediting it away; 0.0 nets nothing. See `netting_discount_sweep.py` for
    the real-data test of this tradeoff.
 
+4. **Deterministic DDLT option** (`ddlt="quadrature"`), used by the pipeline
+   (roll_forward_policy.py through meio_parameters.py). It returns the same
+   percentile of the same Gamma-mixture DDLT, computed by integrating over 64
+   equiprobable lead-time nodes instead of sampling. That is the n_sims -> infinity
+   limit of the Monte Carlo, about 7x closer to a 400k-draw reference than 4,000
+   draws, and it uses no random numbers. Monte Carlo draws come from one shared
+   stream, so changing a few rows' demand shifts every later row's draws. A test
+   that bumped 20 CDC03 rows moved safety stock on 5,566 of 7,468 rows in all 23
+   DCs, by about 3% each. That would bury a scenario's prepared-vs-unprepared delta
+   in noise. With quadrature a row changes only when its own inputs do. The
+   default stays "monte_carlo", so the research scripts reproduce their published
+   results.
+
+Scenario overrides (`overrides`, a models/overrides PlanHooks; None by default)
+apply in this order: demand to the target-week estimate, service targets to z,
+`policy.pooling_alpha` to the per-SKU alpha. The caller applies lead times to
+`leadtime_by_dc`, and capacity and policy rules after the solve. `alpha_by_sku`
+and `z_by_sku` carry tuned per-SKU values from meio_parameters.py. They are passed
+explicitly, so a pipeline run never touches the module-global seams below.
+
 Scope: Monte Carlo + continuous alpha apply to RDC/CDC sizing. PDC still
 uses `meio_weekly_lib.solve_pdc_policy`'s closed-form push-ceiling logic
 unchanged (not at stake here -- see README "Known limitation: internal
@@ -62,12 +82,13 @@ N_SIMS = 4000
 ALPHA_OVERRIDE_BY_SKU: dict = {}
 
 
-def resolve_alpha(df: pd.DataFrame, default_alpha: float) -> np.ndarray:
-    """Per-row alpha: ALPHA_OVERRIDE_BY_SKU[sku_id] if set, else
-    default_alpha (normal behavior when the override is empty)."""
-    if ALPHA_OVERRIDE_BY_SKU:
-        return df.sku_id.map(ALPHA_OVERRIDE_BY_SKU).fillna(default_alpha).to_numpy()
-    return np.full(len(df), default_alpha)
+def resolve_alpha(df: pd.DataFrame, default_alpha: float, alpha_by_sku: dict | None = None) -> np.ndarray:
+    """Per-row alpha: alpha_by_sku (or, when that is None, the ALPHA_OVERRIDE_BY_SKU
+    research seam) where set, else default_alpha."""
+    mapping = ALPHA_OVERRIDE_BY_SKU if alpha_by_sku is None else alpha_by_sku
+    if mapping:
+        return df.sku_id.map(mapping).fillna(default_alpha).to_numpy(dtype=float)
+    return np.full(len(df), default_alpha, dtype=float)
 
 
 def _gamma_params(mean, std):
@@ -102,10 +123,52 @@ def monte_carlo_ddlt(target_mean, target_std, lt_mean_wk, lt_std_wk, target_csl,
     return reorder_point, safety_stock, cycle_stock
 
 
+QUAD_NODES = 64       # equiprobable lead-time nodes for ddlt="quadrature"
+QUAD_ITERS = 40       # bisection steps on the mixture CDF (bracket / 2^40)
+
+
+def quadrature_ddlt(target_mean, target_std, lt_mean_wk, lt_std_wk, target_csl,
+                    nodes: int = QUAD_NODES, iters: int = QUAD_ITERS):
+    """monte_carlo_ddlt's distribution, without sampling. DDLT given P = R + L is
+    Gamma(mean = mu P, std = sigma sqrt P) with L ~ Gamma(lead time). Its CDF is
+    averaged over `nodes` equiprobable quantiles of L. The reorder point is the
+    target_csl root of that mixture CDF, found by bisection between the smallest and
+    largest per-node quantile. The cycle stock is its exact mean, mu (R + E[L])."""
+    from scipy.special import gammainc
+    from scipy.stats import gamma
+
+    mean = np.asarray(target_mean, dtype=float)
+    std = np.asarray(target_std, dtype=float)
+    csl = np.broadcast_to(np.asarray(target_csl, dtype=float), mean.shape)
+    lt_shape, lt_scale = _gamma_params(lt_mean_wk, lt_std_wk)
+    u = (np.arange(nodes) + 0.5) / nodes
+    P = lib.REVIEW_WEEKS + gamma.ppf(u[:, None], lt_shape[None, :], scale=lt_scale[None, :])
+    shape, scale = _gamma_params(mean[None, :] * P, std[None, :] * np.sqrt(P))
+    q = gamma.ppf(csl[None, :], shape, scale=scale)
+    lo, hi = q.min(axis=0), q.max(axis=0)
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        below = gammainc(shape, mid[None, :] / scale).mean(axis=0) < csl
+        lo, hi = np.where(below, mid, lo), np.where(below, hi, mid)
+    reorder_point = 0.5 * (lo + hi)
+    cycle_stock = mean * (lib.REVIEW_WEEKS + np.asarray(lt_mean_wk, dtype=float))
+    return reorder_point, np.maximum(0.0, reorder_point - cycle_stock), cycle_stock
+
+
+def _ddlt(method: str, *args, rng=None, n_sims: int = N_SIMS):
+    if method == "quadrature":
+        return quadrature_ddlt(*args)
+    if method == "monte_carlo":
+        return monte_carlo_ddlt(*args, rng, n_sims=n_sims)
+    raise ValueError(f"ddlt must be 'monte_carlo' or 'quadrature', got {method!r}")
+
+
 def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtime_by_dc,
           cost, active_rdc, active_cdc, cdc_primary_rdc, target_week_num, alpha: float, rng,
           n_sims: int = N_SIMS, netting_discount: float = 1.0,
-          scenario_changes: dict = None, scenario_affected_nodes: list = None):
+          scenario_changes: dict = None, scenario_affected_nodes: list = None,
+          overrides=None, ddlt: str = "monte_carlo", alpha_by_sku: dict | None = None,
+          z_by_sku: dict | None = None):
     """One target week's RDC+CDC policy. Call directly for a walk-forward
     loop (advancing as_of_week_num each call); see `build_rolling_policy`
     for the fixed-as-of 52-week build.
@@ -122,9 +185,13 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     see scenario_engine.py). If given and `target_week_num` falls in the
     scenario's affected window, the demand this week's policy is SIZED
     against is bumped the same way the twin bumps what it SIMULATES, so a
-    scenario-aware policy actually recommends different stocking."""
+    scenario-aware policy actually recommends different stocking.
+
+    overrides / ddlt / alpha_by_sku / z_by_sku: see the module docstring; all off by
+    default, so existing call sites are unchanged."""
     demand = lib.target_week_demand(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat,
-                                     target_week_num=target_week_num)
+                                     target_week_num=target_week_num, overrides=overrides)
+    period = demand.target_period.iloc[0] if len(demand) else None
     if scenario_changes and scenario_affected_nodes:
         demand = scenario_engine.apply_demand_surge_to_target_demand(
             demand, scenario_affected_nodes, scenario_changes, as_of_week_num, target_week_num)
@@ -134,13 +201,13 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     cdc["lt_mean_wk"] = cdc.dc_id.map(lambda x: leadtime_by_dc[x][0] / 7.0)
     cdc["lt_std_wk"] = cdc.dc_id.map(lambda x: np.sqrt(leadtime_by_dc[x][1]) / 7.0)
     cdc = cdc.merge(cost, on=["sku_id", "dc_id"], how="left")
-    cdc["z"] = lib.assign_z(cdc)
+    cdc["z"] = lib.assign_z(cdc, overrides, period, z_by_sku)
     cdc["target_csl"] = norm.cdf(cdc.z.clip(lib.Z_MIN, lib.Z_MAX))
     cdc["target_std_uplifted"] = cdc.target_std * lib.SIGMA_UPLIFT["CDC"]
 
-    rop, ss, cyc = monte_carlo_ddlt(cdc.target_mean.to_numpy(), cdc.target_std_uplifted.to_numpy(),
-                                     cdc.lt_mean_wk.to_numpy(), cdc.lt_std_wk.to_numpy(),
-                                     cdc.target_csl.to_numpy(), rng, n_sims=n_sims)
+    rop, ss, cyc = _ddlt(ddlt, cdc.target_mean.to_numpy(), cdc.target_std_uplifted.to_numpy(),
+                         cdc.lt_mean_wk.to_numpy(), cdc.lt_std_wk.to_numpy(),
+                         cdc.target_csl.to_numpy(), rng=rng, n_sims=n_sims)
     cdc["reorder_point"], cdc["safety_stock"], cdc["cycle_stock"] = rop, ss, cyc
     cover_wk = max(lib.REVIEW_WEEKS, lib.ORDER_COVER_WEEKS)
     cdc["order_up_to_level"] = np.maximum(cdc.reorder_point + cdc.target_mean * cover_wk,
@@ -166,13 +233,13 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     rdc["lt_mean_wk"] = rdc.dc_id.map(lambda x: leadtime_by_dc[x][0] / 7.0)
     rdc["lt_std_wk"] = rdc.dc_id.map(lambda x: np.sqrt(leadtime_by_dc[x][1]) / 7.0)
     rdc = rdc.merge(cost, on=["sku_id", "dc_id"], how="left")
-    rdc["z"] = lib.assign_z(rdc)
+    rdc["z"] = lib.assign_z(rdc, overrides, period, z_by_sku)
     rdc["target_csl"] = norm.cdf(rdc.z.clip(lib.Z_MIN, lib.Z_MAX))
 
     # endpoint A: independent (alpha=0)
-    rop_i, ss_i, cyc_i = monte_carlo_ddlt(
-        rdc.own_mean.to_numpy(), (rdc.own_std * lib.SIGMA_UPLIFT["RDC"]).to_numpy(),
-        rdc.lt_mean_wk.to_numpy(), rdc.lt_std_wk.to_numpy(), rdc.target_csl.to_numpy(), rng, n_sims=n_sims)
+    rop_i, ss_i, cyc_i = _ddlt(
+        ddlt, rdc.own_mean.to_numpy(), (rdc.own_std * lib.SIGMA_UPLIFT["RDC"]).to_numpy(),
+        rdc.lt_mean_wk.to_numpy(), rdc.lt_std_wk.to_numpy(), rdc.target_csl.to_numpy(), rng=rng, n_sims=n_sims)
 
     # endpoint B: fully pooled (alpha=1) -- netted against downstream CDC SS,
     # discounted by netting_discount. Full netting (discount=1.0) assumes
@@ -184,12 +251,14 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     # own stock instead of crediting it against what the CDCs already hold.
     mu_echelon = rdc.own_mean + rdc.down_mean
     sigma_echelon = np.sqrt((rdc.own_std * lib.SIGMA_UPLIFT["RDC"]) ** 2 + rdc.down_var)
-    rop_p, ss_p_raw, cyc_p = monte_carlo_ddlt(
-        mu_echelon.to_numpy(), sigma_echelon.to_numpy(),
-        rdc.lt_mean_wk.to_numpy(), rdc.lt_std_wk.to_numpy(), rdc.target_csl.to_numpy(), rng, n_sims=n_sims)
+    rop_p, ss_p_raw, cyc_p = _ddlt(
+        ddlt, mu_echelon.to_numpy(), sigma_echelon.to_numpy(),
+        rdc.lt_mean_wk.to_numpy(), rdc.lt_std_wk.to_numpy(), rdc.target_csl.to_numpy(), rng=rng, n_sims=n_sims)
     ss_p = np.maximum(0.0, ss_p_raw - netting_discount * rdc.down_ss.to_numpy())
 
-    alpha_vec = resolve_alpha(rdc, alpha)
+    alpha_vec = resolve_alpha(rdc, alpha, alpha_by_sku)
+    if overrides:                      # policy.pooling_alpha
+        alpha_vec = overrides.alpha(rdc, alpha_vec, period)
     rdc["safety_stock"] = alpha_vec * ss_p + (1 - alpha_vec) * ss_i
     rdc["cycle_stock"] = alpha_vec * cyc_p + (1 - alpha_vec) * cyc_i
     rdc["reorder_point"] = rdc.cycle_stock + rdc.safety_stock
@@ -198,11 +267,18 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     s_endpoint_i = np.maximum(rdc.reorder_point + rdc.own_mean * cover_wk, rdc.reorder_point * lib.MIN_S_MULTIPLE)
     rdc["order_up_to_level"] = alpha_vec * s_endpoint_p + (1 - alpha_vec) * s_endpoint_i
 
+    # Planning columns as meio_weekly_lib.solve_policy names them, so the weekly tool and
+    # the policy overrides (weeks_of_cover uses target_mean) read either model. An RDC's
+    # target_mean is its own demand.
+    rdc["target_mean"], rdc["target_std"] = rdc.own_mean, rdc.own_std
+    rdc["target_period"] = period
     keep = ["dc_id", "sku_id", "category", "subcategory", "segment", "safety_stock",
-            "reorder_point", "order_up_to_level", "target_csl"]
+            "reorder_point", "order_up_to_level", "target_csl", "target_period", "target_mean", "target_std",
+            "lt_mean_wk", "lt_std_wk", "z", "cycle_stock", "unit_cost_usd"]
     out = pd.concat([cdc[keep], rdc[keep]], ignore_index=True)
-    for c in ["safety_stock", "reorder_point", "order_up_to_level"]:
+    for c in ["safety_stock", "reorder_point", "order_up_to_level", "cycle_stock"]:
         out[c] = out[c].round(1)
+    out["safety_stock_usd"] = (out.safety_stock * out.unit_cost_usd).round(2)
     return out
 
 

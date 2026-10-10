@@ -6,6 +6,24 @@ import re
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_OVERRIDES_ROOT = "output datasets/overrides"
+# Read by the agent tools (Agents/tools/engine.py) before they launch a scenario.
+PIPELINE_CAPABILITIES = {"scenario_config_passthrough": True, "repo_root_paths": True}
+
+
+MEIO_MODELS = ("meio_weekly", "clark_scarf_v2")
+
+
+def meio_model(config: dict) -> str:
+    """The sizing model a config's MEIO runs, from `meio.parameters.model`. A config with
+    no `parameters` section predates the link to run_all.py's tuning and keeps MEIO
+    Weekly, so it rebuilds exactly the policy it built before."""
+    params = (config.get("meio") or {}).get("parameters") or {}
+    model = params.get("model", "meio_weekly")
+    if model not in MEIO_MODELS:
+        raise ValueError(f"meio.parameters.model must be one of {MEIO_MODELS}, got {model!r}")
+    return model
 
 
 def scenario_folder_name(config: dict) -> str:
@@ -46,12 +64,22 @@ def scenario_dir(config_path: Path, output_root: Path) -> Path:
 
 def resolve_path(config_path: Path, config: dict, section: str, key: str,
                  default: Path | None = None) -> Path:
-    """Resolve a repository-relative path stored in a scenario section."""
+    """Resolve a repository-relative path stored in a scenario section. Relative paths
+    resolve from the repository root, not the config's folder, so a scenario config
+    saved anywhere (output datasets/overrides/..., an output folder's audit copy) points
+    at the same data as the root config."""
     value = config.get(section, {}).get(key) if isinstance(config.get(section), dict) else None
     path = Path(value) if isinstance(value, str) and value else default
     if path is None:
         raise ValueError(f"scenario config requires '{section}.{key}'")
-    return path if path.is_absolute() else config_path.parent / path
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def overrides_dir(config_path: Path, config: dict) -> Path:
+    """The scenario's override folder: <overrides.output_root>/SCENARIO_####_Name. Holds the
+    generated config, card and approval, and everything the override engine writes."""
+    root = resolve_path(config_path, config, "overrides", "output_root", default=Path(DEFAULT_OVERRIDES_ROOT))
+    return root / scenario_folder_name(config)
 
 
 def resolve_scenario_path(config_path: Path, config: dict, section: str, key: str) -> Path:

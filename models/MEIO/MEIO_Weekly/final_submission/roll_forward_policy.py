@@ -36,6 +36,12 @@ call site is unaffected.
 
     python roll_forward_policy.py
 
+Sizing model and parameters: the config's `meio.parameters` (meio_parameters.py).
+Clark-Scarf v2 takes alpha and netting_discount from run_all.py's validated
+evidence. A config without that section keeps MEIO Weekly. Either way the
+resolved parameters, and the evidence files they rest on, are written to
+meio_parameters.json next to the policy.
+
 Output: <repo-root>/output datasets/MEIO/<scenario>/rolling_2026/meio_policy_rolling.csv
     (or `out_path` if passed to `run()` directly -- added after
     `alt_models/sim_optimize_rolling.py` and `alt_models/bandit_rolling.py`
@@ -51,11 +57,13 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meio_weekly_lib as lib
 import meio_optimizer_weekly as weekly
+import meio_parameters
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
@@ -63,6 +71,7 @@ OUTPUT_DATASETS_DIR = os.path.join(REPO_ROOT, "output datasets", "MEIO")
 DEFAULT_SCENARIO_CONFIG = os.path.join(REPO_ROOT, "scenario_config.json")
 sys.path.insert(0, os.path.join(REPO_ROOT, "models"))
 import scenario
+import overrides as override_engine
 
 
 def run(data_dir: str | None, as_of_week: str, out_path: str = None,
@@ -70,6 +79,10 @@ def run(data_dir: str | None, as_of_week: str, out_path: str = None,
     config_path = Path(os.path.abspath(scenario_config_path))
     config = scenario.load_config(config_path)
     data_dir = data_dir or str(scenario.resolve_path(config_path, config, "meio", "data_dir"))
+    ovs, plan = weekly.plan_overrides(config_path, config, data_dir, "meio")
+    params = meio_parameters.resolve(config)
+    print(params.summary())
+    rng = np.random.default_rng(params.seed)      # Monte Carlo only; quadrature draws nothing
     dfc = lib.load_demand_forecast(data_dir)
     period_index = lib.load_period_index(data_dir)
     as_of_week_num = int(period_index.loc[period_index.period == as_of_week, "week_num"].iloc[0])
@@ -88,17 +101,24 @@ def run(data_dir: str | None, as_of_week: str, out_path: str = None,
     constrained_weeks = 0
     for wk_num in forward_weeks:
         target_period = period_index.loc[period_index.week_num == wk_num, "period"].iloc[0]
-        demand = lib.target_week_demand(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat,
-                                         target_week_num=wk_num)
-        policy = lib.solve_policy(demand, leadtime_by_dc, cost, active_rdc, active_cdc, cdc_primary_rdc)
+        lanes = plan.lanes(target_period) if plan else None
+        week_leadtime = leadtime_by_dc
+        if lanes is not None:            # this week's lead-time overrides, on the same routing
+            week_rdc_lt, week_cdc_lt, _ = lib.build_leadtime_graph(data_dir, active_rdc, active_cdc, lanes)
+            week_leadtime = {**week_rdc_lt, **week_cdc_lt}
+        policy = weekly.size_rdc_cdc(params, dfc, as_of_week_num, period_index, seasonal_index, sku_subcat,
+                                     week_leadtime, cost, active_rdc, active_cdc, cdc_primary_rdc, wk_num, plan, rng)
         rdc_smoothed = lib.smoothed_rdc_demand_for_pdc(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat,
-                                                        active_rdc, wk_num)
-        pdc_policy = lib.solve_pdc_policy(rdc_smoothed, data_dir, cost)
+                                                        active_rdc, wk_num, overrides=plan)
+        pdc_policy = lib.solve_pdc_policy(rdc_smoothed, data_dir, cost, overrides=plan, period=target_period,
+                                          lanes=lanes, z_by_sku=params.z_by_sku or None)
         n_constrained = int(pdc_policy.capacity_constrained.sum()) if len(pdc_policy) else 0
         if n_constrained:
             constrained_weeks += 1
         if len(pdc_policy):
             policy = pd.concat([policy, pdc_policy], ignore_index=True)
+        if plan:
+            policy = plan.policy(policy, target_period)
         policy["period"] = target_period
         all_weeks.append(policy[["period", "dc_id", "sku_id", "safety_stock",
                                   "reorder_point", "order_up_to_level"]])
@@ -118,6 +138,11 @@ def run(data_dir: str | None, as_of_week: str, out_path: str = None,
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     rolling.to_csv(out_path, index=False)
     print(f"\nWrote {len(rolling):,} (period, dc, sku) policy rows to {out_path}")
+    if params.model != "meio_weekly":
+        print(f"Parameters: {params.write(Path(out_path).parent / 'meio_parameters.json')}")
+    if plan:
+        receipt = override_engine.write_receipts(scenario.overrides_dir(config_path, config), "meio", plan.ovs, ovs)
+        print(f"Override receipts: {receipt}")
     print(f"Weeks covered: {rolling.period.nunique()}  "
           f"Mean order_up_to_level: {rolling.order_up_to_level.mean():.1f}  "
           f"(static single-week policy was 195.3 -- see README)")

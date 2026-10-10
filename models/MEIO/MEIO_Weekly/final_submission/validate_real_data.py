@@ -70,7 +70,7 @@ TWIN = str(scenario.resolve_path(
 SCENARIO_OUT_DIR = scenario.resolve_scenario_path(
     SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "scenario")
 TWIN_OUT_ROOT = str(scenario.resolve_path(
-    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "output_root"))
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "twin_output_root"))
 TWIN_OUT_DIR = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME)
 RUN_OUT_DIR = os.path.join(SCENARIO_OUT_DIR, "validation_output")  # full validation detail
 RESULTS_DIR = os.path.join(SCENARIO_OUT_DIR, "results")             # summaries/charts/reports
@@ -112,7 +112,8 @@ def run_twin_history(run_name, policy_csv, seed=SEED):
     cmd = [sys.executable, TWIN, "--mode", "history", "--horizon-weeks", str(HISTORY_WEEKS),
            "--run-name", run_name, "--policy", policy_csv, "--seed", str(seed),
             "--data-dir", DEFAULT_DATA, "--out-root", TWIN_OUT_ROOT,
-            "--scenario-config", SCENARIO_CONFIG, "--label", run_name]
+               "--scenario-config", SCENARIO_CONFIG, "--label", run_name,
+               "--skip-output-documentation"]
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     with open(os.path.join(out_dir, "run_kpis.json")) as f:
         kpi = json.load(f)

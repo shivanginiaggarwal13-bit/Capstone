@@ -179,7 +179,7 @@ def _worker(job):
     cluster_skus = cluster_map_skus(cluster_map, cluster)
     tag = (cluster.replace(" ", "") + f"_a{alpha:.1f}_s{seed}").replace(".", "")
     kpi, actual_kpi, test_inv, test_actual = simulate_combo(cluster_skus, alpha, seed, tag)
-    row = {"cluster": cluster, "alpha": alpha, "seed": seed,
+    row = {"cluster": cluster, "alpha": alpha, "seed": seed, "netting_discount": 1.0,   # vrd's default
            **cluster_stats(test_inv, test_actual, cluster_skus, kpi, actual_kpi)}
     _write_partial(row)
     return f"[done] {cluster} alpha={alpha:.1f} seed={seed}  own_fill={row['own_fill_rate']}"
@@ -210,7 +210,7 @@ def run_all(clusters_to_run, workers):
         for cluster in CLUSTERS:
             if _partial_done(cluster, REFERENCE_ALPHA, seed):
                 continue
-            row = {"cluster": cluster, "alpha": REFERENCE_ALPHA, "seed": seed,
+            row = {"cluster": cluster, "alpha": REFERENCE_ALPHA, "seed": seed, "netting_discount": 1.0,
                    **cluster_stats(test_inv, test_actual, cluster_map_skus(cluster_map, cluster), kpi, actual_kpi)}
             _write_partial(row)
 

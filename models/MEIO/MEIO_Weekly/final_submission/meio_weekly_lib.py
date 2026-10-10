@@ -231,14 +231,19 @@ LONG_WINDOW_WEEKS = 52
 Z_OVERRIDE_BY_SKU: dict = {}
 
 
-def assign_z(df: pd.DataFrame) -> pd.Series:
-    """z per row: Z_OVERRIDE_BY_SKU[sku_id] if set, else the segment-based
-    Z_BY_SEGMENT lookup (original behavior, unchanged when the override is
-    empty)."""
-    if Z_OVERRIDE_BY_SKU:
-        overridden = df.sku_id.map(Z_OVERRIDE_BY_SKU)
-        return overridden.fillna(df.segment.map(Z_BY_SEGMENT)).fillna(Z_DEFAULT)
-    return df.segment.map(Z_BY_SEGMENT).fillna(Z_DEFAULT)
+def assign_z(df: pd.DataFrame, overrides=None, period: str | None = None,
+             z_by_sku: dict | None = None) -> pd.Series:
+    """z per row: z_by_sku (or, when that is None, the Z_OVERRIDE_BY_SKU research
+    seam) where set, else the segment-based Z_BY_SEGMENT lookup (original behavior,
+    unchanged when both are empty). `overrides` (models/overrides PlanHooks, None by
+    default) then applies the scenario's service.target_csl overrides active in `period`."""
+    mapping = Z_OVERRIDE_BY_SKU if z_by_sku is None else z_by_sku
+    if mapping:
+        overridden = df.sku_id.map(mapping)
+        z = overridden.fillna(df.segment.map(Z_BY_SEGMENT)).fillna(Z_DEFAULT)
+    else:
+        z = df.segment.map(Z_BY_SEGMENT).fillna(Z_DEFAULT)
+    return overrides.z(df, z, period) if overrides else z
 
 
 # --------------------------------------------------------------------- IO ---
@@ -335,21 +340,32 @@ def deseasonalized_level(dfc_agg: pd.DataFrame, as_of_week_num: int, period_inde
 
 
 # ------------------------------------------------------------ lead times ---
-def build_leadtime_graph(data_dir: str, active_rdc, active_cdc):
+def build_leadtime_graph(data_dir: str, active_rdc, active_cdc, lanes: pd.DataFrame | None = None):
     """Cumulative (mean_days, var_days) from Plant to every RDC and CDC,
     walking the single fastest (min mean lead time) inbound lane at each
-    node -- identical method to the annual `meio_optimizer.py`."""
-    lanes = pd.read_csv(f"{data_dir}/network_lanes.csv")
+    node -- identical method to the annual `meio_optimizer.py`.
+
+    `lanes` (None by default) is a lane table carrying a scenario's lead-time
+    overrides for one target week. The fastest lane is still chosen on the
+    published lane table -- a delay changes how long a lane takes, not which
+    lane the network uses -- and its mean/std are then read from `lanes`."""
+    base = pd.read_csv(f"{data_dir}/network_lanes.csv")
+    values = None if lanes is None else lanes.set_index("lane_id")[["lead_time_mean_days", "lead_time_std_days"]]
 
     def primary_upstream(dest_ids, dest_type, allowed_origins=None):
-        sub = lanes[lanes.destination_node_type == dest_type]
+        sub = base[base.destination_node_type == dest_type]
         if allowed_origins is not None:
             sub = sub[sub.origin_node_id.isin(allowed_origins)]
         sub = sub[sub.destination_node_id.isin(dest_ids)]
         best = sub.sort_values("lead_time_mean_days").drop_duplicates("destination_node_id", keep="first")
+        if values is not None:
+            best = best.assign(lead_time_mean_days=best.lane_id.map(values.lead_time_mean_days).to_numpy(),
+                               lead_time_std_days=best.lane_id.map(values.lead_time_std_days).to_numpy())
         return best.set_index("destination_node_id")[
             ["origin_node_id", "lead_time_mean_days", "lead_time_std_days"]
         ]
+
+    lanes = base
 
     pdc_ids = lanes.loc[lanes.destination_node_type == "PLANT_DC", "destination_node_id"].unique()
     plant_to_pdc = primary_upstream(pdc_ids, "PLANT_DC")
@@ -425,7 +441,7 @@ def blended_cv(dfc_agg: pd.DataFrame, as_of_week_num: int, period_index: pd.Data
 
 def target_week_demand(dfc_agg: pd.DataFrame, as_of_week_num: int, period_index: pd.DataFrame,
                         seasonal_index: pd.DataFrame, sku_subcat: dict,
-                        target_week_num: int | None = None) -> pd.DataFrame:
+                        target_week_num: int | None = None, overrides=None) -> pd.DataFrame:
     """Bias-corrected mean, blended toward a de-seasonalized estimate, and
     blended-CV std for a target week, per (sku_id, dc_id). This is what the
     optimizer sizes that week's stock against.
@@ -492,12 +508,15 @@ def target_week_demand(dfc_agg: pd.DataFrame, as_of_week_num: int, period_index:
     # clark_scarf_model.py -- confirmed the sizing math itself was
     # unaffected, only the reporting column in meio_recommendations_weekly.csv
     # was blank for every RDC/CDC row).
-    return d.drop(columns=["subcategory"])
+    d = d.drop(columns=["subcategory"])
+    # Scenario demand overrides change this estimate itself, not the raw forecast it
+    # blends, so a known +25% is planned as +25% (models/overrides/meio.py).
+    return overrides.demand(d, target_period) if overrides else d
 
 
 # --------------------------------------------------------------- solving ---
 def solve_policy(demand: pd.DataFrame, leadtime_by_dc: dict, cost: pd.DataFrame,
-                  active_rdc, active_cdc, cdc_primary_rdc: dict = None) -> pd.DataFrame:
+                  active_rdc, active_cdc, cdc_primary_rdc: dict = None, overrides=None) -> pd.DataFrame:
     """Classic (R,s,S) sizing over the protection interval P = R + L, matched
     to `supply_brain_generator_v5.derive_baseline_policy()` -- the function
     that produces this dataset's own baseline policy:
@@ -521,7 +540,8 @@ def solve_policy(demand: pd.DataFrame, leadtime_by_dc: dict, cost: pd.DataFrame,
     d["target_std_uplifted"] = d.target_std * d.sigma_uplift
 
     d = d.merge(cost, on=["sku_id", "dc_id"], how="left")
-    d["z"] = assign_z(d)
+    period = d.target_period.iloc[0] if overrides and len(d) else None
+    d["z"] = assign_z(d, overrides, period)
 
     prot_wk = REVIEW_WEEKS + d.lt_mean_wk
     d["sigma_lt_demand"] = np.sqrt(
@@ -548,9 +568,10 @@ def load_sourcing_map(data_dir: str) -> pd.DataFrame:
     return pd.read_csv(f"{data_dir}/sku_sourcing_map.csv")
 
 
-def build_pdc_leadtime(data_dir: str) -> dict:
-    """(mean_days, std_days) for the Plant -> PDC lane feeding each PDC."""
-    lanes = pd.read_csv(f"{data_dir}/network_lanes.csv")
+def build_pdc_leadtime(data_dir: str, lanes: pd.DataFrame | None = None) -> dict:
+    """(mean_days, std_days) for the Plant -> PDC lane feeding each PDC. `lanes` (None
+    by default) carries a scenario's lead-time overrides for one target week."""
+    lanes = pd.read_csv(f"{data_dir}/network_lanes.csv") if lanes is None else lanes
     plant_dc = pd.read_csv(f"{data_dir}/plant_dc_master.csv")
     plant_of_pdc = plant_dc.set_index("plant_dc_id")["plant_id"].to_dict()
     lane_lt = {(r.origin_node_id, r.destination_node_id):
@@ -587,7 +608,8 @@ def load_plant_capacity(data_dir: str):
     return family_capacity, plant_capacity, plant_of_pdc
 
 
-def clip_to_plant_capacity(thru: pd.DataFrame, data_dir: str) -> pd.DataFrame:
+def clip_to_plant_capacity(thru: pd.DataFrame, data_dir: str, overrides=None,
+                           period: str | None = None) -> pd.DataFrame:
     """Scale down `thru.mu` (required PDC throughput per sku) so no plant is
     ever asked to sustain more than it can actually build -- mirrors the
     twin's own two-stage production clip (family line, then plant-wide) so
@@ -604,6 +626,8 @@ def clip_to_plant_capacity(thru: pd.DataFrame, data_dir: str) -> pd.DataFrame:
     recommendation had to be scaled back.
     """
     family_capacity, plant_capacity, plant_of_pdc = load_plant_capacity(data_dir)
+    if overrides:   # a scenario's plant_capacity overrides active in this target week
+        family_capacity, plant_capacity = overrides.capacity(family_capacity, plant_capacity, period)
     sku_family = load_sku_production_family(data_dir)
 
     t = thru.copy()
@@ -630,7 +654,8 @@ def clip_to_plant_capacity(thru: pd.DataFrame, data_dir: str) -> pd.DataFrame:
 
 def smoothed_rdc_demand_for_pdc(dfc_agg: pd.DataFrame, as_of_week_num: int, period_index: pd.DataFrame,
                                  seasonal_index: pd.DataFrame, sku_subcat: dict, active_rdc,
-                                 target_week_num: int, window_weeks: int = PDC_SMOOTH_WEEKS) -> pd.DataFrame:
+                                 target_week_num: int, window_weeks: int = PDC_SMOOTH_WEEKS,
+                                 overrides=None) -> pd.DataFrame:
     """Per (sku_id, dc_id=RDC): target_mean averaged over a `window_weeks`
     window CENTERED on target_week_num (not a forward-only look-ahead --
     see docstring point 11 for why that wasn't enough), for sizing PDC
@@ -649,13 +674,15 @@ def smoothed_rdc_demand_for_pdc(dfc_agg: pd.DataFrame, as_of_week_num: int, peri
         if period_index[period_index.week_num == wk].empty:
             continue
         d = target_week_demand(dfc_agg, as_of_week_num, period_index, seasonal_index, sku_subcat,
-                                target_week_num=wk)
+                                target_week_num=wk, overrides=overrides)
         frames.append(d[d.dc_id.isin(active_rdc)][["sku_id", "dc_id", "target_mean"]])
     allwk = pd.concat(frames, ignore_index=True)
     return allwk.groupby(["sku_id", "dc_id"], as_index=False)["target_mean"].mean()
 
 
-def solve_pdc_policy(rdc_demand: pd.DataFrame, data_dir: str, cost: pd.DataFrame) -> pd.DataFrame:
+def solve_pdc_policy(rdc_demand: pd.DataFrame, data_dir: str, cost: pd.DataFrame, overrides=None,
+                     period: str | None = None, lanes: pd.DataFrame | None = None,
+                     z_by_sku: dict | None = None) -> pd.DataFrame:
     """PDC (plant DC) policy, matching `derive_baseline_policy()`'s PDC
     branch: a PDC is pushed by production, not pulled -- its order-up-to is
     a holding ceiling sized on throughput, not a demand-driven trigger.
@@ -700,16 +727,16 @@ def solve_pdc_policy(rdc_demand: pd.DataFrame, data_dir: str, cost: pd.DataFrame
                             reorder_point=None, order_up_to_level=None, safety_stock_usd=None,
                             mu_requested=None, capacity_constrained=None)
 
-    thru = clip_to_plant_capacity(thru, data_dir)
+    thru = clip_to_plant_capacity(thru, data_dir, overrides, period)
 
-    pdc_lt = build_pdc_leadtime(data_dir)
+    pdc_lt = build_pdc_leadtime(data_dir, lanes)
     thru["lt_mean_days"] = thru.dc_id.map(lambda p: pdc_lt.get(p, (0.5, 0.07))[0])
     thru["lt_std_days"] = thru.dc_id.map(lambda p: pdc_lt.get(p, (0.5, 0.07))[1])
     thru["lt_mean_wk"] = thru.lt_mean_days / 7.0
     thru["lt_std_wk"] = thru.lt_std_days / 7.0
 
     thru = thru.merge(cost, on=["sku_id", "dc_id"], how="left")
-    thru["z"] = assign_z(thru)
+    thru["z"] = assign_z(thru, overrides, period, z_by_sku)
 
     thru["safety_stock"] = (thru.z * np.sqrt(thru.lt_mean_wk) * thru.mu
                              * SIGMA_UPLIFT["PDC"] * 0.5).round(1)

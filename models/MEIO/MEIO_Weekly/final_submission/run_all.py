@@ -26,6 +26,15 @@ Order matters for cache reuse, not just correctness:
      both are the longest steps, so a shorter night still finishes 1-5)
   8. scenario_test.py                           (Feature 2 demand-surge
      scenario test, ~10-15 min, fast enough to run last regardless)
+  9. netting_discount_sweep.py --multiseed --alpha 0.6
+                                                (5-seed netting check at the real-data
+     fill-optimal alpha. Alpha 0.4/0.6 were only multi-seed tested at netting 1.0, so
+     until this runs, meio_parameters.py keeps the pipeline at alpha 0.2.)
+
+What the pipeline uses: meio_parameters.py reads these steps' results/ CSVs (from
+`<artifacts.scenario>/results/`, falling back to the committed copy in this folder)
+and picks the parameters roll_forward_policy.py builds the policy with. See the
+"validated" rule in its docstring and meio_parameters.json next to each policy.
 
 Resumable steps (segment_alpha_real_data.py, and anything reusing an
 already-cached baseline) pick up where they left off if this is re-run, so
@@ -54,6 +63,7 @@ STEPS = [
     ("segment_alpha_real_data.py", []),
     ("service_level_real_data.py", []),
     ("scenario_test.py", ["--scenario", "../../../twin/scenario_config.example.json"]),
+    ("netting_discount_sweep.py", ["--multiseed", "--alpha", "0.6"]),
 ]
 
 

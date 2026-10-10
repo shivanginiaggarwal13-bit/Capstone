@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://supply-brain.local/schemas/override/1.0",
+  "title": "Supply Brain scenario changes (override layer)",
+  "description": "The `changes` object of a scenario_config.json. Structure only: which scope keys, operations, value ranges and sides each measure accepts is enforced by Agents/tools/catalog.py, and the engine re-checks at run time. Keep the measure enum in sync with catalog.MEASURES (a unit test enforces it).",
+  "type": "object",
+  "required": ["override_schema_version", "overrides"],
+  "additionalProperties": false,
+  "properties": {
+    "override_schema_version": {"const": "1.0"},
+    "overrides": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/override"},
+      "minItems": 1,
+      "maxItems": 60
+    }
+  },
+  "$defs": {
+    "override": {
+      "type": "object",
+      "required": ["id", "measure", "scope", "operation", "applies_to", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^OVR-[0-9]{4}$"},
+        "group": {
+          "type": "string",
+          "description": "Links overrides produced together (a promotion and its post-promo dip, a library scenario) so they are reviewed and removed as one."
+        },
+        "measure": {
+          "enum": [
+            "demand.volume", "demand.volatility",
+            "supply.lead_time_mean", "supply.lead_time_std", "supply.lane_outage",
+            "supply.plant_capacity", "supply.schedule_adherence",
+            "inventory.on_hand", "inventory.in_transit",
+            "service.target_csl",
+            "policy.safety_stock", "policy.reorder_point", "policy.order_up_to_level",
+            "policy.pooling_alpha",
+            "economics.unit_cost", "economics.margin", "economics.holding_rate",
+            "economics.storage_cost", "economics.logistics_cost"
+          ]
+        },
+        "scope": {"$ref": "#/$defs/scope"},
+        "window": {"$ref": "#/$defs/window"},
+        "operation": {"enum": ["scale", "add", "set", "floor", "cap", "block"]},
+        "value": {"type": ["number", "null"]},
+        "unit": {
+          "enum": ["multiplier", "units", "units_per_week", "weeks_of_cover", "days",
+                   "probability", "fraction", "usd_per_unit", "pct_annual", "none"]
+        },
+        "applies_to": {
+          "type": "array",
+          "items": {"enum": ["plan", "actual"]},
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "plan = MEIO sizes the policy knowing about the change; actual = the Twin simulates it happening."
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {"type": ["boolean", "number", "string"]}
+        },
+        "rationale": {"type": "string", "minLength": 3},
+        "provenance": {"type": "object"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "description": "Keys AND together; values within a key OR together. Use {\"all\": true} for an explicit portfolio-wide change.",
+      "properties": {
+        "all": {"const": true},
+        "sku_id": {"$ref": "#/$defs/values"},
+        "category": {"$ref": "#/$defs/values"},
+        "subcategory": {"$ref": "#/$defs/values"},
+        "brand": {"$ref": "#/$defs/values"},
+        "segment": {"$ref": "#/$defs/values"},
+        "price_tier": {"$ref": "#/$defs/values"},
+        "production_family": {"$ref": "#/$defs/values"},
+        "cluster": {"$ref": "#/$defs/values"},
+        "archetype": {"$ref": "#/$defs/values"},
+        "dc_id": {"$ref": "#/$defs/values"},
+        "region": {"$ref": "#/$defs/values"},
+        "echelon": {"$ref": "#/$defs/values"},
+        "b2b_customer_id": {"$ref": "#/$defs/values"},
+        "plant_id": {"$ref": "#/$defs/values"},
+        "lane_id": {"$ref": "#/$defs/values"},
+        "origin_node_id": {"$ref": "#/$defs/values"},
+        "destination_node_id": {"$ref": "#/$defs/values"},
+        "transport_mode": {"$ref": "#/$defs/values"}
+      }
+    },
+    "values": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "window": {
+      "type": "object",
+      "required": ["start_period", "end_period"],
+      "additionalProperties": false,
+      "description": "Inclusive ISO-week range inside the forward horizon. Omit for the whole horizon.",
+      "properties": {
+        "start_period": {"$ref": "#/$defs/period"},
+        "end_period": {"$ref": "#/$defs/period"}
+      }
+    },
+    "period": {"type": "string", "pattern": "^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$"}
+  }
+}

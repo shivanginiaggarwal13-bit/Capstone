@@ -14,12 +14,16 @@ ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = ROOT / "scenario_config.json"
 
 
-def scenario_paths(config_path: Path, config: dict) -> tuple[Path, Path, Path]:
+def scenario_paths(config_path: Path, config: dict) -> tuple[Path, Path]:
+    """What this runner writes, and so what it clears: the scenario's MEIO policy folder
+    and its one Twin run. It leaves alone the MEIO artifacts (run_all.py's tuning
+    evidence, which meio_parameters.py reads to build the policy) and the other runs
+    under projections/<scenario>/ (validate_real_data.py's cached baselines, other arms)."""
     name = scenario.scenario_folder_name(config)
     policy_dir = scenario.resolve_path(config_path, config, "meio", "output_root") / name
-    artifact_dir = scenario.resolve_scenario_path(config_path, config, "artifacts", "scenario")
-    twin_dir = scenario.resolve_path(config_path, config, "digital_twin", "output_root") / "projections" / name
-    return policy_dir, artifact_dir, twin_dir
+    twin_run = (scenario.resolve_path(config_path, config, "digital_twin", "output_root") / "projections" / name
+                / str(config["digital_twin"].get("run_name", "meio_policy")))
+    return policy_dir, twin_run
 
 
 def clear_existing(config_path: Path, config: dict, approve: bool) -> None:
@@ -30,8 +34,8 @@ def clear_existing(config_path: Path, config: dict, approve: bool) -> None:
     name = scenario.scenario_folder_name(config)
     if not approve:
         answer = input(
-            f"Scenario {name} already exists. Clear its MEIO, MEIO artifact, "
-            "and Twin projection outputs? [y/N]: "
+            f"Scenario {name} already exists. Clear its MEIO policy and this Twin run "
+            f"({', '.join(str(p) for p in existing)})? [y/N]: "
         ).strip().lower()
         if answer not in {"y", "yes"}:
             raise SystemExit("Cancelled; existing scenario outputs were preserved.")
@@ -60,7 +64,7 @@ def run(config_path: Path, approve: bool = False) -> Path:
 
     print("=== 1/2 MEIO policy runner ===", flush=True)
     subprocess.run(
-        [sys.executable, str(meio_script)],
+        [sys.executable, str(meio_script), "--scenario-config", str(config_path)],
         cwd=ROOT,
         check=True,
     )

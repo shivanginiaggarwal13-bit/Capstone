@@ -104,13 +104,15 @@ def multiseed_check(alpha=vrd.HEADLINE_ALPHA, discounts=(0.0, 1.0), seeds=vrd.MU
             fr_actual = vrd.fill_rate_kpis(test_actual, "actual")
             fr_csv2 = vrd.fill_rate_kpis(test_csv2, "csv2")
             rows.append({
-                "netting_discount": nd, "seed": seed,
+                "netting_discount": nd, "seed": seed, "alpha": alpha,
                 "fill_delta_pp": (fr_csv2["customer_fill_rate"] - fr_actual["customer_fill_rate"]) * 100,
                 "internal_replen_fill": fr_csv2["internal_replen_fill_rate"],
                 "cost_delta_usd": kpi["total_landed_cost_usd"] - actual_kpi["total_landed_cost_usd"],
             })
     summary = pd.DataFrame(rows)
-    out = os.path.join(RESULTS_DIR, "netting_discount_multiseed.csv")
+    # alpha=0.2 keeps the original file name; meio_parameters.py reads netting_discount_multiseed*.csv
+    suffix = "" if alpha == vrd.HEADLINE_ALPHA else "_alpha{:.1f}".format(alpha).replace(".", "_")
+    out = os.path.join(RESULTS_DIR, f"netting_discount_multiseed{suffix}.csv")
     summary.to_csv(out, index=False)
     agg = summary.groupby("netting_discount").agg(
         n_wins=("fill_delta_pp", lambda s: (s > 0).sum()), n_seeds=("fill_delta_pp", "size"),
@@ -126,11 +128,13 @@ def main():
     ap.add_argument("--alpha", type=float, default=None, choices=list(TEST_ALPHAS),
                      help="Run just one alpha; omit to run both.")
     ap.add_argument("--multiseed", action="store_true",
-                     help="Run the 5-seed robustness check of netting_discount in {0.0, 1.0} at alpha=0.2 instead.")
+                     help="Run the 5-seed robustness check of netting_discount in {0.0, 1.0} instead, at "
+                          "--alpha (default 0.2). At 0.6 this is the evidence meio_parameters.py needs "
+                          "before it can move the pipeline's alpha off 0.2.")
     args = ap.parse_args()
     os.makedirs(RESULTS_DIR, exist_ok=True)
     if args.multiseed:
-        multiseed_check()
+        multiseed_check(alpha=args.alpha if args.alpha is not None else vrd.HEADLINE_ALPHA)
         return
     alphas = [args.alpha] if args.alpha is not None else list(TEST_ALPHAS)
     for a in alphas:

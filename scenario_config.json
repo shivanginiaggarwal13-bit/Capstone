@@ -25,7 +25,8 @@
   },
   "artifacts": {
     "entrypoint": "models/MEIO/MEIO_Weekly/final_submission/run_all.py",
-    "scenario": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2"
+    "scenario": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+    "twin_output_root": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/twin_runs"
   },
   "details": {
     "owner": "Supply Planning",

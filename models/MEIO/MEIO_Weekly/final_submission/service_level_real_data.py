@@ -37,7 +37,7 @@ this matters, caught as a real bug earlier this session). Reuses the SAME
 ms_actual_s{seed} baseline cache segment_alpha_real_data.py and
 netting_discount_sweep.py --multiseed already built this session.
 
-    python service_level_real_data.py                             # all combos, default 4 workers
+    python service_level_real_data.py                             # all combos, default 1 workers
     python service_level_real_data.py --cluster "Mid-Tier Core"   # one cluster only
     python service_level_real_data.py --summarize-only            # just re-aggregate
 """
@@ -70,7 +70,7 @@ CLUSTER_CSV = os.path.join(REPO_ROOT, "Clustering & Segmentation", "segmentation
 
 CLUSTERS = ["Flagship Promo-Driven", "Mid-Tier Core", "Long-Tail Erratic", "Long-Tail Supply-Risk"]
 CANDIDATE_CSL = [0.90, 0.95, 0.97, 0.99]
-DEFAULT_WORKERS = 4
+DEFAULT_WORKERS = 1
 
 PARTIAL_DIR = os.path.join(RUN_OUT_DIR, "service_level_partial")   # gitignored scratch, one file/combo
 OUT_CSV = os.path.join(RESULTS_DIR, "service_level_real_data_multiseed.csv")   # tracked, aggregated
@@ -190,6 +190,7 @@ def _worker(job):
     tag = cluster.replace(" ", "") + f"_csl{round(csl * 100)}_s{seed}"
     kpi, actual_kpi, test_inv, test_actual = simulate_combo(override, seed, tag)
     row = {"cluster": cluster, "csl": csl, "z": round(cz, 4), "seed": seed,
+           "alpha": HEADLINE_ALPHA, "netting_discount": NETTING_DISCOUNT,
            **cluster_stats(test_inv, test_actual, skus, kpi, actual_kpi)}
     _write_partial(row)
     return f"[done] {cluster} csl={csl:.2f} seed={seed}  own_fill={row['own_fill_rate']}"
@@ -223,6 +224,7 @@ def run_all(clusters_to_run, workers):
                 continue
             skus = cluster_skus(arch_map, cluster)
             row = {"cluster": cluster, "csl": csl, "z": round(candidate_z(csl), 4), "seed": seed,
+                   "alpha": HEADLINE_ALPHA, "netting_discount": NETTING_DISCOUNT,
                    **cluster_stats(test_inv, test_actual, skus, kpi, actual_kpi)}
             _write_partial(row)
 

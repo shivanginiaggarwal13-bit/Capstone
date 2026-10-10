@@ -42,6 +42,56 @@ why it wasn't chosen) is in `results/meio_weekly_vs_actual_report.md` and
 `results/meio_weekly_vs_actual.csv` (its own cost breakdown, computed
 separately, is in `results/meio_weekly_vs_actual_cost.csv`).
 
+## How the tuning reaches the pipeline's policy
+
+`run_all.py`'s steps write their evidence to `<artifacts.scenario>/results/`. The
+pipeline (`run_meio_then_twin.py` → `run_weekly_tools.py` → `roll_forward_policy.py`
+and `meio_optimizer_weekly.py`) builds the policy the Digital Twin runs. Before
+`meio_parameters.py`, nothing connected the two: the pipeline sized stock with MEIO
+Weekly, which has no alpha or netting parameter at all.
+
+Now the shared `scenario_config.json` names the model and the rule in
+`meio.parameters`, and `meio_parameters.resolve()` turns the evidence into the
+parameters the policy is built with.
+
+| Evidence file (`results/`) | Columns read | Run at | Feeds |
+|---|---|---|---|
+| `netting_discount_multiseed*.csv` | netting_discount, seed, fill_delta_pp, cost_delta_usd, (alpha) | alpha 0.2 unless the file says otherwise | `netting_discount`, then `alpha` |
+| `multiseed_alpha_*.csv` | alpha, seed, fill_delta_pp, cost_delta_usd | netting 1.0 | `alpha`, only if it was run at the chosen netting |
+| `segment_alpha_real_data_multiseed.csv` | cluster, alpha, seed, own_fill_rate, portfolio_fill_rate, cost_delta_usd | netting 1.0 | per-SKU alpha by cluster |
+| `service_level_real_data_multiseed.csv` | cluster, csl, seed, own_fill_rate, portfolio_fill_rate, fill_delta_vs_actual_pp, cost_delta_usd | alpha 0.2, netting 0.0 | per-SKU z by cluster |
+| headline, alpha_sweep (single seed), meio_weekly_vs_actual, seasonal, segment_breakdown, scenario_* | — | — | evaluation only |
+
+**The "validated" rule.** A parameter moves off its reference only when the
+evidence passes a paired test across at least 5 seeds: fill must improve by more
+than two standard errors, and cost must not rise by more than two standard errors.
+Evidence gathered at other settings doesn't count. The cluster sweeps are used only
+once complete. The full rule is in `meio_parameters.py`'s docstring.
+
+**What it gives today:** Clark-Scarf v2 with alpha 0.2 and netting 0.0.
+- Netting 0.0 wins on paired seeds: +0.53 pp fill and −$117k cost.
+- α 0.4 and 0.6 were only multi-seed tested at netting 1.0, so they don't count yet.
+- Neither cluster sweep is complete.
+
+`run_all.py` step 9 (`netting_discount_sweep.py --multiseed --alpha 0.6`) is the run
+that can move alpha. Each policy folder gets a `meio_parameters.json` listing every
+decision and the SHA-256 of every evidence file it used. Each sweep script now writes
+the settings it ran at as columns; for the files committed before that change, the
+resolver records which settings it assumed.
+
+**Deterministic DDLT in the pipeline.** The pipeline runs Clark-Scarf v2 with
+`ddlt="quadrature"`: the same Gamma-mixture DDLT percentile, integrated over the lead
+time instead of sampled. It is about 7× closer to a 400k-draw reference than 4,000
+draws.
+- **Why:** Monte Carlo draws come from one shared stream. Bumping 20 CDC03 rows
+  moved safety stock on 5,566 of 7,468 rows in all 23 DCs, by about 3% each. That
+  would make every scenario's prepared-vs-unprepared delta mostly noise.
+- **With quadrature:** a row changes only when its own inputs do.
+- **Research scripts:** they keep Monte Carlo, so their published results reproduce.
+
+A config without `meio.parameters` (anything written before this, such as
+SCENARIO_0003) still runs MEIO Weekly, and its rolling policy rebuilds byte-identical.
+
 ## Where the win actually comes from
 
 On the synthetic 2026 basis, baseline is not weak on average — it's blind at
@@ -226,8 +276,12 @@ impact if ignored) is −0.06pp fill, +$226K cost.
 
 ## Files
 
-- `clark_scarf_v2.py` — the model (Monte Carlo DDLT sizing, continuous alpha,
+- `clark_scarf_v2.py` — the model (Monte Carlo DDLT sizing, or the deterministic
+  `ddlt="quadrature"` the pipeline uses; continuous alpha; scenario-override hooks;
   `ALPHA_OVERRIDE_BY_SKU` seam for the per-segment exploration).
+- `meio_parameters.py` — reads `run_all.py`'s evidence and picks the parameters
+  the pipeline's policy is built with (see "How the tuning reaches the pipeline's
+  policy"). Tests: `tests/test_meio_parameters.py`.
 - `validate_real_data.py` — the full real-data validation suite (headline,
   alpha sweep, 5-seed check, segment breakdown). Run with `--stage <name>`
   for one piece, or no flag for all of them in order. Depends on
@@ -329,15 +383,18 @@ impact if ignored) is −0.06pp fill, +$226K cost.
    instead of a real measured σ from RDC pull-order history. Not started.
 6. **Finish Feature 1's service-level sweep** (`service_level_real_data.py`
    — see that section above and its own "not yet run" note).
-7. **Wire PDC policy into the scenario engine.** `scenario_test.py`'s test
-   run confirmed PDCs don't respond to a scenario at all (`solve_pdc_policy`
-   isn't touched) — a demand surge big/long enough to matter at the plant
-   level would currently be invisible to PDC sizing.
-8. **Build the lead-time and capacity disruption scenario types.** Only
-   demand surge exists; `scenario_engine.py`'s docstring and
-   `digital_twin.py`'s "Known limitations" section both say so. Same
-   pattern as demand surge (scale an already-computed value, don't touch
-   RNG draws) should apply to both.
+7. ~~Wire PDC policy into the scenario engine.~~ Done by the override engine
+   (`models/overrides`): PDC sizing sees a scenario's demand, capacity, lead time
+   and service changes, in the pipeline's MEIO Weekly and Clark-Scarf v2 paths.
+   `scenario_test.py` still uses the legacy `scenario_engine.py` path.
+8. ~~Build the lead-time and capacity disruption scenario types.~~ Done:
+   `models/overrides` applies 19 measures, including lead time, lane outage,
+   plant capacity and attainment, in both MEIO and the Twin.
+9a. **Run `run_all.py` step 9** (`netting_discount_sweep.py --multiseed --alpha
+   0.6`). It is the only evidence that can move the pipeline's alpha off 0.2
+   under the netting fix (see "How the tuning reaches the pipeline's policy").
+   The per-cluster alpha sweep runs at netting 1.0, so it can't feed the pipeline
+   until it is rerun at netting 0.0.
 9. **Multi-seed / multi-scenario validation of the scenario-testing
    feature** before the +0.09pp "value of preparing" number (or any future
    scenario's number) is treated as more than a single working example.

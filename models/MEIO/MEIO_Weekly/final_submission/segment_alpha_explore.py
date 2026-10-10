@@ -62,7 +62,7 @@ TWIN = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_tw
 SCENARIO_OUT_DIR = str(scenario.resolve_scenario_path(
     SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "scenario"))
 TWIN_OUT_ROOT = str(scenario.resolve_path(
-    SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "output_root"))
+    SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "twin_output_root"))
 RUN_OUT_DIR = os.path.join(SCENARIO_OUT_DIR, "validation_output")
 RESULTS_DIR = os.path.join(SCENARIO_OUT_DIR, "results")
 STATE_CSV = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "state"))

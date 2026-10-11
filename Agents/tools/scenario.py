@@ -292,11 +292,16 @@ def _baseline_meio_mismatch(config: dict) -> str | None:
     if not saved.exists() or "unprepared" not in ev["arms"]:
         return None
     then = json.loads(saved.read_text(encoding="utf-8")).get("meio", {}).get("parameters")
-    if then != config["meio"].get("parameters"):
-        return (f"the baseline {ev['baseline_scenario']} was built with meio.parameters {then!r}, but this "
-                f"scenario's config has {config['meio'].get('parameters')!r}; rebuild the scenario from the "
-                f"current config (build_scenario_config) and have it approved again")
-    return None
+    mine = config["meio"].get("parameters")
+    if then == mine:
+        return None
+    if mine == drafts._root_config()["meio"].get("parameters"):
+        return (f"the baseline {ev['baseline_scenario']} on disk was built with meio.parameters {then!r}, not the "
+                f"shared config's current ones; regenerate it first (a person runs `python run_meio_then_twin.py "
+                f"--scenario-config scenario_config.json --yes`), then run this scenario")
+    return (f"this scenario's config has meio.parameters {mine!r}, but the baseline "
+            f"{ev['baseline_scenario']} was built with {then!r}; rebuild the scenario from the current config "
+            f"(build_scenario_config) and have it approved again")
 
 
 def _write_status(path, status: dict) -> None:

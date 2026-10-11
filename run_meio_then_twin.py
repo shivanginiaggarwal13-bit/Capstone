@@ -17,8 +17,9 @@ DEFAULT_CONFIG = ROOT / "scenario_config.json"
 def scenario_paths(config_path: Path, config: dict) -> tuple[Path, Path]:
     """What this runner writes, and so what it clears: the scenario's MEIO policy folder
     and its one Twin run. It leaves alone the MEIO artifacts (run_all.py's tuning
-    evidence, which meio_parameters.py reads to build the policy) and the other runs
-    under projections/<scenario>/ (validate_real_data.py's cached baselines, other arms)."""
+    evidence, which meio_parameters.py reads to build the policy, and its cached Twin
+    runs under `artifacts.twin_output_root`) and the other runs under
+    projections/<scenario>/ (a scenario's other arm)."""
     name = scenario.scenario_folder_name(config)
     policy_dir = scenario.resolve_path(config_path, config, "meio", "output_root") / name
     twin_run = (scenario.resolve_path(config_path, config, "digital_twin", "output_root") / "projections" / name

@@ -8,7 +8,7 @@ speed:
 * **polars for I/O and table work, numpy for the arithmetic.** No pandas on the hot
   path; pandas appears only at the boundary with the scenario override engine
   (models/overrides), which is shared with the Digital Twin and left untouched.
-* **A dense demand panel.** demand_forecast.csv is a complete (sku, dc) x week panel
+* **A dense demand panel.** demand_forecast.parquet is a complete (sku, dc) x week panel
   (7,110 pairs x 104 weeks). `DemandPanel` holds it as [pair, week] arrays, so a
   trailing window is a column slice instead of a filter over 739k rows.
 * **Cached by as-of week.** bias_factor, blended_cv and deseasonalized_level depend on
@@ -28,7 +28,7 @@ Public names and signatures follow the original; frames are polars DataFrames, a
 Method notes from the original module (unchanged)
 -------------------------------------------------
 
-1. `demand_forecast.csv` is really `(period, sku_id, dc_id, b2b_customer_id)`
+1. `demand_forecast.parquet` is really `(period, sku_id, dc_id, b2b_customer_id)`
    grain -- ~5% of (period, sku, dc) combos are split across 2+ B2B
    customers. Every function here aggregates to true (period, sku_id, dc_id)
    weekly totals immediately on load; nothing downstream ever sees the
@@ -44,7 +44,7 @@ Method notes from the original module (unchanged)
    `blended_cv()` averages a short (13wk) and long (52wk) trailing window so
    the safety stock reacts to recent conditions without losing the tails a
    short window misses.
-4. `cost_parameters.csv` is keyed by `(dc_id, subcategory)`, not `category`.
+4. `cost_parameters.parquet` is keyed by `(dc_id, subcategory)`, not `category`.
    Holding cost is DC-specific:
        holding_per_unit_week = (storage_cost_per_unit_year_usd
                                  + unit_cost_usd * inventory_carrying_pct_annual / 100) / 52
@@ -56,7 +56,7 @@ Method notes from the original module (unchanged)
 5. **Protection interval, order cover, echelon uplift, and z -- matched to
    the dataset's own answer key.** `supply_brain_generator_v5.py`'s
    `derive_baseline_policy()` (the function that produces
-   `output datasets/history/forward_policy.csv`, the policy this dataset's
+   `output datasets/history/forward_policy.parquet`, the policy this dataset's
    own twin actually hits ~91% fill rate with) sizes stock differently from
    a first pass of this tool did, and its own comments name the exact
    failure mode a first pass reproduced almost exactly:
@@ -77,7 +77,7 @@ Method notes from the original module (unchanged)
    `solve_policy()` below now matches all four. It also no longer pools RDC
    demand with its downstream CDCs' demand explicitly -- `derive_baseline_
    policy()` doesn't either, and sizes each node directly against its own
-   `demand_forecast.csv` row (RDC01's own recorded in-sample demand is
+   `demand_forecast.parquet` row (RDC01's own recorded in-sample demand is
    ~8x its downstream CDCs' combined demand, so explicit pooling was a
    modest over-count, not the dominant error, but there is no evidence the
    dataset's RDC-level demand rows exclude downstream replenishment pull,
@@ -92,7 +92,7 @@ Method notes from the original module (unchanged)
    throughput it must pass along, not a demand-driven reorder trigger.
    `solve_pdc_policy()` replicates `derive_baseline_policy()`'s PDC branch:
    throughput per (pdc, sku) = sum of every RDC-SKU's demand that sources
-   from that PDC (via `sku_sourcing_map.csv`, the actual routing table --
+   from that PDC (via `sku_sourcing_map.parquet`, the actual routing table --
    not the fastest-lane approximation `build_leadtime_graph()` uses
    elsewhere), using THIS tool's own bias-corrected RDC `target_mean` so
    the whole network stays on one consistent demand basis end to end.
@@ -128,8 +128,8 @@ Method notes from the original module (unchanged)
    Seasonal-segment SKUs, which is what point 7 found was worst-affected.
    `build_seasonal_index()` derives a multiplicative seasonal factor per
    (subcategory, week-of-year), pooled across every SKU in the subcategory
-   over the full 3-year `orders.csv` history (a single year of
-   `demand_forecast.csv` in-sample data isn't enough to estimate an
+   over the full 3-year `orders.parquet` history (a single year of
+   `demand_forecast.parquet` in-sample data isn't enough to estimate an
    individual SKU's seasonal shape without memorizing that one year's
    noise -- the SHAPE is borrowed from the subcategory, the LEVEL stays
    SKU-specific via `deseasonalized_level()`). The fallback in
@@ -166,8 +166,8 @@ Method notes from the original module (unchanged)
     rolling policy demands more total internal replenishment volume,
     network-wide, not just later than PDC could react to. That reads like
     a genuine production-capacity ceiling, so `clip_to_plant_capacity()`
-    wires in `plant_capability.csv` (per-plant, per-production-family
-    weekly capacity) and `plant_master.csv` (plant-wide weekly capacity),
+    wires in `plant_capability.parquet` (per-plant, per-production-family
+    weekly capacity) and `plant_master.parquet` (plant-wide weekly capacity),
     mirroring the twin's own two-stage production clip exactly (family
     line, then plant-wide -- see `models/twin/digital_twin.py`
     ASSUMPTIONS). Verified against real numbers, not just "zero clips
@@ -286,8 +286,8 @@ def target_csl(z: np.ndarray) -> np.ndarray:
 
 # --------------------------------------------------------------------- IO ---
 def load_period_index(data_dir: str) -> pl.DataFrame:
-    """Distinct (period, week_start_date) pairs from demand_forecast.csv, in order."""
-    dfc = rt.read_csv(f"{data_dir}/demand_forecast.csv", columns=["period", "week_start_date"])
+    """Distinct (period, week_start_date) pairs from demand_forecast.parquet, in order."""
+    dfc = rt.read_table(f"{data_dir}/demand_forecast.parquet", columns=["period", "week_start_date"])
     idx = dfc.unique().sort("week_start_date", maintain_order=True)
     return idx.with_columns(pl.int_range(pl.len(), dtype=pl.Int64).alias("week_num"))
 
@@ -349,14 +349,14 @@ class WeekDemand:
 
 
 class DemandPanel:
-    """demand_forecast.csv at true (period, sku_id, dc_id) grain, as dense arrays.
+    """demand_forecast.parquet at true (period, sku_id, dc_id) grain, as dense arrays.
 
     The original's first fix (module docstring point 1) is unchanged: B2B-customer rows
     are summed to (period, week_start_date, horizon, sku_id, dc_id) immediately on load,
     and every quantity is an integer, so those sums are exact in any order."""
 
     def __init__(self, data_dir: str):
-        raw = rt.read_csv(f"{data_dir}/demand_forecast.csv")
+        raw = rt.read_table(f"{data_dir}/demand_forecast.parquet")
         keys = ["period", "week_start_date", "horizon", "sku_id", "dc_id"]
         agg = (raw.group_by(keys)
                .agg(pl.col("forecast_qty").sum(), pl.col("forecast_baseline_qty").sum(),
@@ -379,7 +379,7 @@ class DemandPanel:
         p_idx = np.array([pair_of[(s, d)] for s, d in zip(agg["sku_id"].to_list(), agg["dc_id"].to_list())])
         w_idx = np.array([self.week_of[p] for p in agg["period"].to_list()])
         if len(set(zip(p_idx.tolist(), w_idx.tolist()))) != len(p_idx):
-            raise ValueError("demand_forecast.csv has more than one horizon/week_start_date for a period")
+            raise ValueError("demand_forecast.parquet has more than one horizon/week_start_date for a period")
         self.present = np.zeros((P, W), dtype=bool)
         self.forecast = np.zeros((P, W), dtype=np.int64)
         self.actual = np.zeros((P, W))
@@ -528,15 +528,15 @@ class DemandPanel:
 
 
 def load_demand_forecast(data_dir: str) -> DemandPanel:
-    """demand_forecast.csv aggregated to true (period, horizon, sku_id, dc_id) grain."""
+    """demand_forecast.parquet aggregated to true (period, horizon, sku_id, dc_id) grain."""
     return DemandPanel(data_dir)
 
 
 def load_sku_cost(data_dir: str) -> pl.DataFrame:
     """SKU master joined to DC-specific cost parameters via (dc_id, subcategory): one row
     per (sku_id, dc_id), holding_per_unit_week and stockout_cost_unit DC-specific."""
-    sku = rt.read_csv(f"{data_dir}/sku_master.csv")
-    cost_p = rt.read_csv(f"{data_dir}/cost_parameters.csv")
+    sku = rt.read_table(f"{data_dir}/sku_master.parquet")
+    cost_p = rt.read_table(f"{data_dir}/cost_parameters.parquet")
     sku_c = sku.join(cost_p, on="subcategory", how="left", coalesce=True)
     # numpy, not a polars expression: polars may fold "/ 100.0" into "* 0.01", one ULP off
     f = {c: sku_c[c].cast(pl.Float64).to_numpy() for c in ("storage_cost_per_unit_year_usd", "unit_cost_usd",
@@ -551,15 +551,15 @@ def load_sku_cost(data_dir: str) -> pl.DataFrame:
 
 
 def load_sku_subcategory(data_dir: str) -> dict:
-    sku = rt.read_csv(f"{data_dir}/sku_master.csv", columns=["sku_id", "subcategory"])
+    sku = rt.read_table(f"{data_dir}/sku_master.parquet", columns=["sku_id", "subcategory"])
     return dict(zip(sku["sku_id"].to_list(), sku["subcategory"].to_list()))
 
 
 def build_seasonal_index(data_dir: str) -> pl.DataFrame:
     """Multiplicative seasonal index per (subcategory, week_of_year) pooled across every
-    SKU in the subcategory over orders.csv's 156 weeks (docstring point 8)."""
-    oh = rt.read_csv(f"{data_dir}/orders.csv", columns=["period", "sku_id", "order_qty"])
-    sku_subcat = rt.read_csv(f"{data_dir}/sku_master.csv", columns=["sku_id", "subcategory"])
+    SKU in the subcategory over orders.parquet's 156 weeks (docstring point 8)."""
+    oh = rt.read_table(f"{data_dir}/orders.parquet", columns=["period", "sku_id", "order_qty"])
+    sku_subcat = rt.read_table(f"{data_dir}/sku_master.parquet", columns=["sku_id", "subcategory"])
     oh = oh.join(sku_subcat, on="sku_id", how="left")
     oh = oh.with_columns(pl.col("period").str.split("-W").list.get(1).cast(pl.Int64).alias("week_of_year"))
     wk = (oh.filter(pl.col("subcategory").is_not_null())
@@ -599,7 +599,7 @@ def build_leadtime_graph(data_dir: str, active_rdc, active_cdc, lanes=None):
     single fastest inbound lane at each node. `lanes` (None by default) carries a
     scenario's lead-time overrides; the fastest lane is still chosen on the published
     table and its mean/std are then read from `lanes`."""
-    base = rt.read_csv(f"{data_dir}/network_lanes.csv")
+    base = rt.read_table(f"{data_dir}/network_lanes.parquet")
     over = _lane_table(lanes)
     values = None if over is None else {
         lid: (m, s) for lid, m, s in over.select(["lane_id", "lead_time_mean_days", "lead_time_std_days"]).iter_rows()}
@@ -730,14 +730,14 @@ def solve_policy(demand: WeekDemand, leadtime_by_dc: dict, cost: pl.DataFrame,
 
 
 def load_sourcing_map(data_dir: str) -> pl.DataFrame:
-    """sku_sourcing_map.csv: the routing each (dc_id, sku_id) travels."""
-    return rt.read_csv(f"{data_dir}/sku_sourcing_map.csv")
+    """sku_sourcing_map.parquet: the routing each (dc_id, sku_id) travels."""
+    return rt.read_table(f"{data_dir}/sku_sourcing_map.parquet")
 
 
 def build_pdc_leadtime(data_dir: str, lanes=None) -> dict:
     """(mean_days, std_days) for the Plant -> PDC lane feeding each PDC."""
-    ln = rt.read_csv(f"{data_dir}/network_lanes.csv") if lanes is None else _lane_table(lanes)
-    plant_dc = rt.read_csv(f"{data_dir}/plant_dc_master.csv")
+    ln = rt.read_table(f"{data_dir}/network_lanes.parquet") if lanes is None else _lane_table(lanes)
+    plant_dc = rt.read_table(f"{data_dir}/plant_dc_master.parquet")
     plant_of_pdc = dict(zip(plant_dc["plant_dc_id"].to_list(), plant_dc["plant_id"].to_list()))
     lane_lt = {(o, d): (m, s) for o, d, m, s in ln.select(
         ["origin_node_id", "destination_node_id", "lead_time_mean_days", "lead_time_std_days"]).iter_rows()}
@@ -745,19 +745,19 @@ def build_pdc_leadtime(data_dir: str, lanes=None) -> dict:
 
 
 def load_sku_production_family(data_dir: str) -> dict:
-    sku = rt.read_csv(f"{data_dir}/sku_master.csv", columns=["sku_id", "production_family"])
+    sku = rt.read_table(f"{data_dir}/sku_master.parquet", columns=["sku_id", "production_family"])
     return dict(zip(sku["sku_id"].to_list(), sku["production_family"].to_list()))
 
 
 def load_plant_capacity(data_dir: str):
     """(family_capacity {(plant, family): units/wk}, plant_capacity {plant: units/wk},
     plant_of_pdc {pdc: plant}) -- the twin's two-stage production clip, by key."""
-    fam_cap = rt.read_csv(f"{data_dir}/plant_capability.csv")
+    fam_cap = rt.read_table(f"{data_dir}/plant_capability.parquet")
     family_capacity = {(p, f): c for p, f, c in fam_cap.select(
         ["plant_id", "production_family", "family_capacity_units_per_week"]).iter_rows()}
-    pm = rt.read_csv(f"{data_dir}/plant_master.csv", columns=["plant_id", "production_capacity_units_per_week"])
+    pm = rt.read_table(f"{data_dir}/plant_master.parquet", columns=["plant_id", "production_capacity_units_per_week"])
     plant_capacity = dict(zip(pm["plant_id"].to_list(), pm["production_capacity_units_per_week"].to_list()))
-    plant_dc = rt.read_csv(f"{data_dir}/plant_dc_master.csv", columns=["plant_dc_id", "plant_id"])
+    plant_dc = rt.read_table(f"{data_dir}/plant_dc_master.parquet", columns=["plant_dc_id", "plant_id"])
     plant_of_pdc = dict(zip(plant_dc["plant_dc_id"].to_list(), plant_dc["plant_id"].to_list()))
     return family_capacity, plant_capacity, plant_of_pdc
 

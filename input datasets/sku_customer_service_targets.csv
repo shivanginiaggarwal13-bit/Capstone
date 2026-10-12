@@ -1,4 +1,0 @@
-segment,service_level_target_pct,case_fill_rate_target_pct
-Fast-Moving,0.98,0.96
-Seasonal,0.95,0.92
-Intermediate,0.9,0.88

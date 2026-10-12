@@ -23,14 +23,15 @@ Network:  Plant --0.5d--> Plant DC --> Regional DC --> Customer DC
 
 THE OPTIMIZATION SEAM
 ---------------------
-The only thing an optimizer changes is one standalone CSV:
+The only thing an optimizer changes is one standalone table (Parquet; a CSV
+is accepted too):
 
     dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
 
 Extra columns are ignored, so an optimizer's native output can be passed
 verbatim:
 
-    --policy "output datasets/meio_v2/policy.csv"
+    --policy "output datasets/meio_v2/policy.parquet"
 
 Opening state comes from a separate --state file and is never touched by a
 policy swap, so two runs start from an identical physical position and the
@@ -53,7 +54,7 @@ customer DCs" is just higher CDC S and lower RDC S in the same table.
 Modes
 -----
   history      the span the order history covers; demand replayed from
-               orders.csv. Produces the dataset's inventory record.
+               orders.parquet. Produces the dataset's inventory record.
   forward      the planning horizon; demand = forecast x resampled forecast
                error. The scenario mode, for baseline and optimized runs.
 
@@ -61,13 +62,13 @@ Usage
 -----
   # forward scenario, opening from the end of history
   python digital_twin.py --mode forward --run-name baseline_2026 \
-    --policy "output datasets/history/forward_policy.csv" \
-    --state  "output datasets/history/opening_position.csv"
+    --policy "output datasets/history/forward_policy.parquet" \
+    --state  "output datasets/history/opening_position.parquet"
 
   # score an optimized policy against the same opening position
   python digital_twin.py --mode forward --run-name meio_v2 \
-      --policy "output datasets/meio_v2/policy.csv" \
-    --state  "output datasets/history/closing_position.csv"
+      --policy "output datasets/meio_v2/policy.parquet" \
+    --state  "output datasets/history/closing_position.parquet"
 """
 
 from __future__ import annotations
@@ -127,8 +128,8 @@ PROMISE_Z = 1.2816             # 90th percentile of a normal lane
 # │ To move to NET margin (after off-invoice, trade fund, volume rebate and  │
 # │ logistics allowance — roughly 11-15% of list, see b2b_customer_terms),   │
 # │ change the single string below to the net-margin column and make sure    │
-# │ that column exists in sku_master.csv. A per-unit net margin can be       │
-# │ derived from orders.csv as net_margin_usd.sum() / order_qty.sum()        │
+# │ that column exists in sku_master.parquet. A per-unit net margin can be   │
+# │ derived from orders.parquet as net_margin_usd.sum() / order_qty.sum()    │
 # │ grouped by sku_id.                                                       │
 # │                                                                          │
 # │ Nothing else in this file needs to change.                               │
@@ -179,7 +180,7 @@ class TwinInputs:
 
     reorder_point: np.ndarray              # [n_nodes, n_skus], or
     order_up_to: np.ndarray                # [n_weeks, n_nodes, n_skus] if
-    safety_stock: np.ndarray               # the policy CSV has a `period`
+    safety_stock: np.ndarray               # the policy table has a `period`
                                             # column -- use _policy_at(inp, w)
     active: np.ndarray
 
@@ -240,17 +241,17 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
                                     for s in ss.spawn(3)]
     notes: Dict[str, object] = {"mode": mode, "seed": seed}
 
-    sku_master = pd.read_csv(data_dir / "sku_master.csv")
-    cost_p = pd.read_csv(data_dir / "cost_parameters.csv")
-    lanes = pd.read_csv(data_dir / "network_lanes.csv")
+    sku_master = pd.read_parquet(data_dir / "sku_master.parquet")
+    cost_p = pd.read_parquet(data_dir / "cost_parameters.parquet")
+    lanes = pd.read_parquet(data_dir / "network_lanes.parquet")
     # sku_sourcing_map: routing — which parent serves each (node, SKU)
     # sku_plant_sourcing: production — how volume splits across the plants
     #                     qualified to make each SKU
-    sourcing_map = pd.read_csv(data_dir / "sku_sourcing_map.csv")
-    sourcing = pd.read_csv(data_dir / "sku_plant_sourcing.csv")
-    plant_dc = pd.read_csv(data_dir / "plant_dc_master.csv")
-    plant_master = pd.read_csv(data_dir / "plant_master.csv")
-    plant_cap = pd.read_csv(data_dir / "plant_capability.csv")
+    sourcing_map = pd.read_parquet(data_dir / "sku_sourcing_map.parquet")
+    sourcing = pd.read_parquet(data_dir / "sku_plant_sourcing.parquet")
+    plant_dc = pd.read_parquet(data_dir / "plant_dc_master.parquet")
+    plant_master = pd.read_parquet(data_dir / "plant_master.parquet")
+    plant_cap = pd.read_parquet(data_dir / "plant_capability.parquet")
     if overrides:   # unit cost, margin, carrying/storage rates, freight -- static for the run
         sku_master, cost_p, lanes = override_engine.twin.economics(overrides, sku_master, cost_p, lanes)
 
@@ -332,14 +333,14 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026,
                   if r.plant_id in plant_i}
 
     notes["sourcing"] = {
-        "rule": "sku_sourcing_map.csv (input table)",
+        "rule": "sku_sourcing_map.parquet (input table)",
         "pairs_resolved": resolved,
         "pairs_on_fallback": n_fallback,
     }
 
     # ---------------------------------------------------------- lead times --
     # Lead times are drawn per order line from each lane's own mean and std in
-    # network_lanes.csv. An earlier version resampled the observed
+    # network_lanes.parquet. An earlier version resampled the observed
     # actual_lead_days pool instead; measured per lane that pool reproduces
     # these same parameters almost exactly, so the empirical draw bought no
     # fidelity and cost a dependency on simulated output.
@@ -481,6 +482,15 @@ POLICY_COLUMNS = ["dc_id", "sku_id", "safety_stock", "reorder_point",
                   "order_up_to_level"]
 
 
+def read_table(path) -> pd.DataFrame:
+    """A policy or opening-state table handed in from outside: Parquet, which is what
+    the project writes, or a CSV an external optimizer still produces."""
+    path = Path(path)
+    if path.suffix.lower() == ".csv":
+        return pd.read_csv(path)
+    return pd.read_parquet(path)
+
+
 def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
                  policy_csv, state_csv, periods=None, overrides=None):
     """Load the policy and the opening state from two SEPARATE files.
@@ -508,7 +518,7 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
     and the difference between them measures the decision rather than the
     starting point.
 
-    `opening_inventory_2026.csv` also carries policy columns, because it is a
+    `opening_inventory_2026.parquet` also carries policy columns, because it is a
     published dataset table and downstream consumers expect them. The twin
     ignores those columns and reads the standalone file instead, so there is
     exactly one source of truth for what a run executed.
@@ -518,10 +528,10 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
 
     if policy_csv is None:
         raise ValueError(
-            "a policy file is required: pass --policy <csv> with columns "
+            "a policy file is required: pass --policy <parquet or csv> with columns "
             + ", ".join(POLICY_COLUMNS))
     pol_path = Path(policy_csv)
-    pol = pd.read_csv(pol_path)
+    pol = read_table(pol_path)
     missing = [c for c in POLICY_COLUMNS if c not in pol.columns]
     if missing:
         raise ValueError(
@@ -578,7 +588,7 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date,
     op_eta = np.zeros((n_nodes, n_skus), dtype=int)
     if state_csv is not None:
         w0 = pd.Timestamp(w0_date)
-        state = pd.read_csv(state_csv)
+        state = read_table(state_csv)
         if overrides:   # write-offs, injections, pre-builds, lost pipeline -- the opening position
             state = override_engine.twin.opening_state(overrides, state)
         for r in state.itertuples(index=False):
@@ -624,8 +634,8 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
 
     if mode == "history":
         # Replay the orders that actually happened, at their delivery day.
-        o = pd.read_csv(data_dir / "orders.csv",
-                        usecols=["delivery_date", "period", "sku_id", "dc_id",
+        o = pd.read_parquet(data_dir / "orders.parquet",
+                        columns=["delivery_date", "period", "sku_id", "dc_id",
                                  "order_qty"])
         o = o[o.period.isin(set(periods))]
         day0 = pd.Timestamp(week_monday(week_index[0]))
@@ -634,14 +644,14 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
         si = o.sku_id.map(sku_idx).to_numpy()
         # Orders placed near the end of the window can be scheduled to land
         # after it. Dropping them would silently lose demand and the replay
-        # would no longer reconcile to orders.csv, so they are clamped onto
+        # would no longer reconcile to orders.parquet, so they are clamped onto
         # the last day instead.
         dday = np.clip(dday, 0, T - 1)
         keep = (~pd.isna(ni)) & (~pd.isna(si))
         np.add.at(daily, (dday[keep], ni[keep].astype(int),
                           si[keep].astype(int)),
                   o.order_qty.to_numpy()[keep].astype(np.int32))
-        notes["demand_basis"] = "orders.csv replay at delivery_date"
+        notes["demand_basis"] = "orders.parquet replay at delivery_date"
         notes["realised_demand_units"] = float(daily.sum())
         return daily, notes
 
@@ -650,7 +660,7 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx,
     # forecast volume so the aggregate bias reproduced is the volume-weighted
     # +8.5% the forecaster actually has; an unweighted draw over-weights
     # small-denominator weeks and inflates it to +14.7%.
-    dfc = pd.read_csv(data_dir / "demand_forecast.csv")
+    dfc = pd.read_parquet(data_dir / "demand_forecast.parquet")
     n_weeks = len(periods)
     pidx = {p: k for k, p in enumerate(periods)}
     fwd_rows = dfc[dfc.period.isin(set(periods))]
@@ -1262,7 +1272,7 @@ ASSUMPTIONS = [
     "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a "
     "weekly (R,s,S) review with R = 1 week.",
     "Lead times are drawn per order line from each lane's own mean and std "
-    "in network_lanes.csv, so every receipt arrives on its own realised "
+    "in network_lanes.parquet, so every receipt arrives on its own realised "
     "transit rather than the average. The committed lead time quoted to the "
     "child is that lane's ~90th percentile.",
     "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following "
@@ -1272,7 +1282,7 @@ ASSUMPTIONS = [
     "A parent holds back its own expected demand for the remainder of the "
     "review period before releasing stock downstream, implementing "
     "'customer orders served first'.",
-    "Routing comes from sku_sourcing_map.csv, an input table derived from "
+    "Routing comes from sku_sourcing_map.parquet, an input table derived from "
     "network structure: each RDC draws a SKU from the nearest plant DC whose "
     "plant is qualified to make it, and each CDC from its min-lead-time "
     "inbound RDC. It is not mined from simulated receipts.",
@@ -1291,9 +1301,9 @@ def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0,
     svc_sku, svc_node, costs = summarise(inv, twin, inp)
     k = kpis(inv, twin, inp, costs)
 
-    inv.to_csv(out / "inventory.csv", index=False)
-    rcpt.to_csv(out / "replenishment_receipts.csv", index=False)
-    prod.to_csv(out / "production.csv", index=False)
+    inv.to_parquet(out / "inventory.parquet", index=False)
+    rcpt.to_parquet(out / "replenishment_receipts.parquet", index=False)
+    prod.to_parquet(out / "production.parquet", index=False)
     svc_sku.to_csv(out / "service_summary.csv", index=False)
     svc_node.to_csv(out / "service_by_node.csv", index=False)
     costs.to_csv(out / "cost_summary.csv", index=False)
@@ -1309,7 +1319,7 @@ def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0,
         for i, j in np.argwhere(inp.active)],
         columns=["dc_id", "sku_id", "safety_stock", "reorder_point",
                  "order_up_to_level"])
-    pol.to_csv(out / "policy.csv", index=False)
+    pol.to_parquet(out / "policy.parquet", index=False)
 
     manifest = {
         "schema_version": SCHEMA_VERSION,
@@ -1448,7 +1458,7 @@ internal shortfall; the child re-orders at the next review. That is what makes
 
 | Mode | Horizon | Demand | Opening state |
 |---|---|---|---|
-| `history` | the span the order history covers | replayed from `orders.csv` | cold start, zero stock |
+| `history` | the span the order history covers | replayed from `orders.parquet` | cold start, zero stock |
 | `forward` | the planning horizon | forecast x a forecast-error ratio resampled from in-sample history | from `--state` |
 
 ### Assumptions
@@ -1461,7 +1471,7 @@ Every run records these in its own `run_manifest.json`.
 
 ## Part 2 — The optimization seam
 
-One standalone CSV, five required columns:
+One standalone table (Parquet, or CSV), five required columns:
 
 ```
 dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
@@ -1474,8 +1484,8 @@ error rather than quietly defaulting to zero.
 
 ```bash
 python models/twin/digital_twin.py --mode forward --run-name meio_v2 \
-    --policy "output datasets/meio_v2/policy.csv" \
-    --state  "output datasets/history/opening_position.csv"
+    --policy "output datasets/meio_v2/policy.parquet" \
+    --state  "output datasets/history/opening_position.parquet"
 ```
 
 **Comparison contract.** Two runs are comparable only when they share a seed
@@ -1517,8 +1527,8 @@ still takes the `scenario_engine.py` path; any other key is refused.
 ```bash
 python models/twin/digital_twin.py --mode forward \\
     --scenario-config models/twin/scenario_config.example.json \\
-    --policy "output datasets/history/forward_policy.csv" \\
-    --state "output datasets/history/opening_position.csv"
+    --policy "output datasets/history/forward_policy.parquet" \\
+    --state "output datasets/history/opening_position.parquet"
 ```
 
 The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
@@ -1546,7 +1556,7 @@ reference to the code that produced them.
 
 ## Part 4 — Artefact reference
 
-### `opening_position.csv` — history runs only
+### `opening_position.parquet` — history runs only
 
 The position the forward horizon opens on, which is the terminal state of
 history. This is what a forward run consumes via `--state`.
@@ -1566,20 +1576,20 @@ Built off the terminal inventory rather than the forward policy, so a
 (location, SKU) pair the forward policy does not cover still carries its real
 stock across the cut-over instead of having it silently destroyed.
 
-### `forward_policy.csv` — history runs only
+### `forward_policy.parquet` — history runs only
 
 The operating policy for the planning horizon, sized on the **forecast**. Same
 five-column contract as above, plus `production_family`, `segment` and `z` for
-reference. Its sibling `baseline_policy.csv` — sized on the order history and
+reference. Its sibling `baseline_policy.parquet` — sized on the order history and
 used to simulate the past — lives in `input datasets/` because it ran the past.
 
-### `policy.csv` — every run
+### `policy.parquet` — every run
 
 Exactly the `(safety_stock, reorder_point, order_up_to_level)` that run
 executed, normalised to the five-column contract. The audit trail: whatever was
 fed in via `--policy`, this is what the engine actually used.
 
-### `inventory.csv` — forward runs
+### `inventory.parquet` — forward runs
 
 Grain: **period x dc x sku**. The primary physics output.
 
@@ -1604,7 +1614,7 @@ Grain: **period x dc x sku**. The primary physics output.
 is an echelon total and counts a unit once per tier it passes through;
 `demand_customer_qty` is the external figure that reconciles to real orders.
 
-### `replenishment_receipts.csv` — forward runs
+### `replenishment_receipts.parquet` — forward runs
 
 Grain: **one row per (ship day, lane, sku)**.
 
@@ -1619,7 +1629,7 @@ quoted to the child, which is what puts on-time delivery near 90% with a
 genuine late tail rather than a coin flip. `short_qty` is the balance the parent
 could not cover.
 
-### `production.csv` — forward runs
+### `production.parquet` — forward runs
 
 Grain: **period x plant x sku**.
 
@@ -1686,7 +1696,7 @@ what move.
   regional-DC-to-regional-DC lanes and second inbound lanes, but no flow is
   routed across them.
 - **Single-sourcing per (node, SKU).** Routing is one parent per pair, taken
-  from `sku_sourcing_map.csv`.
+  from `sku_sourcing_map.parquet`.
 - **Scenario overrides have stated limits.** A lane outage holds dispatches
   until the lane reopens (no failover routing); inventory overrides change the
   opening position only (no mid-horizon shocks); economics overrides are static
@@ -1793,10 +1803,10 @@ def main():
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--horizon-weeks", type=int, default=None)
     ap.add_argument("--policy", default=None,
-                    help="CSV of dc_id,sku_id,safety_stock,reorder_point,"
+                    help="Parquet (or CSV) table of dc_id,sku_id,safety_stock,reorder_point,"
                          "order_up_to_level - the optimization seam")
     ap.add_argument("--state", default=None,
-                    help="opening position CSV (opening_stock, "
+                    help="opening position table, Parquet or CSV (opening_stock, "
                          "in_transit_qty). Omit for a cold start.")
     ap.add_argument("--label", default="")
     ap.add_argument("--scenario-config", default=None,

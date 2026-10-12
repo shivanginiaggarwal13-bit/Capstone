@@ -21,7 +21,6 @@ import argparse
 import json
 import os
 import sys
-from pathlib import Path
 
 import polars as pl
 from scipy.stats import norm
@@ -29,7 +28,6 @@ from scipy.stats import norm
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime as rt                       # noqa: E402
 import policy_builds as pb                 # noqa: E402
-import digital_twin_fast as twin           # noqa: E402
 import validate_real_data as vrd           # noqa: E402
 
 RESULTS_DIR = vrd.RESULTS_DIR
@@ -59,7 +57,7 @@ def candidate_z(csl):
 def load_baseline():
     """sku->archetype, sku->baseline z, archetype->recommended CSL, straight from the
     segmentation deliverable's output."""
-    c = rt.read_csv(CLUSTER_CSV, columns=["sku_id", "archetype", "safety_factor_z", "recommended_csl"])
+    c = rt.read_table(CLUSTER_CSV, columns=["sku_id", "archetype", "safety_factor_z", "recommended_csl"])
     arch_map = dict(zip(c["sku_id"].to_list(), c["archetype"].to_list()))
     z_map = dict(zip(c["sku_id"].to_list(), c["safety_factor_z"].cast(pl.Float64).to_list()))
     csl_by_cluster = dict(zip(c["archetype"].to_list(), c["recommended_csl"].cast(pl.Float64).to_list()))
@@ -97,7 +95,7 @@ def _aggregate_partials() -> pl.DataFrame:
                     rows.append(json.load(f))
     out = pl.DataFrame(rows) if rows else pl.DataFrame()
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    rt.write_csv(out, OUT_CSV)
+    rt.write_table(out, OUT_CSV)
     return out
 
 
@@ -124,13 +122,13 @@ def _run_seed(ctx, log, clusters_to_run, seed, baseline):
     actual = vrd.ms_actual_arm(ctx, seed)
     variants = {}
     if ladder:
-        variants["ladder"] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_svc_baseline_ladder_s{seed}.csv"),
+        variants["ladder"] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_svc_baseline_ladder_s{seed}.parquet"),
                                              HEADLINE_ALPHA, NETTING_DISCOUNT, z_by_sku=dict(z_map))
     for c, csl in combos:
         override = dict(z_map)
         cz = candidate_z(csl)
         override.update({sku: cz for sku in cluster_skus(arch_map, c)})
-        variants[(c, csl)] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_svc_{_tag(c, csl, seed)}.csv"),
+        variants[(c, csl)] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_svc_{_tag(c, csl, seed)}.parquet"),
                                              HEADLINE_ALPHA, NETTING_DISCOUNT, z_by_sku=override)
     res_b = vrd.build(ctx, variants, seed).result()
     vrd.log_build(log, res_b)
@@ -188,7 +186,7 @@ def summarize(log):
                 "cost_delta_mean": rt.nanmean_pandas(cost), "cost_delta_std": rt.nanstd_pandas(cost),
             })
     summary = pl.DataFrame(rows)
-    rt.write_csv(summary, SUMMARY_CSV)
+    rt.write_table(summary, SUMMARY_CSV)
     log(rt.show(summary))
     log("\n=== Best CSL per cluster, by OWN fill rate (mean across seeds so far) ===")
     _, _, csl_by_cluster = load_baseline()
@@ -224,8 +222,6 @@ def main(argv=None):
     ctx = rt.Context(args.workers)
     try:
         run(ctx, rt.StepLog(), args.cluster, args.summarize_only)
-        if not args.summarize_only:
-            twin.write_output_documentation(Path(vrd.TWIN_OUT_ROOT))
     finally:
         ctx.close()
 

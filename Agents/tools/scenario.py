@@ -313,7 +313,7 @@ def baseline_policy_path(config: dict):
     ev = config["evaluation"]
     sc = _models_scenario()
     meio_root = paths.REPO_ROOT / config["meio"].get("output_root", "output datasets/MEIO")
-    filename = config["meio"].get("policy_filename", "meio_policy_rolling.csv")
+    filename = config["meio"].get("policy_filename", "meio_policy_rolling.parquet")
     found = sorted((meio_root / ev["baseline_scenario"]).rglob(filename), key=lambda p: p.stat().st_mtime)
     if found:
         return found[-1]

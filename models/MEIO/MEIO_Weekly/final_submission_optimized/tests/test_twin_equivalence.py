@@ -22,13 +22,13 @@ import digital_twin as orig             # noqa: E402  (models/twin, on sys.path 
 
 REPO = rt.REPO_ROOT
 DATA = REPO / "input datasets"
-POLICY = REPO / "output datasets" / "history" / "forward_policy.csv"
-STATE = REPO / "output datasets" / "history" / "opening_position.csv"
+POLICY = REPO / "output datasets" / "history" / "forward_policy.parquet"
+STATE = REPO / "output datasets" / "history" / "opening_position.parquet"
 
 
 def time_varying_policy(periods, seed=0) -> Path:
-    """forward_policy.csv per period, perturbed, with some rows dropped (forward-fill)."""
-    base = pd.read_csv(POLICY)[["dc_id", "sku_id", "safety_stock", "reorder_point", "order_up_to_level"]]
+    """forward_policy.parquet per period, perturbed, with some rows dropped (forward-fill)."""
+    base = pd.read_parquet(POLICY)[["dc_id", "sku_id", "safety_stock", "reorder_point", "order_up_to_level"]]
     rng = np.random.default_rng(seed)
     frames = []
     for k, p in enumerate(periods):
@@ -39,9 +39,9 @@ def time_varying_policy(periods, seed=0) -> Path:
         if k:
             f = f[rng.random(len(f)) > 0.05]
         frames.append(f.assign(period=p))
-    path = Path(tempfile.mkdtemp(prefix="twin_eq_")) / "policy.csv"
+    path = Path(tempfile.mkdtemp(prefix="twin_eq_")) / "policy.parquet"
     pd.concat(frames, ignore_index=True)[["period", "dc_id", "sku_id", "safety_stock", "reorder_point",
-                                          "order_up_to_level"]].to_csv(path, index=False)
+                                          "order_up_to_level"]].to_parquet(path, index=False)
     return path
 
 

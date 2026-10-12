@@ -42,7 +42,7 @@ evidence. A config without that section keeps MEIO Weekly. Either way the
 resolved parameters, and the evidence files they rest on, are written to
 meio_parameters.json next to the policy.
 
-Output: <repo-root>/output datasets/MEIO/<scenario>/rolling_2026/meio_policy_rolling.csv
+Output: <repo-root>/output datasets/MEIO/<scenario>/rolling_2026/meio_policy_rolling.parquet
     (or `out_path` if passed to `run()` directly -- added after
     `alt_models/sim_optimize_rolling.py` and `alt_models/bandit_rolling.py`
     were run IN PARALLEL, both hardcoded to this same default path, and
@@ -133,10 +133,13 @@ def run(data_dir: str | None, as_of_week: str, out_path: str = None,
         out_dir = output_root / scenario.scenario_folder_name(config) / "rolling_2026"
         os.makedirs(out_dir, exist_ok=True)
         scenario.copy_config(config_path, out_dir.parent, config)
-        out_path = str(out_dir / "meio_policy_rolling.csv")
+        out_path = str(out_dir / "meio_policy_rolling.parquet")
     else:
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    rolling.to_csv(out_path, index=False)
+    if str(out_path).lower().endswith(".csv"):      # a caller that still names a CSV file
+        rolling.to_csv(out_path, index=False)
+    else:
+        rolling.to_parquet(out_path, index=False)
     print(f"\nWrote {len(rolling):,} (period, dc, sku) policy rows to {out_path}")
     if params.model != "meio_weekly":
         print(f"Parameters: {params.write(Path(out_path).parent / 'meio_parameters.json')}")

@@ -28,7 +28,7 @@ that section keeps MEIO Weekly, the method below.
 
 Method (see meio_weekly_lib.py for the fixes this bakes in vs. the version
 that was found underperforming):
-    1. Aggregate demand_forecast.csv to true (period, sku, dc) grain.
+    1. Aggregate demand_forecast.parquet to true (period, sku, dc) grain.
     2. Bias-correct next week's forecast_qty by the trailing actual/forecast
        ratio (short window).
     3. Size demand uncertainty from a blended short+long trailing CV.
@@ -38,8 +38,8 @@ that was found underperforming):
 
 Outputs (under the repo's tracked `output datasets/MEIO/Scenario/<scenario>/<target_week>/`,
 alongside the other deliverables' own `output datasets/<name>/` folders):
-    meio_recommendations_weekly.csv   SKU x DC lines
-    meio_policy_weekly.csv             dc_id,sku_id,safety_stock,
+    meio_recommendations_weekly.parquet   SKU x DC lines
+    meio_policy_weekly.parquet             dc_id,sku_id,safety_stock,
                                          reorder_point,order_up_to_level
                                          (digital_twin.py --policy contract)
     meio_summary_by_dc_weekly.csv      "stock to maintain" rollup per DC
@@ -121,7 +121,7 @@ def run(data_dir: str | None, as_of_week: str | None, short_window: int, long_wi
 
     row = period_index[period_index.period == as_of_week]
     if row.empty:
-        raise SystemExit(f"--as-of-week {as_of_week!r} not found in demand_forecast.csv periods")
+        raise SystemExit(f"--as-of-week {as_of_week!r} not found in demand_forecast.parquet periods")
     as_of_week_num = int(row.iloc[0]["week_num"])
 
     seasonal_index = lib.build_seasonal_index(data_dir)
@@ -163,12 +163,12 @@ def run(data_dir: str | None, as_of_week: str | None, short_window: int, long_wi
                  "lt_mean_wk", "lt_std_wk", "target_csl", "z", "cycle_stock", "safety_stock",
                  "reorder_point", "order_up_to_level", "safety_stock_usd",
                  "mu_requested", "capacity_constrained"]
-    policy.reindex(columns=reco_cols).to_csv(os.path.join(run_dir, "meio_recommendations_weekly.csv"), index=False)
+    policy.reindex(columns=reco_cols).to_parquet(os.path.join(run_dir, "meio_recommendations_weekly.parquet"), index=False)
     if params.model != "meio_weekly":
         params.write(Path(run_dir) / "meio_parameters.json")
 
     policy_csv = policy[["dc_id", "sku_id", "safety_stock", "reorder_point", "order_up_to_level"]]
-    policy_csv.to_csv(os.path.join(run_dir, "meio_policy_weekly.csv"), index=False)
+    policy_csv.to_parquet(os.path.join(run_dir, "meio_policy_weekly.parquet"), index=False)
 
     by_dc = policy.groupby("dc_id").agg(
         skus=("sku_id", "nunique"),

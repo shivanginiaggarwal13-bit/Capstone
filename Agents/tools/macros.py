@@ -1,7 +1,7 @@
 """
 Macro tools: one planner-level concept in, several linked primitive overrides out.
 
-  apply_library_scenario  a row of the disruption library (input datasets/scenarios.csv)
+  apply_library_scenario  a row of the disruption library (input datasets/scenarios.parquet)
   add_price_event         a temporary promotion or an everyday price change -> demand lift
                           (+ the post-promotion pantry-loading dip), using the dataset's
                           own elasticities and dip formula

@@ -7,10 +7,12 @@ Four things every script in this folder needs and none of the originals had:
 1. **Paths, set once.** The repo root's `models/` and `models/twin/` go on sys.path, so
    a worker process started by the pool imports exactly the modules the parent did.
 
-2. **Fast CSV I/O on polars.** `read_csv` caches static inputs per process (keyed by
-   path and mtime), so a worker that scores twenty policies reads `orders.csv` once.
-   `write_csv` writes NaN as an empty field and booleans as True/False, the way pandas'
-   `to_csv` did, so anything downstream parses the same values.
+2. **Fast table I/O on polars.** Data tables are Parquet; summaries stay CSV.
+   `read_table` / `write_table` pick the format from the file suffix. `read_table`
+   caches static inputs per process (keyed by path and mtime), so a worker that scores
+   twenty policies reads `orders.parquet` once. A CSV is written the way pandas' `to_csv`
+   did (NaN as an empty field, booleans as True/False, os.linesep line endings), so it
+   parses to the same values.
 
 3. **pandas-exact reductions.** The published numbers came out of pandas groupby, whose
    float sums are Kahan-compensated and whose std is Welford's one-pass update, and out
@@ -44,8 +46,8 @@ for _p in (HERE, REPO_ROOT / "models", REPO_ROOT / "models" / "twin"):
 
 
 # Opt-in (run_all.py --lean-twin-outputs, or each research script's flag): research twin
-# runs skip inventory.csv / replenishment_receipts.csv / production.csv, ~250 MB each and
-# ~60 GB across a run_all. Runs whose inventory is read back later keep it.
+# runs skip inventory.parquet / replenishment_receipts.parquet / production.parquet, ~35 MB per
+# 156-week run and ~9 GB across a run_all. Runs whose inventory is read back later keep it.
 LEAN_TWIN_OUTPUTS = False
 
 
@@ -79,30 +81,44 @@ def intra_threads() -> int:
 
 
 # ------------------------------------------------------------------------ io --
-_CSV_CACHE: dict = {}
-_CSV_LOCK = threading.Lock()
+_TABLE_CACHE: dict = {}
+_TABLE_LOCK = threading.Lock()
 
 
-def read_csv(path, columns: list[str] | None = None, cache: bool = True, **kw) -> pl.DataFrame:
-    """polars read_csv, cached per process by (path, mtime, columns). Returned frames are
-    immutable, so sharing one across callers is safe."""
+def read_table(path, columns: list[str] | None = None, cache: bool = True) -> pl.DataFrame:
+    """A table by suffix -- Parquet (the project's data tables) or CSV (summaries,
+    segmentation outputs) -- cached per process by (path, mtime, columns). Returned
+    frames are immutable, so sharing one across callers is safe."""
     path = Path(path)
-    key = (str(path.resolve()), path.stat().st_mtime_ns, tuple(columns) if columns else None,
-           tuple(sorted(kw.items())))
+    key = (str(path.resolve()), path.stat().st_mtime_ns, tuple(columns) if columns else None)
     if cache:
-        with _CSV_LOCK:
-            hit = _CSV_CACHE.get(key)
+        with _TABLE_LOCK:
+            hit = _TABLE_CACHE.get(key)
         if hit is not None:
             return hit
-    df = pl.read_csv(path, columns=columns, infer_schema_length=10000, **kw)
+    if path.suffix.lower() == ".csv":
+        df = pl.read_csv(path, columns=columns, infer_schema_length=10000)
+    else:
+        df = pl.read_parquet(path, columns=columns)
     if cache:
-        with _CSV_LOCK:
-            _CSV_CACHE[key] = df
+        with _TABLE_LOCK:
+            _TABLE_CACHE[key] = df
     return df
 
 
+def write_table(df: pl.DataFrame, path) -> None:
+    """Parquet for a .parquet path, else a CSV with pandas `to_csv(index=False)` parity."""
+    path = Path(path)
+    if path.suffix.lower() != ".csv":
+        path.parent.mkdir(parents=True, exist_ok=True)
+        df.write_parquet(path)
+        return
+    write_csv(df, path)
+
+
 def write_csv(df: pl.DataFrame, path) -> None:
-    """pandas `to_csv(index=False)` parity for values: NaN -> empty, bool -> True/False."""
+    """pandas `to_csv(index=False)` parity: NaN -> empty, bool -> True/False, and pandas'
+    line terminator (os.linesep, so CRLF on Windows, as the original's files are)."""
     exprs = []
     for name, dtype in df.schema.items():
         if dtype in (pl.Float32, pl.Float64):
@@ -113,25 +129,19 @@ def write_csv(df: pl.DataFrame, path) -> None:
                          .otherwise(pl.lit(None, dtype=pl.String)).alias(name))
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    (df.with_columns(exprs) if exprs else df).write_csv(path)
+    (df.with_columns(exprs) if exprs else df).write_csv(path, line_terminator=os.linesep)
 
 
-def write_policy(df: pl.DataFrame, out_path, lean: bool = False) -> str:
-    """A policy file for the twin: CSV as the original wrote it, or with `lean`, Parquet
-    next to it (same name, .parquet) -- a walk-forward policy repeats 105 warm-up weeks
-    of the baseline, ~50 MB of CSV per file. Returns the path written."""
-    if lean:
-        path = Path(out_path).with_suffix(".parquet")
-        path.parent.mkdir(parents=True, exist_ok=True)
-        df.write_parquet(path)
-        return str(path)
-    write_csv(df, out_path)
-    return str(out_path)
+def write_policy(df: pl.DataFrame, out_path) -> str:
+    """A policy file for the twin, always Parquet (a .csv name is given the .parquet
+    suffix). Returns the path written."""
+    path = Path(out_path).with_suffix(".parquet")
+    write_table(df, path)
+    return str(path)
 
 
 def read_policy(path) -> pl.DataFrame:
-    path = Path(path)
-    return pl.read_parquet(path) if path.suffix == ".parquet" else read_csv(path, cache=False)
+    return read_table(path, cache=False)
 
 
 def write_text_shared(path, text: str, attempts: int = 20) -> None:

@@ -42,7 +42,7 @@ def meio_parameters():
 
 
 def _read(name: str, **kw) -> pd.DataFrame:
-    return pd.read_csv(paths.DATA_DIR / name, **kw)
+    return pd.read_parquet(paths.DATA_DIR / name, **kw)
 
 
 # ----------------------------------------------------------------- masters --
@@ -88,12 +88,12 @@ def opening_position() -> pd.DataFrame:
 
 @lru_cache(maxsize=None)
 def library() -> pd.DataFrame:
-    return _read("scenarios.csv")
+    return _read("scenarios.parquet")
 
 
 @lru_cache(maxsize=None)
 def forward_policy() -> pd.DataFrame:
-    return pd.read_csv(paths.FORWARD_POLICY)
+    return pd.read_parquet(paths.FORWARD_POLICY)
 
 
 # ----------------------------------------------------------------- horizon --

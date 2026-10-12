@@ -13,7 +13,7 @@ Everything below comes from the real run on 9 Oct 2026, stored in these folders:
 | What | Where |
 |---|---|
 | Config, card, approval, run status and log, engine receipts | `output datasets/overrides/SCENARIO_0003_Southeast_Heatwave_July_Maintenance_Flood/` |
-| The re-planned MEIO policy | `output datasets/MEIO/SCENARIO_0003_…/rolling_2026/meio_policy_rolling.csv` |
+| The re-planned MEIO policy | `output datasets/MEIO/SCENARIO_0003_…/rolling_2026/meio_policy_rolling.parquet` |
 | The two Twin runs | `output datasets/projections/SCENARIO_0003_…/{prepared,unprepared}/` |
 
 > **Baseline changed after this run (9 Oct, later).** The shared config now runs Clark-Scarf v2 with tuned parameters (`meio.parameters`; see `models/MEIO/MEIO_Weekly/final_submission/README.md`), and SCENARIO_0002 was regenerated with it.
@@ -137,7 +137,7 @@ for wk_num in forward_weeks:
 | Seam | Code | What changes |
 |---|---|---|
 | Demand | `fwd_rows = override_engine.twin.forecast_rows(overrides, fwd_rows)` ([digital_twin.py:658](../../models/twin/digital_twin.py:658)) | The forward forecast lines, scaled **before** the (period, dc, sku) group-by and before the forecast-error draw. Customer scope is honoured and the random draws are unchanged, so out-of-scope demand is bit-for-bit identical (common random numbers). |
-| Opening stock | `state = override_engine.twin.opening_state(overrides, state)` ([digital_twin.py:583](../../models/twin/digital_twin.py:583)) | RDC03's opening position, right after `opening_position.csv` is read. |
+| Opening stock | `state = override_engine.twin.opening_state(overrides, state)` ([digital_twin.py:583](../../models/twin/digital_twin.py:583)) | RDC03's opening position, right after `opening_position.parquet` is read. |
 | Capacity | `cap_family_week` from `capacity_weeks(...)` ([digital_twin.py:370](../../models/twin/digital_twin.py:370)); used in `_produce` ([digital_twin.py:1014](../../models/twin/digital_twin.py:1014)) | Line capacity by production week: `inp.cap_family_week.get((wk, p, fam), inp.cap_family.get((p, fam)))`. |
 | Lanes, outages, adherence, economics | `lane_week`, `lane_blocks`, `adherence_week`, `economics()` | Not used in this scenario. |
 

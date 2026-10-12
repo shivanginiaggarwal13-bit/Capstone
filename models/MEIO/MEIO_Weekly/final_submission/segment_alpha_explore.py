@@ -6,7 +6,7 @@ Explores whether a single portfolio-wide alpha is leaving value on the
 table, using the segments actually identified by the Clustering &
 Segmentation deliverable's own analysis (`segmentation_v4.py`'s k-means
 clustering, k=4: Flagship Promo-Driven, Mid-Tier Core, Long-Tail Erratic,
-Long-Tail Supply-Risk) -- NOT the sku_master.csv 3-way label
+Long-Tail Supply-Risk) -- NOT the sku_master.parquet 3-way label
 (Fast-Moving/Seasonal/Intermediate) that the rest of this submission's
 validated results use.
 
@@ -23,7 +23,7 @@ things to check before trusting any number here:
      2%-of-revenue cluster's effect on PORTFOLIO fill is small almost by
      construction, regardless of how much it matters to itself) -- the
      `own_fill` stage corrects for this by re-slicing each run's own
-     inventory.csv down to just that cluster's SKUs.
+     inventory.parquet down to just that cluster's SKUs.
   2. Clusters are not independent: raising one cluster's setting can hurt
      another's fill rate through shared RDC/PDC capacity, even with that
      other cluster's own setting untouched (observed directly in this
@@ -93,20 +93,20 @@ def run_twin_forward(run_name, policy_csv, seed=SEED):
     subprocess.run(cmd, check=True, cwd=REPO_ROOT, capture_output=True, text=True)
     with open(os.path.join(out_dir, "run_kpis.json")) as f:
         kpi = json.load(f)
-    inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+    inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
     return kpi, inv
 
 
 def stage_baseline():
-    """Synthetic-basis baseline (dataset's own forward_policy.csv). Cached
+    """Synthetic-basis baseline (dataset's own forward_policy.parquet). Cached
     after first run."""
     out_dir = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME, "synthetic_baseline")
     if os.path.exists(os.path.join(out_dir, "run_kpis.json")):
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
             kpi = json.load(f)
-        inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+        inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
         return kpi, inv
-    forward_policy_csv = os.path.join(REPO_ROOT, "output datasets", "history", "forward_policy.csv")
+    forward_policy_csv = os.path.join(REPO_ROOT, "output datasets", "history", "forward_policy.parquet")
     return run_twin_forward("synthetic_baseline", forward_policy_csv)
 
 
@@ -132,7 +132,7 @@ def stage_sweep(seed=SEED):
             csv2.ALPHA_OVERRIDE_BY_SKU.clear()
             csv2.ALPHA_OVERRIDE_BY_SKU.update(
                 {sku: (alpha if arch == cluster else REFERENCE_ALPHA) for sku, arch in cluster_map.items()})
-            policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}.csv")
+            policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}.parquet")
             csv2.build_rolling_policy(DEFAULT_DATA, AS_OF_WEEK, REFERENCE_ALPHA, N_SIMS, rng, policy_csv)
             csv2.ALPHA_OVERRIDE_BY_SKU.clear()
 
@@ -150,9 +150,9 @@ def stage_sweep(seed=SEED):
 
 
 def stage_own_fill():
-    """Re-slice each sweep run's own inventory.csv down to just that
+    """Re-slice each sweep run's own inventory.parquet down to just that
     cluster's SKUs -- corrects the portfolio-level dilution. Requires
-    `sweep` to have already run (reuses its cached per-run inventory.csv,
+    `sweep` to have already run (reuses its cached per-run inventory.parquet,
     no new twin runs)."""
     print("=== Stage: own_fill (corrects portfolio-level dilution) ===")
     cluster_map = load_cluster_map()
@@ -162,11 +162,11 @@ def stage_own_fill():
         for alpha in ALPHAS:
             tag = f"{cluster.replace(' ', '')}_a{alpha:.1f}".replace(".", "")
             inv_path = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME,
-                                    tag, "inventory.csv")
+                                    tag, "inventory.parquet")
             if not os.path.exists(inv_path):
                 print(f"  SKIP {tag}: run the 'sweep' stage first")
                 continue
-            inv = pd.read_csv(inv_path, usecols=["sku_id", "demand_customer_qty", "unmet_customer_qty"])
+            inv = pd.read_parquet(inv_path, columns=["sku_id", "demand_customer_qty", "unmet_customer_qty"])
             inv["archetype"] = inv.sku_id.map(cluster_map)
             g = inv[inv.archetype == cluster]
             cd, cu = g.demand_customer_qty.sum(), g.unmet_customer_qty.sum()

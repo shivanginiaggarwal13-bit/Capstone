@@ -23,7 +23,7 @@ What changed is how the work is scheduled, not what is computed:
     state the previous one ended on, so its policies reproduce exactly too.
   * Every twin run is the in-process optimized twin on the shared process pool, and
     returns the window/segment summaries the reports need instead of re-reading a
-    200 MB inventory.csv.
+    200 MB inventory.parquet.
 
     python validate_real_data.py                   # every stage
     python validate_real_data.py --stage headline  # just one stage
@@ -54,7 +54,7 @@ SCENARIO_NAME = scenario.scenario_folder_name(SCENARIO_SETTINGS)
 DEFAULT_DATA = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "meio", "data_dir"))
 BASELINE_POLICY_CSV = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "policy"))
 SCENARIO_OUT_DIR = scenario.resolve_scenario_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "scenario")
-TWIN_OUT_ROOT = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "output_root"))
+TWIN_OUT_ROOT = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "twin_output_root"))
 TWIN_OUT_DIR = os.path.join(TWIN_OUT_ROOT, "projections", SCENARIO_NAME)
 RUN_OUT_DIR = os.path.join(SCENARIO_OUT_DIR, "validation_output")  # full validation detail
 RESULTS_DIR = os.path.join(SCENARIO_OUT_DIR, "results")             # summaries/charts/reports
@@ -97,7 +97,7 @@ def prepare():
 
 # ------------------------------------------------------------------ groups --
 def segment_groups() -> dict:
-    sm = rt.read_csv(os.path.join(DEFAULT_DATA, "sku_master.csv"), columns=["sku_id", "segment"])
+    sm = rt.read_table(os.path.join(DEFAULT_DATA, "sku_master.parquet"), columns=["sku_id", "segment"])
     out: dict = {}
     for s, g in zip(sm["sku_id"].to_list(), sm["segment"].to_list()):
         if g is not None:
@@ -106,7 +106,7 @@ def segment_groups() -> dict:
 
 
 def cluster_groups() -> dict:
-    c = rt.read_csv(CLUSTER_CSV, columns=["sku_id", "archetype"])
+    c = rt.read_table(CLUSTER_CSV, columns=["sku_id", "archetype"])
     out: dict = {}
     for s, a in zip(c["sku_id"].to_list(), c["archetype"].to_list()):
         out.setdefault(a, []).append(s)
@@ -123,7 +123,7 @@ def summary_request(groups: dict | None = None) -> dict:
 
 
 # -------------------------------------------------------------- twin jobs --
-# runs whose inventory.csv is read back later (baseline cache reuse, --stage segments): never lean
+# runs whose inventory.parquet is read back later (baseline cache reuse, --stage segments): never lean
 KEEP_INVENTORY = ("actual", "csv2_headline")
 
 
@@ -170,7 +170,7 @@ def warmup_parity_check(res_a: dict, res_b: dict) -> bool:
 def walkforward_job(variants: dict, rng, model="clark_scarf_v2", threads=1) -> dict:
     return {"data_dir": DEFAULT_DATA, "variants": variants, "rng": rng, "n_sims": N_SIMS, "model": model,
             "baseline_policy_csv": BASELINE_POLICY_CSV, "warmup": (WARMUP_START, WARMUP_END),
-            "test": (TEST_START, TEST_END), "threads": threads, "lean": rt.LEAN_TWIN_OUTPUTS}
+            "test": (TEST_START, TEST_END), "threads": threads}
 
 
 def build(ctx, variants: dict, rng, model="clark_scarf_v2", priority=P_BUILD, threads=1, lane=None):
@@ -191,7 +191,7 @@ def log_build(log, res: dict):
 
 def write_csv(df: pl.DataFrame, name: str) -> str:
     path = os.path.join(RESULTS_DIR, name)
-    rt.write_csv(df, path)
+    rt.write_table(df, path)
     return path
 
 
@@ -201,7 +201,7 @@ def run(ctx, log, stages=None):
     prepare()
     stages = list(stages or STAGES)
     if "segments" in stages and "headline" not in stages and \
-            not os.path.exists(os.path.join(TWIN_OUT_DIR, "csv2_headline", "inventory.csv")):
+            not os.path.exists(os.path.join(TWIN_OUT_DIR, "csv2_headline", "inventory.parquet")):
         log("  headline stage hasn't run yet -- running it now")
         stages.append("headline")
     want = set(stages)
@@ -213,12 +213,12 @@ def run(ctx, log, stages=None):
     # --- seed-2026 fresh stream: headline, alpha sweep's first link, multiseed @2026
     v26 = {}
     if "headline" in want:
-        v26["headline"] = pb.variant_spec(policy_path("policy_csv2_headline.csv"), HEADLINE_ALPHA, 1.0)
+        v26["headline"] = pb.variant_spec(policy_path("policy_csv2_headline.parquet"), HEADLINE_ALPHA, 1.0)
     if "alpha_sweep" in want:
         v26["sweep_0"] = pb.variant_spec(policy_path(_sweep_name(SWEEP_ALPHAS[0])), SWEEP_ALPHAS[0], 1.0)
     if "multiseed" in want:
         for a in (0.4, 0.6):
-            v26[f"ms_{a}"] = pb.variant_spec(policy_path(f"policy_ms_{_ms_tag(a, SEED)}.csv"), a, 1.0)
+            v26[f"ms_{a}"] = pb.variant_spec(policy_path(f"policy_ms_{_ms_tag(a, SEED)}.parquet"), a, 1.0)
     builds = {}
     if v26:
         chained = "alpha_sweep" in want         # the alpha sweep continues this stream's generator
@@ -227,7 +227,7 @@ def run(ctx, log, stages=None):
     if "multiseed" in want:
         for seed in MULTISEED_SEEDS:
             if seed != SEED:
-                builds[seed] = build(ctx, {f"ms_{a}": pb.variant_spec(policy_path(f"policy_ms_{_ms_tag(a, seed)}.csv"),
+                builds[seed] = build(ctx, {f"ms_{a}": pb.variant_spec(policy_path(f"policy_ms_{_ms_tag(a, seed)}.parquet"),
                                                                       a, 1.0) for a in (0.4, 0.6)}, seed)
     jobs = {}
     if "meio_weekly" in want:
@@ -254,7 +254,7 @@ def run(ctx, log, stages=None):
 
 
 def _sweep_name(a):
-    return f"policy_sweep_{_alpha_tag(a)}.csv"
+    return f"policy_sweep_{_alpha_tag(a)}.parquet"
 
 
 def _alpha_tag(a):
@@ -267,7 +267,7 @@ def _ms_tag(alpha, seed):
 
 def _stage_meio_weekly(ctx, log, actual):
     log("=== Stage: meio_weekly ===")
-    res_b = build(ctx, {"meio_weekly": pb.variant_spec(policy_path("policy_meio_weekly.csv"))}, None,
+    res_b = build(ctx, {"meio_weekly": pb.variant_spec(policy_path("policy_meio_weekly.parquet"))}, None,
                   model="meio_weekly").result()
     log_build(log, res_b)
     res = run_twin_history(ctx, "meio_weekly", res_b["paths"]["meio_weekly"]).result()
@@ -372,7 +372,7 @@ def _stage_segments(ctx, log, actual, headline_job):
     if headline_job is not None:
         res = headline_job.result()[2]
     else:
-        res = ctx.submit(twin.simulate_task, {**history_job("csv2_headline", policy_path("policy_csv2_headline.csv")),
+        res = ctx.submit(twin.simulate_task, {**history_job("csv2_headline", policy_path("policy_csv2_headline.parquet")),
                                               "use_cache": True}, priority=P_TWIN).result()
     act = actual.result()
     log("=== Stage: segments (Fast-Moving/Seasonal/Intermediate breakdown of the headline result) ===")
@@ -400,7 +400,6 @@ def main(argv=None):
     log = rt.StepLog()
     try:
         run(ctx, log, [args.stage] if args.stage else None)
-        twin.write_output_documentation(Path(TWIN_OUT_ROOT))
     finally:
         ctx.close()
 

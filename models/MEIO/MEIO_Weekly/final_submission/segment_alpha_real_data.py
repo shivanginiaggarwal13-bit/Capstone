@@ -128,7 +128,7 @@ def _actual_arm(seed):
     if os.path.exists(os.path.join(out_dir, "run_kpis.json")):
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
             kpi = json.load(f)
-        inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+        inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
         return kpi, inv
     return vrd.run_twin_history(run_name, vrd.BASELINE_POLICY_CSV, seed=seed)
 
@@ -142,7 +142,7 @@ def simulate_combo(cluster_skus_or_none, alpha, seed, tag):
     rng = np.random.default_rng(seed)
     override = {} if cluster_skus_or_none is None else {sku: alpha for sku in cluster_skus_or_none}
     policy_csv = vrd.build_walkforward_policy_csv2(
-        vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_sreal_{tag}.csv"),
+        vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_sreal_{tag}.parquet"),
         alpha=REFERENCE_ALPHA, rng=rng, alpha_override=override)
     kpi, inv = vrd.run_twin_history(f"sreal_{tag}", policy_csv, seed=seed)
     test_actual = inv_actual[(inv_actual.period >= TEST_START) & (inv_actual.period <= TEST_END)]

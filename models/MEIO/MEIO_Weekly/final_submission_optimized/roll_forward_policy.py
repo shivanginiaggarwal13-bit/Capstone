@@ -14,7 +14,7 @@ generator in order, so results match the original either way.
 
     python roll_forward_policy.py
 
-Output: <repo-root>/output datasets/MEIO/<scenario>/rolling_2026/meio_policy_rolling.csv
+Output: <repo-root>/output datasets/MEIO/<scenario>/rolling_2026/meio_policy_rolling.parquet
     (or `out_path` if passed to `run()`): period, dc_id, sku_id, safety_stock,
     reorder_point, order_up_to_level; plus meio_parameters.json next to it.
 """
@@ -100,10 +100,10 @@ def run(data_dir: str | None, as_of_week: str, out_path: str = None,
         out_dir = output_root / scenario.scenario_folder_name(config) / "rolling_2026"
         os.makedirs(out_dir, exist_ok=True)
         scenario.copy_config(config_path, out_dir.parent, config)
-        out_path = str(out_dir / "meio_policy_rolling.csv")
+        out_path = str(out_dir / "meio_policy_rolling.parquet")
     else:
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    rt.write_csv(rolling, out_path)
+    rt.write_table(rolling, out_path)
     print(f"\nWrote {rolling.height:,} (period, dc, sku) policy rows to {out_path}")
     if params.model != "meio_weekly":
         print(f"Parameters: {params.write(Path(out_path).parent / 'meio_parameters.json')}")

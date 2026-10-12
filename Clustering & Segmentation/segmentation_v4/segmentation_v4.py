@@ -80,26 +80,30 @@ BLOCKS_CANDIDATE = {
 # 1. LOAD
 # --------------------------------------------------------------------------- #
 def load_tables(input_dir):
-    def rd(name, **kw):
-        return pd.read_csv(os.path.join(input_dir, name), **kw)
+    def rd(name, parse_dates=()):
+        # the generator writes Parquet; parse_dates as read_csv applied it
+        df = pd.read_parquet(os.path.join(input_dir, name))
+        for c in parse_dates:
+            df[c] = pd.to_datetime(df[c])
+        return df
 
     def rd_opt(name, **kw):
         """Load a table only if the file exists in this dataset drop -- several
         tables (replenishment_receipts.csv, write_offs.csv) were added between
         dataset versions, so the script must not hard-fail if they're missing."""
         path = os.path.join(input_dir, name)
-        return pd.read_csv(path, **kw) if os.path.exists(path) else None
+        return rd(name, **kw) if os.path.exists(path) else None
 
     tables = {
-        "sku_master": rd("sku_master.csv"),
-        "cost_parameters": rd("cost_parameters.csv"),
-        "network_lanes": rd("network_lanes.csv"),
-        "orders": rd("orders.csv", parse_dates=["order_date", "delivery_date"]),
-        "demand_forecast": rd("demand_forecast.csv"),
-        "sku_customer_service_targets": rd("sku_customer_service_targets.csv"),
-        "inventory": rd_opt("inventory.csv"),
-        "replenishment_receipts": rd_opt("replenishment_receipts.csv"),
-        "write_offs": rd_opt("write_offs.csv"),
+        "sku_master": rd("sku_master.parquet"),
+        "cost_parameters": rd("cost_parameters.parquet"),
+        "network_lanes": rd("network_lanes.parquet"),
+        "orders": rd("orders.parquet", parse_dates=["order_date", "delivery_date"]),
+        "demand_forecast": rd("demand_forecast.parquet"),
+        "sku_customer_service_targets": rd("sku_customer_service_targets.parquet"),
+        "inventory": rd_opt("inventory.parquet"),
+        "replenishment_receipts": rd_opt("replenishment_receipts.parquet"),
+        "write_offs": rd_opt("write_offs.parquet"),
     }
     return tables
 

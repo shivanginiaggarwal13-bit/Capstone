@@ -10,8 +10,8 @@ quadrature DDLT runs its bisection across CPU threads.
     python meio_optimizer_weekly.py --as-of-week 2025-W52
 
 Outputs (under `output datasets/MEIO/<scenario>/<target_week>/`):
-    meio_recommendations_weekly.csv   SKU x DC lines
-    meio_policy_weekly.csv            dc_id,sku_id,safety_stock,reorder_point,order_up_to_level
+    meio_recommendations_weekly.parquet   SKU x DC lines
+    meio_policy_weekly.parquet            dc_id,sku_id,safety_stock,reorder_point,order_up_to_level
     meio_summary_by_dc_weekly.csv     "stock to maintain" rollup per DC
 Also (next to this script): meio_weekly_history.csv, chart_ss_trend.png
 """
@@ -123,7 +123,7 @@ def run(data_dir: str | None, as_of_week: str | None, short_window: int, long_wi
         has_actual = [p for p, h in zip(dfc.periods, dfc.horizon) if h == "in_sample"]
         as_of_week = has_actual[-1]
     if as_of_week not in dfc.week_of:
-        raise SystemExit(f"--as-of-week {as_of_week!r} not found in demand_forecast.csv periods")
+        raise SystemExit(f"--as-of-week {as_of_week!r} not found in demand_forecast.parquet periods")
     as_of_week_num = dfc.week_of[as_of_week]
 
     seasonal_index = lib.build_seasonal_index(data_dir)
@@ -157,13 +157,13 @@ def run(data_dir: str | None, as_of_week: str | None, short_window: int, long_wi
     scenario.copy_config(Path(config_path), Path(scenario_dir), config)
 
     reco = policy.select([pl.col(c) if c in policy.columns else pl.lit(None).alias(c) for c in RECO_COLS])
-    rt.write_csv(reco, os.path.join(run_dir, "meio_recommendations_weekly.csv"))
+    rt.write_table(reco, os.path.join(run_dir, "meio_recommendations_weekly.parquet"))
     if params.model != "meio_weekly":
         params.write(Path(run_dir) / "meio_parameters.json")
-    rt.write_csv(policy.select(["dc_id", "sku_id", "safety_stock", "reorder_point", "order_up_to_level"]),
-                 os.path.join(run_dir, "meio_policy_weekly.csv"))
+    rt.write_table(policy.select(["dc_id", "sku_id", "safety_stock", "reorder_point", "order_up_to_level"]),
+                 os.path.join(run_dir, "meio_policy_weekly.parquet"))
     by_dc = summary_by_dc(policy)
-    rt.write_csv(by_dc, os.path.join(run_dir, "meio_summary_by_dc_weekly.csv"))
+    rt.write_table(by_dc, os.path.join(run_dir, "meio_summary_by_dc_weekly.csv"))
 
     print(f"\nWrote {policy.height:,} SKU x DC recommendation rows to {run_dir}/")
     print(f"\nStock to maintain next week ({target_period}), by DC:")
@@ -193,7 +193,7 @@ def run(data_dir: str | None, as_of_week: str | None, short_window: int, long_wi
     else:
         history = row
     history = history.sort("target_week", maintain_order=True)
-    rt.write_csv(history, history_path)
+    rt.write_table(history, history_path)
     print(f"\nAppended run to {history_path}")
 
     fig, ax = plt.subplots(figsize=(9, 4.5))

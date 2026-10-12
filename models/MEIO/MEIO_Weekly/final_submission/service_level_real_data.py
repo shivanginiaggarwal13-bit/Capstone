@@ -132,7 +132,7 @@ def _actual_arm(seed):
     if os.path.exists(os.path.join(out_dir, "run_kpis.json")):
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
             kpi = json.load(f)
-        inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+        inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
         return kpi, inv
     return vrd.run_twin_history(run_name, vrd.BASELINE_POLICY_CSV, seed=seed)
 
@@ -151,7 +151,7 @@ def simulate_combo(z_override, seed, tag):
     lib.Z_OVERRIDE_BY_SKU.update(z_override)
     try:
         policy_csv = vrd.build_walkforward_policy_csv2(
-            vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_svc_{tag}.csv"),
+            vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_svc_{tag}.parquet"),
             alpha=HEADLINE_ALPHA, rng=rng, netting_discount=NETTING_DISCOUNT)
     finally:
         lib.Z_OVERRIDE_BY_SKU.clear()

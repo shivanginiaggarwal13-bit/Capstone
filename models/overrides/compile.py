@@ -211,7 +211,7 @@ def load(config: dict, *, data_dir=None, state_csv=None, clusters_csv=None) -> O
     twin = config.get("digital_twin", {})
     master = MasterData(_path(data_dir or twin.get("data_dir", "input datasets")),
                         _path(clusters_csv) if clusters_csv else DEFAULT_CLUSTERS,
-                        _path(state_csv or twin.get("state", "output datasets/history/opening_position.csv")))
+                        _path(state_csv or twin.get("state", "output datasets/history/opening_position.parquet")))
     compiled = [_compile(raw, master, meio_model(config)) for raw in changes["overrides"]]
     ids = [o.id for o in compiled]
     if len(ids) != len(set(ids)):

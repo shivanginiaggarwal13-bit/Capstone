@@ -149,8 +149,8 @@ def scope_service(scenario: str, override_id: str, baseline_scenario: str | None
                                             if (paths.PROJECTIONS_DIR / scenario / a / "run_kpis.json").exists()]
     out = {}
     for label, scn, run in arms:
-        inv = pd.read_csv(run_dir(scn, run) / "inventory.csv",
-                          usecols=["period", "dc_id", "sku_id", "demand_customer_qty", "unmet_customer_qty"])
+        inv = pd.read_parquet(run_dir(scn, run) / "inventory.parquet",
+                          columns=["period", "dc_id", "sku_id", "demand_customer_qty", "unmet_customer_qty"])
         inv = inv[inv.period.isin(periods)].merge(pairs, on=["dc_id", "sku_id"])
         demand, unmet = float(inv.demand_customer_qty.sum()), float(inv.unmet_customer_qty.sum())
         out[label] = {"customer_demand": round(demand), "unmet": round(unmet),
@@ -166,17 +166,17 @@ def scope_service(scenario: str, override_id: str, baseline_scenario: str | None
 
 
 def _policy_frame(scenario: str, periods: list[str] | None = None) -> pd.DataFrame:
-    rolling = sorted((paths.MEIO_OUTPUT_DIR / scenario).rglob("meio_policy_rolling.csv"),
+    rolling = sorted((paths.MEIO_OUTPUT_DIR / scenario).rglob("meio_policy_rolling.parquet"),
                      key=lambda p: p.stat().st_mtime)
     if rolling:
-        pol = pd.read_csv(rolling[-1])
+        pol = pd.read_parquet(rolling[-1])
         if periods:
             pol = pol[pol.period.isin(periods)]
         return pol.groupby(["dc_id", "sku_id"], as_index=False)[
             ["safety_stock", "reorder_point", "order_up_to_level"]].mean()
-    snapshots = sorted((paths.PROJECTIONS_DIR / scenario).glob("*/policy.csv"))
+    snapshots = sorted((paths.PROJECTIONS_DIR / scenario).glob("*/policy.parquet"))
     if snapshots:
-        return pd.read_csv(snapshots[0])
+        return pd.read_parquet(snapshots[0])
     raise ValueError(f"no MEIO policy or run policy found for {scenario}")
 
 

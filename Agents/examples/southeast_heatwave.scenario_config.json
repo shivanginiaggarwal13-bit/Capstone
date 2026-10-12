@@ -94,8 +94,8 @@
     "run_name": "prepared",
     "seed": 2026,
     "data_dir": "input datasets",
-    "policy": "output datasets/history/forward_policy.csv",
-    "state": "output datasets/history/opening_position.csv",
+    "policy": "output datasets/history/forward_policy.parquet",
+    "state": "output datasets/history/opening_position.parquet",
     "output_root": "output datasets"
   },
   "meio": {
@@ -104,7 +104,7 @@
     "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/roll_forward_policy.py",
     "data_dir": "input datasets",
     "as_of_week": "2025-W52",
-    "policy_filename": "meio_policy_rolling.csv",
+    "policy_filename": "meio_policy_rolling.parquet",
     "output_root": "output datasets/MEIO"
   },
   "artifacts": {

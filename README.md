@@ -70,7 +70,7 @@ python run_meio_then_twin.py
 
 The runner invokes the configured `meio.runner_entrypoint`, which runs the
 MEIO production tools, then finds the generated
-`meio_policy_rolling.csv` under the configured MEIO policy scenario folder, and
+`meio_policy_rolling.parquet` under the configured MEIO policy scenario folder, and
 passes that time-varying policy to the configured Digital Twin entrypoint. It
 does not run the research artefact sweeps. Those are separate and configured
 under `artifacts.entrypoint`, with their exact scenario destination in
@@ -171,11 +171,11 @@ Score another policy from the identical opening state:
 
 ```bash
 python models/twin/digital_twin.py --mode forward --run-name meio_v2 \
-  --policy "output datasets/meio_v2/policy.csv" \
-  --state "output datasets/history/opening_position.csv"
+  --policy "output datasets/meio_v2/policy.parquet" \
+  --state "output datasets/history/opening_position.parquet"
 ```
 
-The policy contract is one CSV with these required columns:
+The policy contract is one table (Parquet; a CSV is accepted too) with these required columns:
 
 ```text
 dc_id,sku_id,safety_stock,reorder_point,order_up_to_level
@@ -185,7 +185,7 @@ Extra policy columns are ignored. Use `--out-root` to place a run in another out
 
 ## Run MEIO optimization
 
-The optimizer lives at `models/MEIO/meio_optimizer.py`. Its output is a policy CSV that can be passed directly to the digital twin through `--policy`.
+The optimizer lives at `models/MEIO/meio_optimizer.py`. Its output is a policy table that can be passed directly to the digital twin through `--policy`.
 
 Before running an optimization experiment, confirm the optimizer's command-line help and output location:
 
@@ -254,7 +254,7 @@ The SHAP CSVs, metrics JSON, and charts are in `output datasets/segmentation/rep
 | `report_artifacts/shap_global_importance.csv` | Portfolio-wide SHAP feature ranking |
 | `report_artifacts/shap_cluster_importance.csv` | Cluster-specific SHAP feature importance |
 | `projections/baseline/run_kpis.json` | Baseline forward scenario KPIs |
-| `history/opening_position.csv` | Common opening state for policy comparisons |
+| `history/opening_position.parquet` | Common opening state for policy comparisons |
 
 ## Validation checklist
 

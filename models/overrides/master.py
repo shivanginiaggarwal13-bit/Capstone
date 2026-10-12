@@ -49,13 +49,13 @@ class MasterData:
         self._matches: dict = {}
         self._planning: dict = {}
 
-    def _read(self, name: str, **kw) -> pd.DataFrame:
-        return pd.read_csv(self.data_dir / name, **kw)
+    def _read(self, name: str, columns=None) -> pd.DataFrame:
+        return pd.read_parquet(self.data_dir / name, columns=columns)
 
     # ------------------------------------------------------------- masters --
     @cached_property
     def skus(self) -> pd.DataFrame:
-        sm = self._read("sku_master.csv")
+        sm = self._read("sku_master.parquet")
         if self.clusters_csv and self.clusters_csv.exists():
             cl = pd.read_csv(self.clusters_csv, usecols=["sku_id", "cluster", "archetype", "recommended_csl"])
             sm = sm.merge(cl, on="sku_id", how="left")
@@ -66,9 +66,9 @@ class MasterData:
 
     @cached_property
     def nodes(self) -> pd.DataFrame:
-        cdc = self._read("customer_dc_master.csv").rename(columns={"customer_dc_id": "dc_id"})
-        rdc = self._read("regional_dc_master.csv").rename(columns={"regional_dc_id": "dc_id"})
-        pdc = self._read("plant_dc_master.csv").rename(columns={"plant_dc_id": "dc_id"})
+        cdc = self._read("customer_dc_master.parquet").rename(columns={"customer_dc_id": "dc_id"})
+        rdc = self._read("regional_dc_master.parquet").rename(columns={"regional_dc_id": "dc_id"})
+        pdc = self._read("plant_dc_master.parquet").rename(columns={"plant_dc_id": "dc_id"})
         state_region = dict(zip(pd.concat([cdc.state, rdc.state]), pd.concat([cdc.region, rdc.region])))
         pdc["region"] = pdc.state.map(state_region)
         pdc["dc_name"] = pdc.city + " Plant DC"
@@ -80,7 +80,7 @@ class MasterData:
 
     @cached_property
     def lanes(self) -> pd.DataFrame:
-        ln = self._read("network_lanes.csv")
+        ln = self._read("network_lanes.parquet")
         nd = self.nodes.set_index("dc_id")
         ln["dc_id"] = ln.destination_node_id
         ln["region"] = ln.dc_id.map(nd.region)
@@ -90,46 +90,48 @@ class MasterData:
     @cached_property
     def plants(self) -> pd.DataFrame:
         pdc = self.nodes[self.nodes.echelon == "PDC"][["dc_id", "plant_id", "region"]]
-        return self._read("plant_master.csv").merge(pdc.rename(columns={"dc_id": "plant_dc_id"}),
+        return self._read("plant_master.parquet").merge(pdc.rename(columns={"dc_id": "plant_dc_id"}),
                                                      on="plant_id", how="left")
 
     @cached_property
     def plant_families(self) -> pd.DataFrame:
         cols = ["plant_id", "region", "production_capacity_units_per_week"]
-        return self._read("plant_capability.csv").merge(self.plants[cols], on="plant_id", how="left")
+        return self._read("plant_capability.parquet").merge(self.plants[cols], on="plant_id", how="left")
 
     @cached_property
     def customers(self) -> pd.DataFrame:
-        return self._read("b2b_customer_master.csv").merge(
-            self._read("b2b_customer_terms.csv"), on=["b2b_customer_id", "pricing_strategy"], how="left")
+        return self._read("b2b_customer_master.parquet").merge(
+            self._read("b2b_customer_terms.parquet"), on=["b2b_customer_id", "pricing_strategy"], how="left")
 
     @cached_property
     def cost_parameters(self) -> pd.DataFrame:
-        cp = self._read("cost_parameters.csv")
+        cp = self._read("cost_parameters.parquet")
         cat = self.skus.drop_duplicates("subcategory").set_index("subcategory").category
         cp["category"] = cp.subcategory.map(cat)
         return cp.merge(self.nodes[["dc_id", "region", "echelon"]], on="dc_id", how="left")
 
     @cached_property
     def sourcing_map(self) -> pd.DataFrame:
-        return self._read("sku_sourcing_map.csv")
+        return self._read("sku_sourcing_map.parquet")
 
     @cached_property
     def plant_sourcing(self) -> pd.DataFrame:
-        return self._read("sku_plant_sourcing.csv")
+        return self._read("sku_plant_sourcing.parquet")
 
     @cached_property
     def opening_position(self) -> pd.DataFrame:
         if self.state_csv is None:
             raise ValueError("this measure needs the opening position (digital_twin.state)")
-        return pd.read_csv(self.state_csv)
+        # Parquet, as the generator writes it; a CSV state file handed in still reads
+        return (pd.read_csv(self.state_csv) if Path(self.state_csv).suffix.lower() == ".csv"
+                else pd.read_parquet(self.state_csv))
 
     # ------------------------------------------------------------- horizon --
     @cached_property
     def forward_demand(self) -> pd.DataFrame:
         """Forward-horizon forecast lines: (period, dc, sku, customer) with promo lift."""
-        d = self._read("demand_forecast.csv",
-                       usecols=["period", "week_start_date", "horizon", "sku_id", "dc_id", "b2b_customer_id",
+        d = self._read("demand_forecast.parquet",
+                       columns=["period", "week_start_date", "horizon", "sku_id", "dc_id", "b2b_customer_id",
                                 "forecast_qty", "forecast_promo_lift_qty"])
         return d[d.horizon == "forward"].drop(columns="horizon").reset_index(drop=True)
 

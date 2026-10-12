@@ -19,14 +19,12 @@ twin runs then go to the shared pool in parallel.
 import argparse
 import os
 import sys
-from pathlib import Path
 
 import polars as pl
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime as rt                       # noqa: E402
 import policy_builds as pb                 # noqa: E402
-import digital_twin_fast as twin           # noqa: E402
 import validate_real_data as vrd           # noqa: E402
 
 RESULTS_DIR = vrd.RESULTS_DIR
@@ -42,7 +40,7 @@ def sweep_one_alpha(ctx, log, alpha):
     vrd.prepare()
     actual = vrd.actual_arm(ctx)
     tags = {nd: f"a{alpha:.1f}_nd{nd:.2f}".replace(".", "") for nd in NETTING_DISCOUNTS}
-    res_b = vrd.build(ctx, {nd: pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_netting_{tags[nd]}.csv"), alpha, nd)
+    res_b = vrd.build(ctx, {nd: pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_netting_{tags[nd]}.parquet"), alpha, nd)
                             for nd in NETTING_DISCOUNTS}, vrd.SEED).result()
     vrd.log_build(log, res_b)
     twins = {nd: vrd.run_twin_history(ctx, f"netting_{tags[nd]}", res_b["paths"][nd]) for nd in NETTING_DISCOUNTS}
@@ -68,7 +66,7 @@ def multiseed_check(ctx, log, alpha=vrd.HEADLINE_ALPHA, discounts=(0.0, 1.0), se
     vrd.prepare()
     actuals = {seed: vrd.ms_actual_arm(ctx, seed) for seed in seeds}
     tag = {(nd, s): f"nd{nd:.2f}_s{s}".replace(".", "") for nd in discounts for s in seeds}
-    builds = {s: vrd.build(ctx, {nd: pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_netting_ms_{tag[(nd, s)]}.csv"),
+    builds = {s: vrd.build(ctx, {nd: pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_netting_ms_{tag[(nd, s)]}.parquet"),
                                                      alpha, nd) for nd in discounts}, s) for s in seeds}
     twins = {}
     for s in seeds:
@@ -119,7 +117,6 @@ def main(argv=None):
     ctx = rt.Context(args.workers)
     try:
         run(ctx, rt.StepLog(), args.alpha, args.multiseed)
-        twin.write_output_documentation(Path(vrd.TWIN_OUT_ROOT))
     finally:
         ctx.close()
 

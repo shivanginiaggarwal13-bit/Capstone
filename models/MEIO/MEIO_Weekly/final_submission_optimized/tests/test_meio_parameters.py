@@ -33,7 +33,7 @@ import overrides as engine              # noqa: E402
 
 DATA = str(REPO / "input datasets")
 ROOT_CONFIG = json.loads((REPO / "scenario_config.json").read_text(encoding="utf-8"))
-COMMITTED = "models/MEIO/MEIO_Weekly/final_submission_optimized/results"
+COMMITTED = "models/MEIO/MEIO_Weekly/final_submission/results"
 SEEDS = (2026, 7, 42, 123, 2027)
 
 

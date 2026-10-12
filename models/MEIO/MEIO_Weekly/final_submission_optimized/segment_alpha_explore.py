@@ -48,7 +48,7 @@ DEFAULT_DATA = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "me
 CLUSTER_CSV = os.path.join(REPO_ROOT, "Clustering & Segmentation", "segmentation_v4", "sku_clusters.csv")
 TWIN = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "entrypoint"))
 SCENARIO_OUT_DIR = str(scenario.resolve_scenario_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "scenario"))
-TWIN_OUT_ROOT = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "output_root"))
+TWIN_OUT_ROOT = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "artifacts", "twin_output_root"))
 RUN_OUT_DIR = os.path.join(SCENARIO_OUT_DIR, "validation_output")
 RESULTS_DIR = os.path.join(SCENARIO_OUT_DIR, "results")
 STATE_CSV = str(scenario.resolve_path(SCENARIO_CONFIG, SCENARIO_SETTINGS, "digital_twin", "state"))
@@ -77,7 +77,7 @@ def prepare():
 
 
 def load_cluster_map():
-    c = rt.read_csv(CLUSTER_CSV, columns=["sku_id", "archetype"])
+    c = rt.read_table(CLUSTER_CSV, columns=["sku_id", "archetype"])
     return dict(zip(c["sku_id"].to_list(), c["archetype"].to_list()))
 
 
@@ -93,8 +93,8 @@ def run_dir(run_name) -> str:
 
 
 def stage_baseline(ctx):
-    """Synthetic-basis baseline (the dataset's own forward_policy.csv), cached on disk."""
-    forward_policy_csv = os.path.join(REPO_ROOT, "output datasets", "history", "forward_policy.csv")
+    """Synthetic-basis baseline (the dataset's own forward_policy.parquet), cached on disk."""
+    forward_policy_csv = os.path.join(REPO_ROOT, "output datasets", "history", "forward_policy.parquet")
     return ctx.once(("twin", "synthetic_baseline"), twin.simulate_task,
                     forward_job("synthetic_baseline", forward_policy_csv, use_cache=True), priority=P_BASELINE)
 
@@ -109,7 +109,7 @@ def _override(cluster_map, cluster, alpha):
 
 def rolling_job(variants, rng, threads=1) -> dict:
     return {"data_dir": DEFAULT_DATA, "as_of_week": AS_OF_WEEK, "variants": variants, "rng": rng, "n_sims": N_SIMS,
-            "threads": threads, "max_weeks": ROLLING_WEEKS, "lean": rt.LEAN_TWIN_OUTPUTS}
+            "threads": threads, "max_weeks": ROLLING_WEEKS}
 
 
 def stage_sweep(ctx, log, seed=SEED, fresh_rng=False):
@@ -119,7 +119,7 @@ def stage_sweep(ctx, log, seed=SEED, fresh_rng=False):
     cluster_map = load_cluster_map()
     baseline = stage_baseline(ctx)
     combos = [(c, a) for c in CLUSTERS for a in ALPHAS]
-    specs = {(c, a): pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_{_tag(c, a)}.csv"), REFERENCE_ALPHA, 1.0,
+    specs = {(c, a): pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_{_tag(c, a)}.parquet"), REFERENCE_ALPHA, 1.0,
                                      alpha_by_sku=_override(cluster_map, c, a)) for c, a in combos}
     twins = {}
     if fresh_rng:
@@ -150,13 +150,13 @@ def stage_sweep(ctx, log, seed=SEED, fresh_rng=False):
                      "total_landed_cost_usd": kpi["total_landed_cost_usd"], "cost_delta_usd": cost_delta})
         log(f"  {c} alpha={a:.1f}: fill {kpi['customer_fill_rate']:.4f}  cost_delta ${cost_delta:+,.0f}")
     summary = pl.DataFrame(rows, schema_overrides={"alpha": pl.Float64})
-    rt.write_csv(summary, os.path.join(RESULTS_DIR, "segment_alpha_sweep_portfolio.csv"))
+    rt.write_table(summary, os.path.join(RESULTS_DIR, "segment_alpha_sweep_portfolio.csv"))
     log(rt.show(summary))
     return summary
 
 
 def stage_own_fill(ctx, log):
-    """Re-slice each sweep run's own inventory.csv down to that cluster's SKUs (corrects
+    """Re-slice each sweep run's own inventory.parquet down to that cluster's SKUs (corrects
     the portfolio-level dilution). Reads the sweep's run folders; no new twin runs."""
     log("=== Stage: own_fill (corrects portfolio-level dilution) ===")
     cluster_map = load_cluster_map()
@@ -165,11 +165,11 @@ def stage_own_fill(ctx, log):
     for cluster in CLUSTERS:
         skus = [s for s, a in cluster_map.items() if a == cluster]
         for alpha in ALPHAS:
-            inv_path = os.path.join(run_dir(_tag(cluster, alpha)), "inventory.csv")
+            inv_path = os.path.join(run_dir(_tag(cluster, alpha)), "inventory.parquet")
             if not os.path.exists(inv_path):
                 log(f"  SKIP {_tag(cluster, alpha)}: run the 'sweep' stage first")
                 continue
-            inv = pl.read_csv(inv_path, columns=["sku_id", "demand_customer_qty", "unmet_customer_qty"])
+            inv = rt.read_table(inv_path, columns=["sku_id", "demand_customer_qty", "unmet_customer_qty"], cache=False)
             g = inv.filter(pl.col("sku_id").is_in(skus))
             cd = float(np.add.reduce(g["demand_customer_qty"].cast(pl.Float64).to_numpy()))
             cu = float(np.add.reduce(g["unmet_customer_qty"].cast(pl.Float64).to_numpy()))
@@ -177,7 +177,7 @@ def stage_own_fill(ctx, log):
     out = pl.DataFrame(rows)
     piv = out.pivot(on="cluster", index="alpha", values="own_fill_rate").sort("alpha")
     piv = piv.select(["alpha"] + [c for c in CLUSTERS if c in piv.columns])
-    rt.write_csv(piv, os.path.join(RESULTS_DIR, "segment_alpha_sweep_own_fill.csv"))
+    rt.write_table(piv, os.path.join(RESULTS_DIR, "segment_alpha_sweep_own_fill.csv"))
     log(rt.show(piv))
     log("\n=== Spread across alpha, OWN cluster fill (diagnostic, not a recommendation) ===")
     for cl in CLUSTERS:
@@ -195,13 +195,19 @@ STAGES = {"baseline": None, "sweep": stage_sweep, "own_fill": stage_own_fill}
 def run(ctx, log, stage=None, seed=SEED, fresh_rng=False):
     prepare()
     if stage == "baseline":
-        return stage_baseline(ctx).result()
-    if stage == "sweep":
-        return stage_sweep(ctx, log, seed, fresh_rng)
-    if stage == "own_fill":
-        return stage_own_fill(ctx, log)
-    stage_sweep(ctx, log, seed, fresh_rng)
-    return stage_own_fill(ctx, log)
+        out = stage_baseline(ctx).result()
+    elif stage == "sweep":
+        out = stage_sweep(ctx, log, seed, fresh_rng)
+    elif stage == "own_fill":
+        out = stage_own_fill(ctx, log)
+    else:
+        stage_sweep(ctx, log, seed, fresh_rng)
+        out = stage_own_fill(ctx, log)
+    # The original's twin runs here don't pass --skip-output-documentation, so each one
+    # rewrote <twin output root>/OUTPUT_DOCUMENTATION.md. Written once, if any run simulated.
+    if stage in (None, "sweep") or not stage_baseline(ctx).result().get("cached"):
+        twin.write_output_documentation(Path(TWIN_OUT_ROOT))
+    return out
 
 
 def main(argv=None):
@@ -217,7 +223,6 @@ def main(argv=None):
     ctx = rt.Context(args.workers)
     try:
         run(ctx, rt.StepLog(), args.stage, args.seed, args.fresh_rng)
-        twin.write_output_documentation(Path(TWIN_OUT_ROOT))
     finally:
         ctx.close()
 

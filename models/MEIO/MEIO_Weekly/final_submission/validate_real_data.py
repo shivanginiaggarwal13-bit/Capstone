@@ -4,11 +4,11 @@ Clark-Scarf v2 — Real-Data Validation Suite
 
 Every number elsewhere in this project's synthetic-basis work is scored
 against resampled forecast-error noise, not real demand. This suite re-tests
-against ACTUAL replayed 2025 orders (`orders.csv`, via `digital_twin.py
+against ACTUAL replayed 2025 orders (`orders.parquet`, via `digital_twin.py
 --mode history`), with the policy genuinely refit every week from only real
 data available as of that week -- no lookahead.
 
-Why the window is 2025 only, not 2023-2025: `demand_forecast.csv` -- the
+Why the window is 2025 only, not 2023-2025: `demand_forecast.parquet` -- the
 source of every trailing bias/CV statistic the estimator uses -- only has
 rows for 2025-2026, even though real orders go back to 2023. 2023-W01
 through 2025-W01 (105 weeks) is identical, unavoidable warm-up in every
@@ -33,7 +33,7 @@ Stages (run via --stage, or all in order if omitted):
                hold up 5/5 seeds -- this is what upgrades the sweep from
                "promising" to "validated, modulo one real year").
   segments     Fast-Moving/Seasonal/Intermediate breakdown of the headline
-               result -- the sku_master.csv 3-way label, NOT the
+               result -- the sku_master.parquet 3-way label, NOT the
                segmentation deliverable's clusters (see segment_alpha_explore.py
                for that).
 
@@ -102,7 +102,7 @@ def df_to_md(df):
 
 
 def _all_periods(data_dir):
-    return sorted(pd.read_csv(os.path.join(data_dir, "orders.csv"), usecols=["period"]).period.unique())
+    return sorted(pd.read_parquet(os.path.join(data_dir, "orders.parquet"), columns=["period"]).period.unique())
 
 
 def run_twin_history(run_name, policy_csv, seed=SEED):
@@ -117,7 +117,7 @@ def run_twin_history(run_name, policy_csv, seed=SEED):
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     with open(os.path.join(out_dir, "run_kpis.json")) as f:
         kpi = json.load(f)
-    inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+    inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
     return kpi, inv
 
 
@@ -161,7 +161,7 @@ def build_walkforward_policy_meio(data_dir, out_path):
     seasonal_index = lib.build_seasonal_index(data_dir)
     sku_subcat = lib.load_sku_subcategory(data_dir)
 
-    baseline_pol = pd.read_csv(BASELINE_POLICY_CSV)[POLICY_COLS]
+    baseline_pol = pd.read_parquet(BASELINE_POLICY_CSV)[POLICY_COLS]
     warmup_periods = [p for p in _all_periods(data_dir) if WARMUP_START <= p <= WARMUP_END]
 
     def wk_num(period):
@@ -186,7 +186,7 @@ def build_walkforward_policy_meio(data_dir, out_path):
 
     rolling = pd.concat(frames, ignore_index=True)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    rolling.to_csv(out_path, index=False)
+    rolling.to_parquet(out_path, index=False)
     print(f"[meio_weekly] wrote {len(rolling):,} rows -> {out_path}")
     return out_path
 
@@ -208,7 +208,7 @@ def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=
     seasonal_index = lib.build_seasonal_index(data_dir)
     sku_subcat = lib.load_sku_subcategory(data_dir)
 
-    baseline_pol = pd.read_csv(BASELINE_POLICY_CSV)[POLICY_COLS]
+    baseline_pol = pd.read_parquet(BASELINE_POLICY_CSV)[POLICY_COLS]
     warmup_periods = [p for p in _all_periods(data_dir) if WARMUP_START <= p <= WARMUP_END]
 
     def wk_num(period):
@@ -239,7 +239,7 @@ def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=
 
     rolling = pd.concat(frames, ignore_index=True)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    rolling.to_csv(out_path, index=False)
+    rolling.to_parquet(out_path, index=False)
     print(f"[clark_scarf_v2 alpha={alpha} netting_discount={netting_discount}] wrote {len(rolling):,} rows -> {out_path}")
     return out_path
 
@@ -252,7 +252,7 @@ def stage_actual(seed=SEED):
         print("[actual] already built, reusing cache")
         with open(os.path.join(out_dir, "run_kpis.json")) as f:
             kpi = json.load(f)
-        inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+        inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
         return kpi, inv
     print("=== Stage: actual (baseline, 156-week real replay) ===")
     return run_twin_history("actual", BASELINE_POLICY_CSV, seed=seed)
@@ -261,7 +261,7 @@ def stage_actual(seed=SEED):
 def stage_meio_weekly():
     print("=== Stage: meio_weekly ===")
     actual_kpi, inv_actual = stage_actual()
-    policy_csv = build_walkforward_policy_meio(DEFAULT_DATA, os.path.join(RUN_OUT_DIR, "policy_meio_weekly.csv"))
+    policy_csv = build_walkforward_policy_meio(DEFAULT_DATA, os.path.join(RUN_OUT_DIR, "policy_meio_weekly.parquet"))
     kpi, inv = run_twin_history("meio_weekly", policy_csv)
     ok = warmup_parity_check(inv_actual, inv)
     print(f"  warm-up parity: {ok}")
@@ -277,7 +277,7 @@ def stage_meio_weekly():
 def stage_headline():
     print("=== Stage: headline (Clark-Scarf v2, alpha=0.2, THE validated real-data result) ===")
     actual_kpi, inv_actual = stage_actual()
-    policy_csv = build_walkforward_policy_csv2(DEFAULT_DATA, os.path.join(RUN_OUT_DIR, "policy_csv2_headline.csv"),
+    policy_csv = build_walkforward_policy_csv2(DEFAULT_DATA, os.path.join(RUN_OUT_DIR, "policy_csv2_headline.parquet"),
                                                 alpha=HEADLINE_ALPHA)
     kpi, inv = run_twin_history("csv2_headline", policy_csv)
     ok = warmup_parity_check(inv_actual, inv)
@@ -309,7 +309,7 @@ def stage_alpha_sweep():
         tag = f"a{a:.1f}".replace(".", "")
         print(f"  --- alpha={a:.1f} ---")
         policy_csv = build_walkforward_policy_csv2(
-            DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_sweep_{tag}.csv"), alpha=a, rng=rng)
+            DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_sweep_{tag}.parquet"), alpha=a, rng=rng)
         kpi, inv = run_twin_history(f"sweep_{tag}", policy_csv)
         test_inv = inv[(inv.period >= TEST_START) & (inv.period <= TEST_END)]
         fr = fill_rate_kpis(test_inv, f"alpha={a:.1f}")
@@ -335,12 +335,12 @@ def stage_multiseed():
             if os.path.exists(os.path.join(actual_out, "run_kpis.json")):
                 with open(os.path.join(actual_out, "run_kpis.json")) as f:
                     actual_kpi = json.load(f)
-                inv_actual = pd.read_csv(os.path.join(actual_out, "inventory.csv"))
+                inv_actual = pd.read_parquet(os.path.join(actual_out, "inventory.parquet"))
             else:
                 actual_kpi, inv_actual = run_twin_history(actual_run, BASELINE_POLICY_CSV, seed=seed)
 
             policy_csv = build_walkforward_policy_csv2(
-                DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_ms_{tag}.csv"), alpha=alpha, rng=rng)
+                DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_ms_{tag}.parquet"), alpha=alpha, rng=rng)
             kpi, inv = run_twin_history(f"ms_{tag}", policy_csv, seed=seed)
 
             test_actual = inv_actual[(inv_actual.period >= TEST_START) & (inv_actual.period <= TEST_END)]
@@ -367,12 +367,12 @@ def stage_segments():
     print("=== Stage: segments (Fast-Moving/Seasonal/Intermediate breakdown of the headline result) ===")
     actual_kpi, inv_actual = stage_actual()
     headline_dir = os.path.join(TWIN_OUT_DIR, "csv2_headline")
-    if not os.path.exists(os.path.join(headline_dir, "inventory.csv")):
+    if not os.path.exists(os.path.join(headline_dir, "inventory.parquet")):
         print("  headline stage hasn't run yet -- running it now")
         stage_headline()
-    inv_csv2 = pd.read_csv(os.path.join(headline_dir, "inventory.csv"))
+    inv_csv2 = pd.read_parquet(os.path.join(headline_dir, "inventory.parquet"))
 
-    seg_map = pd.read_csv(os.path.join(DEFAULT_DATA, "sku_master.csv"), usecols=["sku_id", "segment"])
+    seg_map = pd.read_parquet(os.path.join(DEFAULT_DATA, "sku_master.parquet"), columns=["sku_id", "segment"])
     seg_map = dict(zip(seg_map.sku_id, seg_map.segment))
 
     rows = []

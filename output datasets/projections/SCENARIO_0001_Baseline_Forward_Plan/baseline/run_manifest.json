@@ -3,19 +3,19 @@
   "run_name": "baseline",
   "label": "",
   "mode": "forward",
-  "generated_at": "2026-10-08T00:28:50",
+  "generated_at": "2026-10-11T19:01:45",
   "seed": 2026,
-  "policy_override": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\forward_policy.csv",
+  "policy_override": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\forward_policy.parquet",
   "margin_basis": "margin_usd",
-  "runtime_seconds": 11.4,
+  "runtime_seconds": 7.1,
   "assumptions": [
     "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
     "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
-    "Lead times are drawn per order line from each lane's own mean and std in network_lanes.csv, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.",
+    "Lead times are drawn per order line from each lane's own mean and std in network_lanes.parquet, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.",
     "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following the fulfilment_type split in the dataset, which is clean by node type.",
     "An internal replenishment order the parent cannot cover is cancelled, not backlogged; the child re-orders at the next weekly review.",
     "A parent holds back its own expected demand for the remainder of the review period before releasing stock downstream, implementing 'customer orders served first'.",
-    "Routing comes from sku_sourcing_map.csv, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.",
+    "Routing comes from sku_sourcing_map.parquet, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.",
     "Holding cost = (storage_cost_per_unit_year + carrying_pct x unit_cost) / 52, keyed on (dc_id, subcategory).",
     "No shelf life, obsolescence or write-offs; no warehouse or lane capacity limits. Production capacity DOES bind.",
     "Demand, lead-time and production RNG streams are independent, so two runs at the same seed differ only by the policy under test."
@@ -24,14 +24,14 @@
     "mode": "forward",
     "seed": 2026,
     "sourcing": {
-      "rule": "sku_sourcing_map.csv (input table)",
+      "rule": "sku_sourcing_map.parquet (input table)",
       "pairs_resolved": 11500,
       "pairs_on_fallback": 0
     },
-    "policy_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\forward_policy.csv",
+    "policy_source": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\forward_policy.parquet",
     "policy_rows": 7476,
     "policy_time_varying": false,
-    "state_source": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\opening_position.csv",
+    "state_source": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\opening_position.parquet",
     "demand_basis": "forecast_qty x volume-weighted resampled forecast-error ratio",
     "forecast_units": 13242327.0,
     "realised_demand_units": 14159736.0,
@@ -58,8 +58,8 @@
       "run_name": "baseline",
       "seed": 2026,
       "data_dir": "input datasets",
-      "policy": "output datasets/history/forward_policy.csv",
-      "state": "output datasets/history/opening_position.csv",
+      "policy": "output datasets/history/forward_policy.parquet",
+      "state": "output datasets/history/opening_position.parquet",
       "output_root": "output datasets"
     },
     "meio": {
@@ -76,9 +76,9 @@
       "mode": "forward",
       "seed": 2026,
       "horizon_weeks": null,
-      "policy": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\forward_policy.csv",
-      "state": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\history\\opening_position.csv",
-      "output_folder": "C:\\Users\\undha\\OneDrive\\Desktop\\MEIO in CPG\\Capstone-Optimization-Algorithm_Final\\output datasets\\projections\\SCENARIO_0001_Baseline_Forward_Plan\\baseline"
+      "policy": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\forward_policy.parquet",
+      "state": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\opening_position.parquet",
+      "output_folder": "G:\\MEIO Personal\\MEIO\\output datasets\\projections\\SCENARIO_0001_Baseline_Forward_Plan\\baseline"
     }
   }
 }

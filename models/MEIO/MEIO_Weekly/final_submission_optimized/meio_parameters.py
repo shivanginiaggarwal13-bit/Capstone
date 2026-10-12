@@ -77,7 +77,7 @@ CLUSTERS = ("Flagship Promo-Driven", "Mid-Tier Core", "Long-Tail Erratic", "Long
 CLUSTER_ALPHAS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)     # segment_alpha_explore.ALPHAS
 CLUSTER_CSLS = (0.90, 0.95, 0.97, 0.99)             # service_level_real_data.CANDIDATE_CSL
 DEFAULTS = {"selection": "validated", "min_seeds": 5, "ddlt": "quadrature", "n_sims": 4000, "seed": 2026,
-            "evidence": ["models/MEIO/MEIO_Weekly/final_submission_optimized/results"],
+            "evidence": ["models/MEIO/MEIO_Weekly/final_submission/results"],
             "clusters": "Clustering & Segmentation/segmentation_v4/sku_clusters.csv"}
 
 # name: (file glob, required columns, settings the script fixed but did not write)

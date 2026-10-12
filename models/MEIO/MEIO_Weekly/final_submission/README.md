@@ -211,7 +211,7 @@ front-end feature needs:
   `scenario_engine.py`): `_build_demand()`'s output tensor is scaled for
   the affected region/nodes over the affected weeks, after the normal
   demand is built, before the twin runs. Region resolution reuses
-  `customer_dc_master.csv`/`regional_dc_master.csv`'s own `region` column
+  `customer_dc_master.parquet`/`regional_dc_master.parquet`'s own `region` column
   — no new data needed.
 - **The policy generator** (`clark_scarf_v2.py::solve`): the SAME scaling
   is applied to `target_week_demand()`'s output (`target_mean`/
@@ -260,7 +260,7 @@ impact if ignored) is −0.06pp fill, +$226K cost.
 
 - **Write-off minimization** (one of the charter's three named KPIs) is not
   measurable in this dataset at all: no shelf-life or obsolescence modeling,
-  `write_offs.csv` is empty by design.
+  `write_offs.parquet` is empty by design.
 - **Working capital** is a mixed result, not a clean win: safety stock value
   fell 9.1%, but total inventory value rose 9.1% (cycle stock grew faster
   than safety stock shrank).
@@ -268,7 +268,7 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   even after the netting-discount fix above — improved (82.11% vs. the
   original 81.99%) but nowhere near actual's 93.21%. The netting step was
   only one contributor; something else is also at play (see "Next steps").
-- **One real year of validation data.** `demand_forecast.csv` only has rows
+- **One real year of validation data.** `demand_forecast.parquet` only has rows
   from 2025 onward even though real orders go back to 2023, so every
   real-data result here is tested against a single year. As 2026 actuals
   accumulate, that becomes a genuine second holdout — none of today's
@@ -351,7 +351,7 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   narrative `*_report.md` files and charts predate the consolidation into
   this folder and are carried over unchanged (the underlying data didn't
   change, so they're still accurate).
-- `validation_output/` — gitignored. Full twin run detail (inventory.csv,
+- `validation_output/` — gitignored. Full twin run detail (inventory.parquet,
   receipts, etc.) per run; regenerate by re-running the scripts above.
 
 ## Next steps, in priority order

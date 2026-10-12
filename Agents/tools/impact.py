@@ -7,7 +7,7 @@ by an order of magnitude.
 
 Previews describe inputs, never outcomes -- fill rate, lost sales and cost come
 only from a run. Service-level and policy previews scale the static forward policy
-(output datasets/history/forward_policy.csv), so they are first-order estimates of
+(output datasets/history/forward_policy.parquet), so they are first-order estimates of
 the safety-stock investment, labelled as such.
 """
 from __future__ import annotations

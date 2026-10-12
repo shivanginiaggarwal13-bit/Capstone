@@ -135,15 +135,15 @@ class WalkForwardTests(unittest.TestCase):
         import tempfile
         tmp = Path(tempfile.mkdtemp(prefix="wf_eq_"))
         i = Shared.inp()
-        variants = {"ref": (csv2.Variant(0.2, 1.0), tmp / "a.csv"), "nd0": (csv2.Variant(0.2, 0.0), tmp / "b.csv"),
-                    "a6": (csv2.Variant(0.6, 1.0), tmp / "c.csv")}
+        variants = {"ref": (csv2.Variant(0.2, 1.0), tmp / "a.parquet"),
+                    "nd0": (csv2.Variant(0.2, 0.0), tmp / "b.parquet"), "a6": (csv2.Variant(0.6, 1.0), tmp / "c.parquet")}
         p = [i.dfc.periods[1], i.dfc.periods[3]]
         for threads in (1, 4):
             with self.subTest(threads=threads):
                 res = pb.walkforward_policies(DATA, variants, 2026, 1200, baseline_policy_csv=str(
-                    REPO / "output datasets" / "history" / "forward_policy.csv"), warmup=("9999", "9999"),
+                    REPO / "output datasets" / "history" / "forward_policy.parquet"), warmup=("9999", "9999"),
                     test=tuple(p), threads=threads)
-                got = pl.read_csv(res["paths"]["ref"])
+                got = rt.read_table(res["paths"]["ref"], cache=False)
                 assert_frames_equal(self, ref("walkforward_w1_3"), got)
 
 

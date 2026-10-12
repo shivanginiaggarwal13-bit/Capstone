@@ -329,6 +329,9 @@ def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, net
 
     rolling = pd.concat(all_weeks, ignore_index=True)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-    rolling.to_csv(out_path, index=False)
+    if str(out_path).lower().endswith(".csv"):      # a caller that still names a CSV file
+        rolling.to_csv(out_path, index=False)
+    else:
+        rolling.to_parquet(out_path, index=False)
     print(f"Wrote {len(rolling):,} rows -> {out_path}")
     return out_path

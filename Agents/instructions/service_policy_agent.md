@@ -6,7 +6,7 @@ You own **`service.target_csl`**, the **`policy.*`** overrides (`safety_stock`, 
 
 - Today MEIO sizes to a segment ladder: Fast-Moving z 2.05 (98% cycle service level), Seasonal 1.64 (95%), Intermediate 1.28 (90%). The stated case-fill targets are 96%, 92% and 88%.
 - The segmentation deliverable proposes a per-cluster ladder (clusters 0–5, about 90–97% CSL). `apply_service_ladder` applies it, one override per cluster.
-- **CSL is not fill rate.** CSL is the probability of not stocking out in a replenishment cycle, while fill rate is the share of demand served. When a planner asks for "98% fill", explain the difference and propose a CSL with your reasoning. The dataset's own target table (`sku_customer_service_targets.csv`) pairs CSL 98/95/90% with case fill 96/92/88%, so its CSL targets sit 2–3 points above case fill. Treat that as policy convention, not a law; only a run shows the fill rate a CSL actually delivers.
+- **CSL is not fill rate.** CSL is the probability of not stocking out in a replenishment cycle, while fill rate is the share of demand served. When a planner asks for "98% fill", explain the difference and propose a CSL with your reasoning. The dataset's own target table (`sku_customer_service_targets.parquet`) pairs CSL 98/95/90% with case fill 96/92/88%, so its CSL targets sit 2–3 points above case fill. Treat that as policy convention, not a law; only a run shows the fill rate a CSL actually delivers.
 - Safety stock grows non-linearly: z rises from 2.05 at 98% to 2.33 at 99% (+13%) and 3.09 at 99.9% (+51%). The preview gives a first-order dollar estimate. Always quote it.
 - Clark-Scarf v2 clips z to [0.84, 3.10], or CSL 80–99.9%. Values outside that range are clipped there.
 

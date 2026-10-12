@@ -16,6 +16,9 @@ rest, and the summary reports what succeeded, what failed and how long each step
     7. service_level_real_data.py
     8. scenario_test.py --scenario ../../../twin/scenario_config.example.json
     9. netting_discount_sweep.py --multiseed --alpha 0.6
+   10. cleanup_research_artifacts.py  -- write a statistical digest of everything
+       produced, then (with confirmation) delete all bulk files that
+       run_weekly_tools.py does NOT read, freeing ~8-9 GB.
 
 Where the time went, and what replaced it:
   * Every policy build re-derived the same demand estimates (~300 pandas filter/groupby
@@ -41,18 +44,19 @@ no longer reproduces the published segment_alpha_sweep_*.csv.
     python run_all.py --from 6         # skip 1-5
     python run_all.py --steps 5,6,7    # only selected steps
     python run_all.py --workers 8      # pool size (default: CPUs - 2)
-    python run_all.py --lean-twin-outputs   # ~5 GB on disk instead of ~70 GB
+    python run_all.py --lean-twin-outputs   # skip most twin runs' detail tables
+    python run_all.py --skip-cleanup        # omit step 10; keep all artifacts on disk
+    python run_all.py --cleanup-yes         # step 10 deletes without a prompt (CI)
 
-Disk: like the original, a full run writes every twin run's detail tables -- about
-60 GB of twin outputs plus ~11 GB of walk-forward policy files. Check free space first,
-or pass --lean-twin-outputs.
+Disk: like the original, a full run writes every twin run's detail tables, now as
+Parquet -- roughly 8 GB of twin outputs (it was ~60 GB of CSV) plus ~0.1 GB of policy
+files (was ~11 GB). --lean-twin-outputs brings that under 1 GB.
 """
 import argparse
 import os
 import sys
 import threading
 import time
-from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime as rt                       # noqa: E402
@@ -70,21 +74,28 @@ STEPS = [
     ("service_level_real_data.py", []),
     ("scenario_test.py", ["--scenario", "../../../twin/scenario_config.example.json"]),
     ("netting_discount_sweep.py", ["--multiseed", "--alpha", "0.6"]),
+    # Step 10: write a digest of every research artifact, then (with confirmation)
+    # delete the bulk files that run_weekly_tools.py does NOT need.  Must run after
+    # all nine research steps; it blocks on step 9 (which itself blocks on step 4).
+    ("cleanup_research_artifacts.py", []),
 ]
 # Steps 4 and 9 name their policy files and twin runs netting_ms_nd{..}_s{seed} without
 # the alpha, so step 9 overwrites step 4's. Run in sequence, as the original did.
-AFTER = {9: 4}
+# Step 10 waits for step 9 (the last step to finish); step 9 already waits for step 4.
+AFTER = {9: 4, 10: 9}
 # Submission order: the long RNG chains first so their first links start at once.
-ORDER = [5, 1, 6, 7, 4, 2, 3, 8, 9]
+# Step 10 is last in ORDER; the AFTER dependency ensures it never starts early.
+ORDER = [5, 1, 6, 7, 4, 2, 3, 8, 9, 10]
 
 
-def _driver(n, ctx, log, explore_fresh_rng):
+def _driver(n, ctx, log, explore_fresh_rng, *, cleanup_yes=False, skip_cleanup=False):
     import validate_real_data as vrd
     import netting_discount_sweep as nds
     import segment_alpha_explore as sae
     import segment_alpha_real_data as sard
     import service_level_real_data as slrd
     import scenario_test as st
+    import cleanup_research_artifacts as cra
     if n == 1:
         vrd.run(ctx, log)
     elif n in (2, 3):
@@ -101,6 +112,11 @@ def _driver(n, ctx, log, explore_fresh_rng):
         st.run(ctx, log, os.path.normpath(os.path.join(SCRIPT_DIR, STEPS[7][1][1])))
     elif n == 9:
         nds.run(ctx, log, alpha=0.6, multiseed=True)
+    elif n == 10:
+        if skip_cleanup:
+            log("[step 10] Skipped (--skip-cleanup).")
+            return
+        cra.run(ctx, log, yes=cleanup_yes)
 
 
 def main():
@@ -109,12 +125,17 @@ def main():
     ap.add_argument("--steps", default=None, help="Comma-separated 1-indexed steps to run, e.g. 5,6,7.")
     ap.add_argument("--workers", type=int, default=None, help="Process-pool size (default: CPUs - 2).")
     ap.add_argument("--lean-twin-outputs", action="store_true",
-                    help="Research twin runs skip inventory.csv / replenishment_receipts.csv / production.csv "
-                         "(~250 MB each, ~60 GB per run_all) unless a later step reads them back. Default: write "
-                         "them, as the original did.")
+                    help="Research twin runs skip inventory / replenishment_receipts / production (~30 MB "
+                         "of Parquet each, ~8 GB per run_all) unless a later step reads them back. Default: "
+                         "write them, as the original did.")
     ap.add_argument("--explore-fresh-rng", action="store_true",
                     help="Step 5 with a fresh generator per build: faster, but does not reproduce the "
                          "published segment_alpha_sweep_*.csv (see segment_alpha_explore.py).")
+    ap.add_argument("--skip-cleanup", action="store_true",
+                    help="Do not run step 10 (cleanup_research_artifacts.py). All bulk files are kept on disk.")
+    ap.add_argument("--cleanup-yes", action="store_true",
+                    help="Step 10 skips the interactive confirmation prompt and deletes immediately. "
+                         "Intended for non-interactive / CI runs. No effect when --skip-cleanup is set.")
     args = ap.parse_args()
     selected = {int(step) for step in args.steps.split(",")} if args.steps else None
     if selected and not selected.issubset(range(1, len(STEPS) + 1)):
@@ -150,7 +171,8 @@ def main():
         t1 = time.time()
         ok = True
         try:
-            _driver(n, ctx, log, args.explore_fresh_rng)
+            _driver(n, ctx, log, args.explore_fresh_rng,
+                    cleanup_yes=args.cleanup_yes, skip_cleanup=args.skip_cleanup)
         except BaseException as e:             # noqa: BLE001 -- one step's failure must not stop the rest
             ok = False
             log.exception(e)
@@ -169,9 +191,6 @@ def main():
             time.sleep(0.2)                    # keep the submission order: chains first
         for t in threads:
             t.join()
-        import digital_twin_fast as twin
-        import validate_real_data as vrd
-        twin.write_output_documentation(Path(vrd.TWIN_OUT_ROOT))
     finally:
         ctx.close()
 

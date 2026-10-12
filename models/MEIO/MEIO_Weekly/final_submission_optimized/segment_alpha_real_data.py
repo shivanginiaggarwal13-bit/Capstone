@@ -24,14 +24,12 @@ import argparse
 import json
 import os
 import sys
-from pathlib import Path
 
 import polars as pl
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime as rt                       # noqa: E402
 import policy_builds as pb                 # noqa: E402
-import digital_twin_fast as twin           # noqa: E402
 import validate_real_data as vrd           # noqa: E402
 import segment_alpha_explore as sae        # noqa: E402
 
@@ -78,7 +76,7 @@ def _aggregate_partials() -> pl.DataFrame:
                     rows.append(json.load(f))
     out = pl.DataFrame(rows) if rows else pl.DataFrame()
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    rt.write_csv(out, OUT_CSV)
+    rt.write_table(out, OUT_CSV)
     return out
 
 
@@ -109,11 +107,11 @@ def _run_seed(ctx, log, clusters_to_run, seed, cluster_map):
     actual = vrd.ms_actual_arm(ctx, seed)
     variants = {}
     if ref:
-        variants["reference"] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_sreal_reference_s{seed}.csv"),
+        variants["reference"] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_sreal_reference_s{seed}.parquet"),
                                                 REFERENCE_ALPHA, 1.0, alpha_by_sku={})
     for c, a in combos:
         skus = [s for s, arch in cluster_map.items() if arch == c]
-        variants[(c, a)] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_sreal_{_tag(c, a, seed)}.csv"),
+        variants[(c, a)] = pb.variant_spec(os.path.join(RUN_OUT_DIR, f"policy_sreal_{_tag(c, a, seed)}.parquet"),
                                            REFERENCE_ALPHA, 1.0, alpha_by_sku={s: a for s in skus})
     res_b = vrd.build(ctx, variants, seed).result()
     vrd.log_build(log, res_b)
@@ -170,7 +168,7 @@ def summarize(log):
                 "cost_delta_mean": rt.nanmean_pandas(cost), "cost_delta_std": rt.nanstd_pandas(cost),
             })
     summary = pl.DataFrame(rows)
-    rt.write_csv(summary, SUMMARY_CSV)
+    rt.write_table(summary, SUMMARY_CSV)
     log(rt.show(summary))
     log("\n=== Best alpha per cluster, by OWN fill rate (mean across seeds so far) ===")
     for cluster in CLUSTERS:
@@ -206,8 +204,6 @@ def main(argv=None):
     ctx = rt.Context(args.workers)
     try:
         run(ctx, rt.StepLog(), args.cluster, args.summarize_only)
-        if not args.summarize_only:
-            twin.write_output_documentation(Path(vrd.TWIN_OUT_ROOT))
     finally:
         ctx.close()
 

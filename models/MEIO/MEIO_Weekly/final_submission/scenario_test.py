@@ -86,7 +86,7 @@ def run_twin_forward(run_name, policy_csv, scenario_config_path=None, seed=SEED)
     out_dir = _latest_scenario_dir(RUN_OUT_DIR) if scenario_config_path else os.path.join(RUN_OUT_DIR, run_name)
     with open(os.path.join(out_dir, "run_kpis.json")) as f:
         kpi = json.load(f)
-    inv = pd.read_csv(os.path.join(out_dir, "inventory.csv"))
+    inv = pd.read_parquet(os.path.join(out_dir, "inventory.parquet"))
     return kpi, inv
 
 
@@ -105,7 +105,7 @@ def run_scenario(scenario_path):
     print(f"=== Scenario: {name} ===\n  changes: {changes}")
 
     print("\n--- A. baseline policy, normal demand ---")
-    baseline_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_baseline.csv")
+    baseline_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_baseline.parquet")
     build_policy(baseline_policy_csv)
     kpi_a, _ = run_twin_forward(f"{tag}_A_baseline", baseline_policy_csv)
 
@@ -121,7 +121,7 @@ def run_scenario(scenario_path):
                                  scenario_config_path=tmp_scenario.name, seed=SEED)
 
     print("\n--- C. scenario-reoptimized policy, SCENARIO demand (prepared) ---")
-    scenario_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_scenario.csv")
+    scenario_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_scenario.parquet")
     build_policy(scenario_policy_csv, scenario_changes=changes)
     kpi_c, _ = run_twin_forward(f"{tag}_C_prepared", scenario_policy_csv,
                                  scenario_config_path=tmp_scenario.name, seed=SEED)
@@ -140,8 +140,8 @@ def run_scenario(scenario_path):
     # DC-level stocking recommendation diff: what the scenario-aware policy
     # actually recommends differently, by DC -- the "recommendations for
     # MEIO based stocking across DCs" half of the feature ask.
-    base_pol = pd.read_csv(baseline_policy_csv)
-    scen_pol = pd.read_csv(scenario_policy_csv)
+    base_pol = pd.read_parquet(baseline_policy_csv)
+    scen_pol = pd.read_parquet(scenario_policy_csv)
     merged = base_pol.merge(scen_pol, on=["period", "dc_id", "sku_id"], suffixes=("_baseline", "_scenario"))
     by_dc = merged.groupby("dc_id").agg(
         baseline_safety_stock=("safety_stock_baseline", "sum"),

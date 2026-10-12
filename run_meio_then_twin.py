@@ -48,7 +48,7 @@ def clear_existing(config_path: Path, config: dict, approve: bool) -> None:
 def latest_policy(config_path: Path, config: dict) -> Path:
     policy_root = scenario.resolve_path(config_path, config, "meio", "output_root")
     policy_dir = policy_root / scenario.scenario_folder_name(config)
-    filename = config.get("meio", {}).get("policy_filename", "meio_policy_rolling.csv")
+    filename = config.get("meio", {}).get("policy_filename", "meio_policy_rolling.parquet")
     policies = list(policy_dir.rglob(filename))
     if not policies:
         raise FileNotFoundError(f"MEIO completed but no {filename} was found under {policy_dir}")

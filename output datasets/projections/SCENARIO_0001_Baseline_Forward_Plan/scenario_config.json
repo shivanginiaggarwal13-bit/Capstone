@@ -10,8 +10,8 @@
     "run_name": "baseline",
     "seed": 2026,
     "data_dir": "input datasets",
-    "policy": "output datasets/history/forward_policy.csv",
-    "state": "output datasets/history/opening_position.csv",
+    "policy": "output datasets/history/forward_policy.parquet",
+    "state": "output datasets/history/opening_position.parquet",
     "output_root": "output datasets"
   },
   "meio": {

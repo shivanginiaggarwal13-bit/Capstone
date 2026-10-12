@@ -1,0 +1,944 @@
+{
+  "generated_at": "2026-10-12T03:04:00Z",
+  "scenario_name": "SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+  "artifacts_scenario": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+  "weekly_tool_inputs_kept": [
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\alpha_sweep_real_data.csv",
+      "size_bytes": 809,
+      "size_human": "809.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\headline_clark_scarf_v2_vs_actual.csv",
+      "size_bytes": 353,
+      "size_human": "353.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\headline_cost_summary.csv",
+      "size_bytes": 312,
+      "size_human": "312.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\meio_weekly_vs_actual.csv",
+      "size_bytes": 348,
+      "size_human": "348.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\multiseed_alpha_04_06.csv",
+      "size_bytes": 727,
+      "size_human": "727.0 B",
+      "weekly_tool_reads": true
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\netting_discount_multiseed.csv",
+      "size_bytes": 649,
+      "size_human": "649.0 B",
+      "weekly_tool_reads": true
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\netting_discount_multiseed_alpha0_6.csv",
+      "size_bytes": 650,
+      "size_human": "650.0 B",
+      "weekly_tool_reads": true
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\netting_discount_sweep_alpha0_2.csv",
+      "size_bytes": 740,
+      "size_human": "740.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\netting_discount_sweep_alpha0_6.csv",
+      "size_bytes": 739,
+      "size_human": "739.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\scenario_DemandSurgeEast_comparison.csv",
+      "size_bytes": 441,
+      "size_human": "441.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\scenario_DemandSurgeEast_stocking_by_dc.csv",
+      "size_bytes": 1306,
+      "size_human": "1.3 KB",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\segment_alpha_real_data_multiseed.csv",
+      "size_bytes": 9191,
+      "size_human": "9.0 KB",
+      "weekly_tool_reads": true
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\segment_alpha_real_data_summary.csv",
+      "size_bytes": 2979,
+      "size_human": "2.9 KB",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\segment_alpha_sweep_own_fill.csv",
+      "size_bytes": 280,
+      "size_human": "280.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\segment_alpha_sweep_portfolio.csv",
+      "size_bytes": 1744,
+      "size_human": "1.7 KB",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\segment_breakdown_real_data.csv",
+      "size_bytes": 105,
+      "size_human": "105.0 B",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\service_level_real_data_multiseed.csv",
+      "size_bytes": 7163,
+      "size_human": "7.0 KB",
+      "weekly_tool_reads": true
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\results\\service_level_real_data_summary.csv",
+      "size_bytes": 2062,
+      "size_human": "2.0 KB",
+      "weekly_tool_reads": false
+    },
+    {
+      "file": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\scenario_config.json",
+      "size_bytes": 1991,
+      "size_human": "1.9 KB",
+      "weekly_tool_reads": true
+    }
+  ],
+  "deleted_groups": [
+    {
+      "label": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\validation_output",
+      "type": "directory",
+      "file_count": 467,
+      "size_bytes": 877960570,
+      "size_human": "837.3 MB",
+      "sample_digests": [
+        {
+          "file": "policy_csv2_headline.parquet",
+          "rows": 1199384,
+          "cols": 6,
+          "columns": [
+            "period",
+            "dc_id",
+            "sku_id",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level"
+          ],
+          "numeric_summary": {
+            "safety_stock": {
+              "mean": 69.012924,
+              "std": 208.219399,
+              "min": 0,
+              "max": 15124.7
+            },
+            "reorder_point": {
+              "mean": 122.440215,
+              "std": 353.063641,
+              "min": 0,
+              "max": 19312.4
+            },
+            "order_up_to_level": {
+              "mean": 286.361488,
+              "std": 948.997387,
+              "min": 0,
+              "max": 38418.7
+            }
+          }
+        },
+        {
+          "file": "policy_DemandSurgeEast_baseline.parquet",
+          "rows": 422552,
+          "cols": 6,
+          "columns": [
+            "period",
+            "dc_id",
+            "sku_id",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level"
+          ],
+          "numeric_summary": {
+            "safety_stock": {
+              "mean": 74.295294,
+              "std": 280.890299,
+              "min": 0,
+              "max": 27557.0
+            },
+            "reorder_point": {
+              "mean": 126.783235,
+              "std": 448.103755,
+              "min": 0,
+              "max": 38523.3
+            },
+            "order_up_to_level": {
+              "mean": 286.687617,
+              "std": 1091.179168,
+              "min": 0,
+              "max": 60293.9
+            }
+          }
+        },
+        {
+          "file": "policy_DemandSurgeEast_scenario.parquet",
+          "rows": 422552,
+          "cols": 6,
+          "columns": [
+            "period",
+            "dc_id",
+            "sku_id",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level"
+          ],
+          "numeric_summary": {
+            "safety_stock": {
+              "mean": 74.57507,
+              "std": 280.57483,
+              "min": 0,
+              "max": 24921.2
+            },
+            "reorder_point": {
+              "mean": 127.288761,
+              "std": 448.48327,
+              "min": 0,
+              "max": 36319.5
+            },
+            "order_up_to_level": {
+              "mean": 287.403819,
+              "std": 1091.636322,
+              "min": 0,
+              "max": 60293.9
+            }
+          }
+        },
+        {
+          "file": "policy_FlagshipPromo-Driven_a00.parquet",
+          "rows": 422552,
+          "cols": 6,
+          "columns": [
+            "period",
+            "dc_id",
+            "sku_id",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level"
+          ],
+          "numeric_summary": {
+            "safety_stock": {
+              "mean": 73.209418,
+              "std": 279.466669,
+              "min": 0,
+              "max": 27956.0
+            },
+            "reorder_point": {
+              "mean": 124.783288,
+              "std": 444.697747,
+              "min": 0,
+              "max": 38786.7
+            },
+            "order_up_to_level": {
+              "mean": 286.091274,
+              "std": 1091.522872,
+              "min": 0,
+              "max": 60293.9
+            }
+          }
+        },
+        {
+          "file": "policy_FlagshipPromo-Driven_a02.parquet",
+          "rows": 422552,
+          "cols": 6,
+          "columns": [
+            "period",
+            "dc_id",
+            "sku_id",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level"
+          ],
+          "numeric_summary": {
+            "safety_stock": {
+              "mean": 72.378547,
+              "std": 276.837912,
+              "min": 0,
+              "max": 23364.2
+            },
+            "reorder_point": {
+              "mean": 124.865856,
+              "std": 443.889243,
+              "min": 0,
+              "max": 34542.0
+            },
+            "order_up_to_level": {
+              "mean": 284.725476,
+              "std": 1089.103796,
+              "min": 0,
+              "max": 60293.9
+            }
+          }
+        },
+        {
+          "file": "projections\\SCENARIO_0001_Demand_Surge_East\\DemandSurgeEast_B_unprepared\\cost_summary.csv",
+          "rows": 27,
+          "cols": 8,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "avg_units_on_hand",
+            "avg_inventory_value_usd",
+            "holding_cost_usd",
+            "stockout_cost_usd",
+            "transport_cost_usd",
+            "total_landed_cost_usd"
+          ]
+        },
+        {
+          "file": "projections\\SCENARIO_0001_Demand_Surge_East\\DemandSurgeEast_B_unprepared\\service_by_node.csv",
+          "rows": 27,
+          "cols": 11,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "skus",
+            "total_demand",
+            "unmet",
+            "replen_demand",
+            "replen_unmet",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "fill_rate_customer",
+            "fill_rate_replen"
+          ]
+        },
+        {
+          "file": "projections\\SCENARIO_0001_Demand_Surge_East\\DemandSurgeEast_B_unprepared\\service_summary.csv",
+          "rows": 500,
+          "cols": 11,
+          "columns": [
+            "sku_id",
+            "total_demand",
+            "unmet",
+            "replen_demand",
+            "replen_unmet",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "served_from_stock",
+            "fill_rate_customer",
+            "fill_rate_replen",
+            "category"
+          ]
+        },
+        {
+          "file": "projections\\SCENARIO_0001_Demand_Surge_East\\DemandSurgeEast_C_prepared\\cost_summary.csv",
+          "rows": 27,
+          "cols": 8,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "avg_units_on_hand",
+            "avg_inventory_value_usd",
+            "holding_cost_usd",
+            "stockout_cost_usd",
+            "transport_cost_usd",
+            "total_landed_cost_usd"
+          ]
+        },
+        {
+          "file": "projections\\SCENARIO_0001_Demand_Surge_East\\DemandSurgeEast_C_prepared\\service_by_node.csv",
+          "rows": 27,
+          "cols": 11,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "skus",
+            "total_demand",
+            "unmet",
+            "replen_demand",
+            "replen_unmet",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "fill_rate_customer",
+            "fill_rate_replen"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "output datasets\\MEIO artifacts\\SCENARIO_0002_MEIO_CLARK_SCARF_V2\\twin_runs\\projections\\SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+      "type": "directory",
+      "file_count": 2391,
+      "size_bytes": 7620167258,
+      "size_human": "7.1 GB",
+      "sample_digests": [
+        {
+          "file": "actual\\inventory.parquet",
+          "rows": 1166256,
+          "cols": 25,
+          "columns": [
+            "period",
+            "week_start_date",
+            "sku_id",
+            "dc_id",
+            "opening_stock",
+            "receipts",
+            "demand_qty",
+            "demand_customer_qty",
+            "demand_replen_qty",
+            "shipments",
+            "unmet_qty",
+            "unmet_customer_qty",
+            "unmet_replen_qty",
+            "lost_margin_usd",
+            "fulfilment_type",
+            "closing_stock",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "lead_time_mean_days",
+            "lead_time_std_days",
+            "cum_lead_time_mean_days",
+            "cum_lead_time_std_days"
+          ],
+          "numeric_summary": {
+            "opening_stock": {
+              "mean": 179.05896,
+              "std": 593.180325,
+              "min": 0,
+              "max": 28630.0
+            },
+            "receipts": {
+              "mean": 58.935238,
+              "std": 239.819339,
+              "min": 0,
+              "max": 23755.0
+            },
+            "demand_qty": {
+              "mean": 64.868441,
+              "std": 253.026596,
+              "min": 0,
+              "max": 25590.0
+            },
+            "demand_customer_qty": {
+              "mean": 29.250967,
+              "std": 109.176911,
+              "min": 0,
+              "max": 13702.0
+            },
+            "demand_replen_qty": {
+              "mean": 35.617474,
+              "std": 227.721382,
+              "min": 0,
+              "max": 25590.0
+            },
+            "shipments": {
+              "mean": 56.141558,
+              "std": 232.698901,
+              "min": 0,
+              "max": 25590.0
+            },
+            "unmet_qty": {
+              "mean": 8.726883,
+              "std": 67.228566,
+              "min": 0,
+              "max": 11961.0
+            },
+            "unmet_customer_qty": {
+              "mean": 4.504097,
+              "std": 41.813508,
+              "min": 0,
+              "max": 11501.0
+            },
+            "unmet_replen_qty": {
+              "mean": 4.222786,
+              "std": 49.347068,
+              "min": 0,
+              "max": 8761.0
+            },
+            "lost_margin_usd": {
+              "mean": 6.782758,
+              "std": 92.568672,
+              "min": 0,
+              "max": 16093.89
+            },
+            "closing_stock": {
+              "mean": 179.074618,
+              "std": 593.446748,
+              "min": 0,
+              "max": 28630.0
+            },
+            "safety_stock": {
+              "mean": 73.351391,
+              "std": 209.910307,
+              "min": 0,
+              "max": 6009.0
+            },
+            "reorder_point": {
+              "mean": 129.863296,
+              "std": 364.092797,
+              "min": 0,
+              "max": 9053.0
+            },
+            "order_up_to_level": {
+              "mean": 304.530364,
+              "std": 999.079364,
+              "min": 0,
+              "max": 22864.0
+            },
+            "avg_on_hand": {
+              "mean": 175.039923,
+              "std": 575.039661,
+              "min": 0,
+              "max": 28191.142857
+            },
+            "holding_cost_usd": {
+              "mean": 1.864674,
+              "std": 8.987987,
+              "min": 0,
+              "max": 525.711991
+            },
+            "lead_time_mean_days": {
+              "mean": 3.634765,
+              "std": 3.126323,
+              "min": 0.5,
+              "max": 12.94
+            },
+            "lead_time_std_days": {
+              "mean": 1.38273,
+              "std": 1.674641,
+              "min": 0.07,
+              "max": 7.05
+            },
+            "cum_lead_time_mean_days": {
+              "mean": 7.5637,
+              "std": 2.818676,
+              "min": 0.5,
+              "max": 11.495
+            },
+            "cum_lead_time_std_days": {
+              "mean": 3.274927,
+              "std": 1.374486,
+              "min": 0.07,
+              "max": 5.365638
+            }
+          }
+        },
+        {
+          "file": "actual\\policy.parquet",
+          "rows": 7476,
+          "cols": 5,
+          "columns": [
+            "dc_id",
+            "sku_id",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level"
+          ],
+          "numeric_summary": {
+            "safety_stock": {
+              "mean": 73.351391,
+              "std": 209.924257,
+              "min": 0,
+              "max": 6009.0
+            },
+            "reorder_point": {
+              "mean": 129.863296,
+              "std": 364.116994,
+              "min": 0,
+              "max": 9053.0
+            },
+            "order_up_to_level": {
+              "mean": 304.530364,
+              "std": 999.145761,
+              "min": 0,
+              "max": 22864.0
+            }
+          }
+        },
+        {
+          "file": "actual\\production.parquet",
+          "rows": 102098,
+          "cols": 11,
+          "columns": [
+            "period",
+            "week_start_date",
+            "plant_id",
+            "sku_id",
+            "production_family",
+            "is_primary",
+            "plan_uncapped_qty",
+            "planned_qty",
+            "actual_qty",
+            "adherence_pct",
+            "capacity_limited_flag"
+          ],
+          "numeric_summary": {
+            "plan_uncapped_qty": {
+              "mean": 332.350546,
+              "std": 631.117647,
+              "min": 0,
+              "max": 25177.0
+            },
+            "planned_qty": {
+              "mean": 331.993163,
+              "std": 627.131858,
+              "min": 0,
+              "max": 25177.0
+            },
+            "actual_qty": {
+              "mean": 315.363582,
+              "std": 597.4582,
+              "min": 0,
+              "max": 23755.0
+            },
+            "adherence_pct": {
+              "mean": 0.950723,
+              "std": 0.028443,
+              "min": 0.9001,
+              "max": 1.0
+            },
+            "capacity_limited_flag": {
+              "mean": 0.002106,
+              "std": 0.045841,
+              "min": 0,
+              "max": 1
+            }
+          }
+        },
+        {
+          "file": "actual\\replenishment_receipts.parquet",
+          "rows": 576113,
+          "cols": 14,
+          "columns": [
+            "receipt_id",
+            "period",
+            "order_week_start",
+            "sku_id",
+            "dc_id",
+            "origin_node_id",
+            "qty_ordered",
+            "qty_received",
+            "promised_lead_days",
+            "actual_lead_days",
+            "ship_day",
+            "arrival_day",
+            "on_time_flag",
+            "short_qty"
+          ],
+          "numeric_summary": {
+            "qty_ordered": {
+              "mean": 135.676124,
+              "std": 343.055437,
+              "min": 1.0,
+              "max": 23755.0
+            },
+            "qty_received": {
+              "mean": 119.442252,
+              "std": 318.648935,
+              "min": 1.0,
+              "max": 23755.0
+            },
+            "promised_lead_days": {
+              "mean": 5.195745,
+              "std": 5.221847,
+              "min": 0.59,
+              "max": 21.69
+            },
+            "actual_lead_days": {
+              "mean": 3.505088,
+              "std": 3.771122,
+              "min": 0.5,
+              "max": 45.78
+            },
+            "ship_day": {
+              "mean": 552.343259,
+              "std": 316.70145,
+              "min": 0,
+              "max": 1091
+            },
+            "arrival_day": {
+              "mean": 556.339373,
+              "std": 316.713015,
+              "min": 1,
+              "max": 1113
+            },
+            "on_time_flag": {
+              "mean": 0.899482,
+              "std": 0.30069,
+              "min": 0,
+              "max": 1
+            },
+            "short_qty": {
+              "mean": 16.233873,
+              "std": 93.655515,
+              "min": 0,
+              "max": 13031.0
+            }
+          }
+        },
+        {
+          "file": "csv2_headline\\inventory.parquet",
+          "rows": 1267656,
+          "cols": 25,
+          "columns": [
+            "period",
+            "week_start_date",
+            "sku_id",
+            "dc_id",
+            "opening_stock",
+            "receipts",
+            "demand_qty",
+            "demand_customer_qty",
+            "demand_replen_qty",
+            "shipments",
+            "unmet_qty",
+            "unmet_customer_qty",
+            "unmet_replen_qty",
+            "lost_margin_usd",
+            "fulfilment_type",
+            "closing_stock",
+            "safety_stock",
+            "reorder_point",
+            "order_up_to_level",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "lead_time_mean_days",
+            "lead_time_std_days",
+            "cum_lead_time_mean_days",
+            "cum_lead_time_std_days"
+          ],
+          "numeric_summary": {
+            "opening_stock": {
+              "mean": 181.328083,
+              "std": 660.684111,
+              "min": 0,
+              "max": 39554.0
+            },
+            "receipts": {
+              "mean": 55.993535,
+              "std": 256.331431,
+              "min": 0,
+              "max": 27972.0
+            },
+            "demand_qty": {
+              "mean": 64.115238,
+              "std": 272.201529,
+              "min": 0,
+              "max": 39439.8
+            },
+            "demand_customer_qty": {
+              "mean": 26.91759,
+              "std": 105.018022,
+              "min": 0,
+              "max": 13702.0
+            },
+            "demand_replen_qty": {
+              "mean": 37.197648,
+              "std": 250.125293,
+              "min": 0,
+              "max": 39439.8
+            },
+            "shipments": {
+              "mean": 52.504248,
+              "std": 244.192608,
+              "min": 0,
+              "max": 30936.0
+            },
+            "unmet_qty": {
+              "mean": 11.61099,
+              "std": 81.291559,
+              "min": 0,
+              "max": 14050.0
+            },
+            "unmet_customer_qty": {
+              "mean": 4.12641,
+              "std": 39.848731,
+              "min": 0,
+              "max": 11501.0
+            },
+            "unmet_replen_qty": {
+              "mean": 7.484581,
+              "std": 68.390248,
+              "min": 0,
+              "max": 14050.0
+            },
+            "lost_margin_usd": {
+              "mean": 5.835501,
+              "std": 83.741782,
+              "min": 0,
+              "max": 14239.45
+            },
+            "closing_stock": {
+              "mean": 182.152759,
+              "std": 664.627036,
+              "min": 0,
+              "max": 39554.0
+            },
+            "safety_stock": {
+              "mean": 65.299598,
+              "std": 203.1342,
+              "min": 0,
+              "max": 15124.7
+            },
+            "reorder_point": {
+              "mean": 115.850102,
+              "std": 344.535511,
+              "min": 0,
+              "max": 19312.4
+            },
+            "order_up_to_level": {
+              "mean": 270.982334,
+              "std": 925.413374,
+              "min": 0,
+              "max": 38418.7
+            },
+            "avg_on_hand": {
+              "mean": 178.202436,
+              "std": 647.541929,
+              "min": 0,
+              "max": 39304.428571
+            },
+            "holding_cost_usd": {
+              "mean": 1.876213,
+              "std": 10.041152,
+              "min": 0,
+              "max": 930.63095
+            },
+            "lead_time_mean_days": {
+              "mean": 3.673259,
+              "std": 3.137942,
+              "min": 0.5,
+              "max": 12.94
+            },
+            "lead_time_std_days": {
+              "mean": 1.403643,
+              "std": 1.679764,
+              "min": 0.07,
+              "max": 7.05
+            },
+            "cum_lead_time_mean_days": {
+              "mean": 7.598183,
+              "std": 2.765029,
+              "min": 0.5,
+              "max": 11.495
+            },
+            "cum_lead_time_std_days": {
+              "mean": 3.298594,
+              "std": 1.359598,
+              "min": 0.07,
+              "max": 5.365638
+            }
+          }
+        },
+        {
+          "file": "actual\\cost_summary.csv",
+          "rows": 27,
+          "cols": 8,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "avg_units_on_hand",
+            "avg_inventory_value_usd",
+            "holding_cost_usd",
+            "stockout_cost_usd",
+            "transport_cost_usd",
+            "total_landed_cost_usd"
+          ]
+        },
+        {
+          "file": "actual\\service_by_node.csv",
+          "rows": 27,
+          "cols": 11,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "skus",
+            "total_demand",
+            "unmet",
+            "replen_demand",
+            "replen_unmet",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "fill_rate_customer",
+            "fill_rate_replen"
+          ]
+        },
+        {
+          "file": "actual\\service_summary.csv",
+          "rows": 500,
+          "cols": 11,
+          "columns": [
+            "sku_id",
+            "total_demand",
+            "unmet",
+            "replen_demand",
+            "replen_unmet",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "served_from_stock",
+            "fill_rate_customer",
+            "fill_rate_replen",
+            "category"
+          ]
+        },
+        {
+          "file": "csv2_headline\\cost_summary.csv",
+          "rows": 27,
+          "cols": 8,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "avg_units_on_hand",
+            "avg_inventory_value_usd",
+            "holding_cost_usd",
+            "stockout_cost_usd",
+            "transport_cost_usd",
+            "total_landed_cost_usd"
+          ]
+        },
+        {
+          "file": "csv2_headline\\service_by_node.csv",
+          "rows": 27,
+          "cols": 11,
+          "columns": [
+            "dc_id",
+            "node_type",
+            "skus",
+            "total_demand",
+            "unmet",
+            "replen_demand",
+            "replen_unmet",
+            "avg_on_hand",
+            "holding_cost_usd",
+            "fill_rate_customer",
+            "fill_rate_replen"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "models\\MEIO\\MEIO_Weekly\\final_submission_optimized\\run_logs",
+      "type": "directory",
+      "file_count": 11,
+      "size_bytes": 71142,
+      "size_human": "69.5 KB"
+    }
+  ],
+  "total_deleted_bytes": 8498198970,
+  "total_deleted_human": "7.9 GB"
+}

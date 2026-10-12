@@ -64,15 +64,15 @@ Stages
 The history stage produces the two files a forward scenario consumes:
 
     python models/twin/digital_twin.py --mode forward --run-name baseline \
-        --policy "output datasets/<run>/forward_policy.csv" \
-        --state  "output datasets/<run>/opening_position.csv"
+        --policy "output datasets/<run>/forward_policy.parquet" \
+        --state  "output datasets/<run>/opening_position.parquet"
 
 
 The policy is a first-class artefact
 ------------------------------------
 `(safety_stock, reorder_point, order_up_to_level)` per node-SKU is a file, not
 something buried in simulation code. It is the only input an optimizer
-changes: a candidate policy is the same CSV with different numbers. An
+changes: a candidate policy is the same table with different numbers. An
 optimized run and the baseline therefore differ by exactly one file, which is
 what makes the comparison mean anything.
 """
@@ -88,6 +88,21 @@ import time
 import numpy as np
 import pandas as pd
 import datetime as dt
+
+
+def _write_table(df: pd.DataFrame, path) -> None:
+    """Write a world or history table as Parquet.
+
+    These tables used to be CSV, and every reader -- this generator's own later
+    stages, the twin, MEIO -- was built against what pandas read back: an empty text
+    field came back as missing. Missing text is therefore written as null, not as an
+    empty string, so a reader's isna() / notna() means what it always meant."""
+    obj = [c for c in df.columns if df[c].dtype == object]
+    if obj:
+        df = df.copy()
+        for c in obj:
+            df[c] = df[c].where(df[c] != "", None)
+    df.to_parquet(path, index=False)
 try:
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt; HAVE_MPL = True
 except Exception:
@@ -435,7 +450,7 @@ def week_start(idx):
 
 
 # ============================================================================
-# FACILITY-BASED HOLDING COST  (cost_parameters.csv, grain = DC x SUBCATEGORY)
+# FACILITY-BASED HOLDING COST  (cost_parameters.parquet, grain = DC x SUBCATEGORY)
 # ----------------------------------------------------------------------------
 # Earlier versions held a 5-row table keyed on CATEGORY with a single `holding_cost_pct_annual`
 # applied as unit_cost x rate. That collapsed two economically different things into one number
@@ -558,7 +573,7 @@ REGION_OF_STATE = {"NJ": "Northeast", "PA": "Northeast", "MA": "Northeast",
 BUILDING_DEPRECIATION_PCT = 2.5      # straight line on the building shell, % per year
 CORPORATE_COST_OF_CAPITAL_PCT = 9.0  # WACC applied to inventory value
 
-# What cost_parameters.csv actually ships. Holding cost for a SKU at a DC is then
+# What cost_parameters.parquet actually ships. Holding cost for a SKU at a DC is then
 #   storage_cost_per_unit_year_usd  +  unit_cost_usd * inventory_carrying_pct_annual / 100
 LEAN_COST_COLS = ["dc_id", "subcategory", "storage_cost_per_unit_year_usd",
                   "inventory_carrying_pct_annual", "stockout_cost_multiplier"]
@@ -566,12 +581,12 @@ FACILITY_DETAIL = None               # set by step1c_facility_costs, read by wri
 
 
 def step1c_facility_costs(OUT, stockout_mult_by_category):
-    """Emit cost_parameters.csv at DC x SUBCATEGORY grain (full cross product), and return the
+    """Emit cost_parameters.parquet at DC x SUBCATEGORY grain (full cross product), and return the
     national-average storage cost per unit-year plus the carrying rate, used to set
     sku_master.holding_cost_per_unit_year_usd."""
-    pdc = pd.read_csv(f"{OUT}/plant_dc_master.csv")
-    rdc = pd.read_csv(f"{OUT}/regional_dc_master.csv")
-    cdc = pd.read_csv(f"{OUT}/customer_dc_master.csv")
+    pdc = pd.read_parquet(f"{OUT}/plant_dc_master.parquet")
+    rdc = pd.read_parquet(f"{OUT}/regional_dc_master.parquet")
+    cdc = pd.read_parquet(f"{OUT}/customer_dc_master.parquet")
     nodes = []
     for df, idc, tier in ((pdc, "plant_dc_id", "PDC"), (rdc, "regional_dc_id", "RDC"),
                           (cdc, "customer_dc_id", "CDC")):
@@ -621,7 +636,7 @@ def step1c_facility_costs(OUT, stockout_mult_by_category):
     # consumes, on the DC x subcategory key. Every intermediate (metro demographics, capex per
     # sqft, cap rate, energy, density) is derivation, not data, so it lives in the generated
     # documentation instead of widening the fact table.
-    cpf[LEAN_COST_COLS].to_csv(f"{OUT}/cost_parameters.csv", index=False)
+    cpf[LEAN_COST_COLS].pipe(_write_table, f"{OUT}/cost_parameters.parquet")
 
     nat = cpf.groupby("subcategory").storage_cost_per_unit_year_usd.mean().to_dict()
     carry = {sc: carrying_pct for sc in UNITS_PER_SQFT}
@@ -730,19 +745,19 @@ def step1_masters():
         "sku_id", "sku_code", "category", "subcategory", "production_family", "brand",
         "case_price_usd", "units_per_case", "list_price_usd", "unit_cost_usd", "margin_usd",
         "margin_pct", "holding_cost_per_unit_year_usd", "shelf_life_days", "segment",
-        "price_tier"]).to_csv(f"{OUT}/sku_master.csv", index=False)
+        "price_tier"]).pipe(_write_table, f"{OUT}/sku_master.parquet")
 
     # ---- WS-D: publish the seasonality curves so they are tunable, not buried in code ----
     pd.DataFrame([{"subcategory": sc, "month": m + 1, "seasonal_index": round(v, 4),
                    "macro_calendar_index": MACRO_CALENDAR_MONTHLY[m],
                    "combined_index": round(v * MACRO_CALENDAR_MONTHLY[m], 4)}
                   for sc, vals in SUBCATEGORY_SEASONALITY_MONTHLY.items()
-                  for m, v in enumerate(vals)]).to_csv(f"{OUT}/seasonality_master.csv", index=False)
+                  for m, v in enumerate(vals)]).pipe(_write_table, f"{OUT}/seasonality_master.parquet")
 
     # ---- WS-F: publish the regional consumption index ----
     pd.DataFrame([{"region": rg, "subcategory": sc, "demand_index": v}
                   for sc, d in REGION_DEMAND_INDEX.items() for rg, v in d.items()]
-                 ).to_csv(f"{OUT}/regional_demand_index.csv", index=False)
+                 ).pipe(_write_table, f"{OUT}/regional_demand_index.parquet")
 
     # cost_parameters is now built at DC x SUBCATEGORY grain by step1c_facility_costs(), which
     # runs after the node masters exist. Only the per-category stockout multiplier is drawn here.
@@ -789,14 +804,14 @@ def step1_masters():
            ("CDC07","Minneapolis Sales DC","Minneapolis, MN"),("CDC08","St. Louis Sales DC","St. Louis, MO"),("CDC09","Detroit Sales DC","Detroit, MI"),
            ("CDC10","Houston Sales DC","Houston, TX"),("CDC11","Phoenix Sales DC","Phoenix, AZ"),("CDC12","Denver Sales DC","Denver, CO"),
            ("CDC13","Los Angeles Sales DC","Los Angeles, CA"),("CDC14","Sacramento Sales DC","Sacramento, CA"),("CDC15","Seattle Sales DC","Seattle, WA")]
-    pd.DataFrame([[pid,nm,*_sp(c),int(net_rng.integers(3_500_000,4_800_000)),"TRUE"] for pid,nm,c in n_plants],
-        columns=["plant_id","plant_name","city","state","production_capacity_units_per_week","no_inventory_flag"]).to_csv(f"{OUT}/plant_master.csv",index=False)
+    pd.DataFrame([[pid,nm,*_sp(c),int(net_rng.integers(3_500_000,4_800_000)),True] for pid,nm,c in n_plants],
+        columns=["plant_id","plant_name","city","state","production_capacity_units_per_week","no_inventory_flag"]).pipe(_write_table, f"{OUT}/plant_master.parquet")
     pd.DataFrame([[d,pid,*_sp(c),int(net_rng.integers(800_000,1_200_000))] for d,pid,c in n_pdc],
-        columns=["plant_dc_id","plant_id","city","state","storage_capacity_units"]).to_csv(f"{OUT}/plant_dc_master.csv",index=False)
+        columns=["plant_dc_id","plant_id","city","state","storage_capacity_units"]).pipe(_write_table, f"{OUT}/plant_dc_master.parquet")
     pd.DataFrame([[d,nm,*_sp(c),NCITY[c][2],int(net_rng.integers(400_000,700_000))] for d,nm,c in n_rdc],
-        columns=["regional_dc_id","dc_name","city","state","region","storage_capacity_units"]).to_csv(f"{OUT}/regional_dc_master.csv",index=False)
+        columns=["regional_dc_id","dc_name","city","state","region","storage_capacity_units"]).pipe(_write_table, f"{OUT}/regional_dc_master.parquet")
     pd.DataFrame([[d,nm,*_sp(c),NCITY[c][2],int(net_rng.integers(90_000,190_000))] for d,nm,c in n_cdc],
-        columns=["customer_dc_id","dc_name","city","state","region","storage_capacity_units"]).to_csv(f"{OUT}/customer_dc_master.csv",index=False)
+        columns=["customer_dc_id","dc_name","city","state","region","storage_capacity_units"]).pipe(_write_table, f"{OUT}/customer_dc_master.parquet")
     _rcity={r[0]:r[2] for r in n_rdc}
     _lanes=[]; _ln=1
     def _add(o_,ot,oc,d_,dt_,dc,lat=False):
@@ -819,7 +834,7 @@ def step1_masters():
     for a,b in sorted(_pairs): _add(a,"REGIONAL_DC",_rcity[a],b,"REGIONAL_DC",_rcity[b],lat=True)
     pd.DataFrame(_lanes,columns=["lane_id","origin_node_id","origin_node_type","destination_node_id","destination_node_type",
         "transport_mode","lead_time_mean_days","lead_time_std_days","distance_miles","logistics_cost_per_unit_usd",
-        "capacity_units_per_week"]).to_csv(f"{OUT}/network_lanes.csv",index=False)
+        "capacity_units_per_week"]).pipe(_write_table, f"{OUT}/network_lanes.parquet")
     rdc_ids=[r[0] for r in n_rdc]; cdc_ids=[c[0] for c in n_cdc]; n_lanes=len(_lanes)
 
     banners = [
@@ -832,7 +847,7 @@ def step1_masters():
     cust_scale_map = {b: s for b, _, _, _, s in banners}
     pd.DataFrame([[b, nm, ch, dm, CUSTOMER_TERMS[b][0]] for b, nm, ch, dm, _ in banners],
                  columns=["b2b_customer_id", "customer_name", "channel_type", "delivery_mode",
-                          "pricing_strategy"]).to_csv(f"{OUT}/b2b_customer_master.csv", index=False)
+                          "pricing_strategy"]).pipe(_write_table, f"{OUT}/b2b_customer_master.parquet")
 
     # coverage-constrained assignment: guarantee EVERY RDC and CDC is attached to >=1 banner (no orphan DCs),
     # then top up each banner to 2-3 DCs. Per-banner demand is unchanged (shares sum to 1) so the demand
@@ -850,7 +865,7 @@ def step1_masters():
         cust_dcs[bid] = chosen
         for dcid, sh in zip(chosen, RNG.dirichlet(np.ones(len(chosen)))):
             serve_rows.append([bid, dcid, "REGIONAL_DC" if dm == "BULK" else "CUSTOMER_DC", round(float(sh), 4)])
-    pd.DataFrame(serve_rows, columns=["b2b_customer_id", "dc_id", "dc_type", "demand_share"]).to_csv(f"{OUT}/customer_serving_dc.csv", index=False)
+    pd.DataFrame(serve_rows, columns=["b2b_customer_id", "dc_id", "dc_type", "demand_share"]).pipe(_write_table, f"{OUT}/customer_serving_dc.parquet")
 
     # ---- WS-G: customer trade terms (list price stays national; differentiation is below list) ----
     term_rows = []
@@ -860,7 +875,7 @@ def step1_masters():
     pd.DataFrame(term_rows, columns=[
         "b2b_customer_id", "pricing_strategy", "everyday_off_invoice_pct", "trade_fund_pct",
         "volume_rebate_pct", "logistics_allowance_pct", "promo_frequency_mult",
-        "promo_depth_mult", "total_trade_rate_pct"]).to_csv(f"{OUT}/b2b_customer_terms.csv", index=False)
+        "promo_depth_mult", "total_trade_rate_pct"]).pipe(_write_table, f"{OUT}/b2b_customer_terms.parquet")
 
     # ---- region lookup for every stocking DC (WS-F needs it in step 2) ----
     dc_city = {d: c for d, _, c in n_rdc}; dc_city.update({d: c for d, _, c in n_cdc})
@@ -873,7 +888,7 @@ def step1_masters():
     pd.DataFrame([[p, fam, int(net_rng.integers(900_000, 1_600_000))]
                   for p, fams in PLANT_CAPABILITY.items() for fam in fams],
                  columns=["plant_id", "production_family", "family_capacity_units_per_week"]
-                 ).to_csv(f"{OUT}/plant_capability.csv", index=False)
+                 ).pipe(_write_table, f"{OUT}/plant_capability.parquet")
 
     dc_weight = {}                                    # dc_id -> aggregate demand share
     for bid, dcid, _dt, sh in serve_rows:
@@ -951,19 +966,19 @@ def step1_masters():
     src = pd.DataFrame(src_rows, columns=["sku_id", "plant_id", "is_primary",
                                           "allocation_share", "unit_cost_at_plant_usd"])
     src["production_family"] = src.sku_id.map(lambda s: sku_meta[s]["family"])
-    src.to_csv(f"{OUT}/sku_plant_sourcing.csv", index=False)
+    src.pipe(_write_table, f"{OUT}/sku_plant_sourcing.parquet")
     n_dual = int((src.groupby("sku_id").size() > 1).sum())
 
     # ---- facility-based holding cost (needs the node masters, so it runs last) ----
     nat_storage, nat_carry = step1c_facility_costs(OUT, stockout_mult)
     # sku_master's holding cost is now DERIVED from the facility model: the national average
     # storage cost for that subcategory plus the carrying charge on its own unit cost. One source
-    # of truth -- the DC-specific value lives in cost_parameters.csv.
-    _sm = pd.read_csv(f"{OUT}/sku_master.csv")
+    # of truth -- the DC-specific value lives in cost_parameters.parquet.
+    _sm = pd.read_parquet(f"{OUT}/sku_master.parquet")
     _sm["holding_cost_per_unit_year_usd"] = (
         _sm.subcategory.map(nat_storage)
         + _sm.unit_cost_usd * _sm.subcategory.map(nat_carry)).round(4)
-    _sm.to_csv(f"{OUT}/sku_master.csv", index=False)
+    _sm.pipe(_write_table, f"{OUT}/sku_master.parquet")
     print(f"    sku_master holding cost re-derived from the facility model: "
           f"${_sm.holding_cost_per_unit_year_usd.min():.3f}-"
           f"${_sm.holding_cost_per_unit_year_usd.max():.3f}/unit/yr")
@@ -990,13 +1005,13 @@ def step2_orders(ctx):
     OUT = OUTPUT_DIR
     sku_meta, seasonal_index = ctx["sku_meta"], ctx["seasonal_index"]
     cust_dcs, cust_scale, cust_deliv = ctx["cust_dcs"], ctx["cust_scale"], ctx["cust_deliv"]
-    serve = pd.read_csv(f"{OUT}/customer_serving_dc.csv")
+    serve = pd.read_parquet(f"{OUT}/customer_serving_dc.parquet")
     share_lookup = {(r.b2b_customer_id, r.dc_id): r.demand_share for r in serve.itertuples()}
     sku_ids = list(sku_meta.keys())
     banners = list(cust_dcs.keys())
 
     # ---------------- PROMOTIONS: customer-specific (or ALL) trade-promo events -----------------
-    # Written to promotions.csv (the promo calendar) and used as the single source of the discounts
+    # Written to promotions.parquet (the promo calendar) and used as the single source of the discounts
     # that appear in orders. Each event = a SKU discounted for a customer (or ALL) over a date range.
     PROMO_TYPES = ["TPR", "Feature", "Display", "Feature+Display"]
     # start weeks are drawn from the trade calendar, not uniformly -- see PROMO_CALENDAR_WEIGHT
@@ -1049,7 +1064,7 @@ def step2_orders(ctx):
     _pr = pd.DataFrame(promo_rows, columns=["promo_id", "sku_id", "b2b_customer_id", "start_date",
                                             "end_date", "planned_discount_pct", "discount_pct",
                                             "promo_type", "plan_status"])
-    _pr.to_csv(f"{OUT}/promotions.csv", index=False)
+    _pr.pipe(_write_table, f"{OUT}/promotions.parquet")
 
     # ---------------- base/shelf price path per SKU (slow drift + 1-3 step revisions) ------------
     # §9.5: v3 clipped the shelf-price path to [0.85, 1.20] x list, giving a mean range of only
@@ -1079,7 +1094,7 @@ def step2_orders(ctx):
                    "sku_id": sid, "planned_base_price_usd": round(float(base_price_path[sid][w]), 2),
                    "list_price_usd": sku_meta[sid]["list_price"]}
                   for sid in sku_ids for w in range(ACTUAL_WEEKS, TOTAL_WEEKS)]
-                 ).to_csv(f"{OUT}/price_plan.csv", index=False)
+                 ).pipe(_write_table, f"{OUT}/price_plan.parquet")
 
     carries = {}
     for b in banners:
@@ -1187,7 +1202,7 @@ def step2_orders(ctx):
             "on_promo", "promo_id", "revenue_usd",
             "off_invoice_pct", "trade_fund_pct", "volume_rebate_pct", "logistics_allowance_pct",
             "invoice_price_usd", "net_price_usd", "net_revenue_usd", "net_margin_usd"]
-    df[cols].to_csv(f"{OUT}/orders.csv", index=False)
+    df[cols].pipe(_write_table, f"{OUT}/orders.parquet")
     n_orders = df.order_id.nunique()
     promo_vol = df.loc[df.on_promo, "order_qty"].sum() / df.order_qty.sum()
     pocket = df.groupby("b2b_customer_id").apply(
@@ -1216,7 +1231,7 @@ def step3_forecast_and_routing(ctx):
     OUT = OUTPUT_DIR
     sku_meta, seasonal_index = ctx["sku_meta"], ctx["seasonal_index"]
     cust_dcs = ctx["cust_dcs"]; plan_depth = ctx["plan_depth"]; sku_ids = list(sku_meta.keys())
-    orders_daily = pd.read_csv(f"{OUT}/orders.csv")
+    orders_daily = pd.read_parquet(f"{OUT}/orders.parquet")
     # roll DAILY order lines up to weekly (sku,dc,customer,period) for forecast/production/inventory
     ws_map = {period_label(i): week_start(i) for i in range(1, TOTAL_WEEKS + 1)}
     orders = orders_daily.groupby(["period", "sku_id", "dc_id", "b2b_customer_id"], as_index=False).order_qty.sum()
@@ -1343,7 +1358,7 @@ def step3_forecast_and_routing(ctx):
     cols = ["period", "week_start_date", "horizon", "sku_id", "dc_id", "b2b_customer_id",
             "forecast_qty", "forecast_baseline_qty", "forecast_promo_lift_qty",
             "actual_qty", "forecast_error_pct"]
-    fcast[cols].to_csv(f"{OUT}/demand_forecast.csv", index=False)
+    fcast[cols].pipe(_write_table, f"{OUT}/demand_forecast.parquet")
 
     _ins = fcast[_is_ins]
     _nz = _ins[_ins.actual_qty > 0]
@@ -1356,15 +1371,15 @@ def step3_forecast_and_routing(ctx):
           f"{BURN_WEEKS}-week burn-in feeds it")
     # =====================================================================================
     EVAL_START = 1
-    plants_df = pd.read_csv(f"{OUT}/plant_master.csv")
+    plants_df = pd.read_parquet(f"{OUT}/plant_master.parquet")
     plant_ids = plants_df.plant_id.tolist()
-    lanes_df = pd.read_csv(f"{OUT}/network_lanes.csv")
-    _pdcm = pd.read_csv(f"{OUT}/plant_dc_master.csv")
+    lanes_df = pd.read_parquet(f"{OUT}/network_lanes.parquet")
+    _pdcm = pd.read_parquet(f"{OUT}/plant_dc_master.parquet")
     pdc_of_plant = dict(zip(_pdcm.plant_id, _pdcm.plant_dc_id))
     plant_of_pdc = dict(zip(_pdcm.plant_dc_id, _pdcm.plant_id))
-    rdc_ids = pd.read_csv(f"{OUT}/regional_dc_master.csv").regional_dc_id.tolist()
+    rdc_ids = pd.read_parquet(f"{OUT}/regional_dc_master.parquet").regional_dc_id.tolist()
 
-    _src = pd.read_csv(f"{OUT}/sku_plant_sourcing.csv")
+    _src = pd.read_parquet(f"{OUT}/sku_plant_sourcing.parquet")
     sourcing = {s: [(r.plant_id, bool(r.is_primary), float(r.allocation_share))
                     for r in g.itertuples()] for s, g in _src.groupby("sku_id")}
     primary_plant = {s: next((p for p, pr, _ in rows if pr), rows[0][0])
@@ -1455,7 +1470,7 @@ def step3_forecast_and_routing(ctx):
                           sku_meta[sid]["family"]])
     _src = pd.DataFrame(_rows, columns=["sku_id", "plant_id", "is_primary", "allocation_share",
                                         "unit_cost_at_plant_usd", "production_family"])
-    _src.to_csv(f"{OUT}/sku_plant_sourcing.csv", index=False)
+    _src.pipe(_write_table, f"{OUT}/sku_plant_sourcing.parquet")
     sourcing = {s: [(r.plant_id, bool(r.is_primary), float(r.allocation_share))
                     for r in g.itertuples()] for s, g in _src.groupby("sku_id")}
     primary_plant = {s: next(p for p, pr, _ in rows if pr) for s, rows in sourcing.items()}
@@ -1484,11 +1499,11 @@ def step3_forecast_and_routing(ctx):
         for fam in fams:
             cap_fam.setdefault((p, fam), 500)
     plants_df["production_capacity_units_per_week"] = plants_df.plant_id.map(cap_plant)
-    plants_df.to_csv(f"{OUT}/plant_master.csv", index=False)
+    plants_df.pipe(_write_table, f"{OUT}/plant_master.parquet")
     pd.DataFrame([[p, fam, cap_fam[(p, fam)]] for p, fams in sorted(PLANT_CAPABILITY.items())
                   for fam in sorted(fams)],
                  columns=["plant_id", "production_family", "family_capacity_units_per_week"]
-                 ).to_csv(f"{OUT}/plant_capability.csv", index=False)
+                 ).pipe(_write_table, f"{OUT}/plant_capability.parquet")
 
 
     # ---- publish the routing as an input table -------------------------------
@@ -1498,7 +1513,7 @@ def step3_forecast_and_routing(ctx):
     # exactly this, so it is published rather than left implicit.
     #
     # It used to be recovered by mining the modal origin out of
-    # replenishment_receipts.csv, which made the twin depend on a file the twin
+    # replenishment_receipts.parquet, which made the twin depend on a file the twin
     # itself produces: a clean dataset could not be bootstrapped, and every run
     # silently inherited the previous one's routing.
     _map = []
@@ -1511,15 +1526,14 @@ def step3_forecast_and_routing(ctx):
         for p, _pr, _sh in sourcing[sid]:
             _map.append([pdc_of_plant[p], sid, p, "parent plant"])
     pd.DataFrame(_map, columns=["dc_id", "sku_id", "origin_node_id", "rule"]
-                 ).sort_values(["dc_id", "sku_id"]).to_csv(
-        f"{OUT}/sku_sourcing_map.csv", index=False)
+                 ).sort_values(["dc_id", "sku_id"]).pipe(_write_table, f"{OUT}/sku_sourcing_map.parquet")
     print(f"  sourcing map: {len(_map):,} (node, SKU) routing rows")
 
     # ---- service-level targets by segment (Service-Level Optimization objective) ----
     seg_targets = {"Fast-Moving": (0.98, 0.96), "Seasonal": (0.95, 0.92), "Intermediate": (0.90, 0.88)}
     pd.DataFrame([[s, sl, cfr] for s, (sl, cfr) in seg_targets.items()],
                  columns=["segment", "service_level_target_pct", "case_fill_rate_target_pct"]
-                 ).to_csv(f"{OUT}/sku_customer_service_targets.csv", index=False)
+                 ).pipe(_write_table, f"{OUT}/sku_customer_service_targets.parquet")
     print(f"  service targets: {len(seg_targets)} segment tiers written")
 
 def validate(opening_path=None):
@@ -1528,17 +1542,17 @@ def validate(opening_path=None):
     def chk(name, cond):
         print(f"[{'OK' if cond else 'FAIL'}] {name}");  errs.append(name) if not cond else None
 
-    sku = pd.read_csv(f"{OUT}/sku_master.csv")
-    orders = pd.read_csv(f"{OUT}/orders.csv")
-    fc = pd.read_csv(f"{OUT}/demand_forecast.csv")
-    prod = pd.read_csv(f"{OUT}/production.csv")
-    inv = pd.read_csv(f"{OUT}/inventory.csv")
-    lanes = pd.read_csv(f"{OUT}/network_lanes.csv")
-    serve = pd.read_csv(f"{OUT}/customer_serving_dc.csv")
-    banners = pd.read_csv(f"{OUT}/b2b_customer_master.csv")
-    plants = pd.read_csv(f"{OUT}/plant_master.csv")
-    pdc = pd.read_csv(f"{OUT}/plant_dc_master.csv"); rdc = pd.read_csv(f"{OUT}/regional_dc_master.csv")
-    cdc = pd.read_csv(f"{OUT}/customer_dc_master.csv")
+    sku = pd.read_parquet(f"{OUT}/sku_master.parquet")
+    orders = pd.read_parquet(f"{OUT}/orders.parquet")
+    fc = pd.read_parquet(f"{OUT}/demand_forecast.parquet")
+    prod = pd.read_parquet(f"{OUT}/production.parquet")
+    inv = pd.read_parquet(f"{OUT}/inventory.parquet")
+    lanes = pd.read_parquet(f"{OUT}/network_lanes.parquet")
+    serve = pd.read_parquet(f"{OUT}/customer_serving_dc.parquet")
+    banners = pd.read_parquet(f"{OUT}/b2b_customer_master.parquet")
+    plants = pd.read_parquet(f"{OUT}/plant_master.parquet")
+    pdc = pd.read_parquet(f"{OUT}/plant_dc_master.parquet"); rdc = pd.read_parquet(f"{OUT}/regional_dc_master.parquet")
+    cdc = pd.read_parquet(f"{OUT}/customer_dc_master.parquet")
 
     sku_ids = set(sku.sku_id); cust_ids = set(banners.b2b_customer_id)
     stock_dcs = set(rdc.regional_dc_id) | set(cdc.customer_dc_id)
@@ -1546,7 +1560,7 @@ def validate(opening_path=None):
 
     chk("500 SKUs, 5 x 100", len(sku) == 500 and (sku.category.value_counts() == 100).all())
     chk("no elasticity answer-key column in sku_master", "true_elasticity" not in sku.columns)
-    chk("no measured-elasticity file emitted", not os.path.exists(f"{OUT}/price_elasticity_measured.csv"))
+    chk("no measured-elasticity file emitted", not os.path.exists(f"{OUT}/price_elasticity_measured.parquet"))
     chk("all money columns present in USD", {"list_price_usd", "unit_cost_usd", "margin_usd"}.issubset(sku.columns)
         and "logistics_cost_per_unit_usd" in lanes.columns and "revenue_usd" in orders.columns)
     chk("orders expose base + promo price columns", {"base_price_usd", "unit_price_usd", "on_promo", "discount_pct"}.issubset(orders.columns))
@@ -1557,7 +1571,7 @@ def validate(opening_path=None):
     chk("delivery_date >= order_date for all lines", (_dd >= _od).all())
     chk("order lines span day-of-week (not just weekly)", _od.dt.dayofweek.nunique() > 1)
     # promotions table + referential integrity with orders
-    promos = pd.read_csv(f"{OUT}/promotions.csv")
+    promos = pd.read_parquet(f"{OUT}/promotions.parquet")
     chk("promotions.sku_id -> sku_master", set(promos.sku_id) <= sku_ids)
     chk("promotions.b2b_customer_id in banners or ALL", set(promos.b2b_customer_id) <= (cust_ids | {"ALL"}))
     _ex = promos[promos.plan_status == "executed"]
@@ -1597,9 +1611,9 @@ def validate(opening_path=None):
     chk("no-gap: every Customer DC has a customer attached", set(cdc.customer_dc_id) <= served)
     chk("no-gap: every Regional DC serves or feeds demand", set(rdc.regional_dc_id) <= (served | feeds_cdc))
     chk("no-gap: every stocking + plant DC has inventory flow (multi-echelon)", all_dc <= inv_nodes)
-    chk("no-gap: every criticality tier has a service target", pd.read_csv(f"{OUT}/sku_customer_service_targets.csv").shape[0] >= 3)
-    if os.path.exists(f"{OUT}/scenarios.csv"):
-        scn = pd.read_csv(f"{OUT}/scenarios.csv")
+    chk("no-gap: every criticality tier has a service target", pd.read_parquet(f"{OUT}/sku_customer_service_targets.parquet").shape[0] >= 3)
+    if os.path.exists(f"{OUT}/scenarios.parquet"):
+        scn = pd.read_parquet(f"{OUT}/scenarios.parquet")
         need = {"demand_surge","forecast_miss","lane_outage","leadtime_spike","plant_shortfall","geographic_disruption"}
         chk("no-gap: scenario library covers all disruption classes", need <= set(scn.scenario_type))
         _sd = pd.to_datetime(scn.start_date)
@@ -1621,11 +1635,11 @@ def validate(opening_path=None):
     # v3's value is shown in the label so a failure is self-explanatory.
     # =====================================================================
     print("\n--- v4 Phase 0/1 assertions ---")
-    seas = pd.read_csv(f"{OUT}/seasonality_master.csv")
-    ridx = pd.read_csv(f"{OUT}/regional_demand_index.csv")
-    terms = pd.read_csv(f"{OUT}/b2b_customer_terms.csv")
-    srcg = pd.read_csv(f"{OUT}/sku_plant_sourcing.csv")
-    cap = pd.read_csv(f"{OUT}/plant_capability.csv")
+    seas = pd.read_parquet(f"{OUT}/seasonality_master.parquet")
+    ridx = pd.read_parquet(f"{OUT}/regional_demand_index.parquet")
+    terms = pd.read_parquet(f"{OUT}/b2b_customer_terms.parquet")
+    srcg = pd.read_parquet(f"{OUT}/sku_plant_sourcing.parquet")
+    cap = pd.read_parquet(f"{OUT}/plant_capability.parquet")
 
     # WS-A: per-unit price basis (v3: Energy Drink median $108.37/unit)
     med = sku.groupby("subcategory").list_price_usd.median()
@@ -1729,7 +1743,7 @@ def validate(opening_path=None):
     # against v3's round-robin baseline. "Does the plant sit in the top-demand region" is NOT a
     # valid test here: the West holds 7 of 27 DCs so it is the top region for most SKUs, and
     # there is no Northeast plant at all, so the metric is degenerate.
-    _pl = pd.read_csv(f"{OUT}/plant_master.csv")
+    _pl = pd.read_parquet(f"{OUT}/plant_master.parquet")
     _lanes_pd = lanes[(lanes.origin_node_type == "PLANT")]
     _dcst2 = pd.concat([rdc.rename(columns={"regional_dc_id": "dc_id"})[["dc_id", "city", "state"]],
                         cdc.rename(columns={"customer_dc_id": "dc_id"})[["dc_id", "city", "state"]]])
@@ -1772,7 +1786,7 @@ def validate(opening_path=None):
         srcg[srcg.is_primary].plant_id.nunique() == len(_plist))
 
     # ---------------- facility-based holding cost (cost_parameters) ----------------
-    cpf = pd.read_csv(f"{OUT}/cost_parameters.csv")
+    cpf = pd.read_parquet(f"{OUT}/cost_parameters.parquet")
     _dcs = set(rdc.regional_dc_id) | set(cdc.customer_dc_id) | set(pdc.plant_dc_id)
     chk(f"cost_parameters is the full DC x SUBCATEGORY cross product "
         f"({cpf.dc_id.nunique()}x{cpf.subcategory.nunique()}={len(cpf)} rows; was 5 rows on category)",
@@ -1819,9 +1833,10 @@ def validate(opening_path=None):
                    - _fd.storage_cost_per_unit_year_usd).abs() < 1e-4).all()))
 
     # ---------------- Phase 2 (WS-H/I/K/L) ----------------
-    rcpt = pd.read_csv(f"{OUT}/replenishment_receipts.csv")
-    wo = pd.read_csv(f"{OUT}/write_offs.csv") if os.path.getsize(f"{OUT}/write_offs.csv") > 40 \
-        else pd.DataFrame(columns=["sku_id", "units_written_off", "write_off_cost_usd"])
+    rcpt = pd.read_parquet(f"{OUT}/replenishment_receipts.parquet")
+    wo = pd.read_parquet(f"{OUT}/write_offs.parquet")
+    if not len(wo.columns):           # a file with no schema at all: nothing was written off
+        wo = pd.DataFrame(columns=["sku_id", "units_written_off", "write_off_cost_usd"])
 
     # WS-H: lead time now drives the inventory numbers (v3: corr -0.05, ROP implied a flat 0.97wk)
     _iv = inv.groupby(["sku_id", "dc_id"], as_index=False).agg(
@@ -1881,8 +1896,8 @@ def validate(opening_path=None):
         bool((inv.demand_qty - inv.shipments - inv.unmet_qty).abs().le(1).all()))
 
     # ---------------- AUDIT FIXES 1-3: lock the three structural fixes in ------------------
-    _pdcm = pd.read_csv(f"{OUT}/plant_dc_master.csv")
-    _srcq = pd.read_csv(f"{OUT}/sku_plant_sourcing.csv")
+    _pdcm = pd.read_parquet(f"{OUT}/plant_dc_master.parquet")
+    _srcq = pd.read_parquet(f"{OUT}/sku_plant_sourcing.parquet")
     _plant_of = dict(zip(_pdcm.plant_dc_id, _pdcm.plant_id))
     _qual = set(zip(_srcq.sku_id, _srcq.plant_id))
     _pv = inv[inv.dc_id.str.startswith("PDC")].groupby(["sku_id", "dc_id"], as_index=False).receipts.sum()
@@ -1924,8 +1939,8 @@ def validate(opening_path=None):
         f"RDC {_cvt['RDC']:.3f} -> PDC {_cvt['PDC']:.3f} (was flat/damping 0.192/0.198/0.198)",
         _cvt["PDC"] > _cvt["CDC"] * 1.05 and _cvt["RDC"] >= _cvt["CDC"])
 
-    _prd2 = pd.read_csv(f"{OUT}/production.csv")
-    _plm2 = pd.read_csv(f"{OUT}/plant_master.csv")
+    _prd2 = pd.read_parquet(f"{OUT}/production.parquet")
+    _plm2 = pd.read_parquet(f"{OUT}/plant_master.parquet")
     _pu2 = (_prd2.groupby(["plant_id", "period"]).actual_qty.sum().reset_index()
             .merge(_plm2[["plant_id", "production_capacity_units_per_week"]], on="plant_id"))
     _u2 = _pu2.actual_qty / _pu2.production_capacity_units_per_week
@@ -1959,7 +1974,7 @@ def validate(opening_path=None):
     chk(f"is_primary flags the largest realised producer for >=95% of SKUs "
         f"({_big.is_primary.mean():.1%}; was 76% among dual-sourced)",
         float(_big.is_primary.mean()) >= 0.95)
-    _oi = pd.read_csv(opening_path)
+    _oi = pd.read_parquet(opening_path)
     chk(f"the forward opening state carries the in-transit pipeline "
         f"({_oi.in_transit_qty.sum():,} units; previously destroyed at the cut-over)",
         {"in_transit_qty", "inventory_position"}.issubset(_oi.columns) and _oi.in_transit_qty.sum() > 0)
@@ -2053,10 +2068,10 @@ def validate(opening_path=None):
         orders.period.nunique() == ACTUAL_WEEKS)
     chk("forward opening position exists for every stocking SKU-DC",
         opening_path is not None and os.path.exists(opening_path)
-        and len(pd.read_csv(opening_path)) ==
+        and len(pd.read_parquet(opening_path)) ==
             inv.groupby(["sku_id", "dc_id"]).ngroups)
     chk("Phase 4: forward price plan emitted for the execution horizon",
-        os.path.exists(f"{OUT}/price_plan.csv") and len(pd.read_csv(f"{OUT}/price_plan.csv")) > 1000)
+        os.path.exists(f"{OUT}/price_plan.parquet") and len(pd.read_parquet(f"{OUT}/price_plan.parquet")) > 1000)
 
     chk(f"shelf life within {SHELF_LIFE_DAYS} days for every SKU -- beyond the "
         f"{ACTUAL_WEEKS}-week span, so nothing can expire",
@@ -2072,7 +2087,7 @@ def validate(opening_path=None):
 def _facility_cost_doc_section():
     """Build the holding-cost appendix for DATASET_DOCUMENTATION.md.
 
-    cost_parameters.csv ships only the four consumable fields; everything explaining HOW those
+    cost_parameters.parquet ships only the four consumable fields; everything explaining HOW those
     numbers were derived -- metro demographics, capex per sqft, cap rates, energy, storage density
     -- is written here instead, so the fact table stays narrow and the reasoning stays auditable.
     """
@@ -2081,8 +2096,8 @@ def _facility_cost_doc_section():
         return ""
     L = []
     A = L.append
-    A("\n### 5.3 Holding cost — how `cost_parameters.csv` is derived\n")
-    A(f"`cost_parameters.csv` has **{len(d):,} rows** on a **dc_id x subcategory** key "
+    A("\n### 5.3 Holding cost — how `cost_parameters.parquet` is derived\n")
+    A(f"`cost_parameters.parquet` has **{len(d):,} rows** on a **dc_id x subcategory** key "
       f"({d.dc_id.nunique()} storage facilities x {d.subcategory.nunique()} subcategories) and "
       f"ships {len(LEAN_COST_COLS)} columns:\n")
     A("| Column | Meaning |")
@@ -2334,7 +2349,7 @@ Recommended method -- one regression with BOTH price terms and SKU + week fixed 
 Minimal snippet (statsmodels):
 
     import pandas as pd, numpy as np, statsmodels.formula.api as smf
-    o = pd.read_csv("orders.csv").merge(pd.read_csv("sku_master.csv")[["sku_id","category"]], on="sku_id")
+    o = pd.read_parquet("orders.parquet").merge(pd.read_parquet("sku_master.parquet")[["sku_id","category"]], on="sku_id")
     o = o[(o.order_qty>0) & (o.base_price_usd>0)].copy()
     o["ln_q"]=np.log(o.order_qty); o["ln_base"]=np.log(o.base_price_usd); o["ln_promo"]=np.log(1-o.discount_pct)
     for cat, g in o.groupby("category"):
@@ -2365,7 +2380,7 @@ def _policy_doc_section():
     drift away from the data.
     """
     OUT = OUTPUT_DIR
-    b = pd.read_csv(f"{OUT}/baseline_policy.csv")
+    b = pd.read_parquet(f"{OUT}/baseline_policy.parquet")
     b["t"] = b.dc_id.str[:3]
     ech = b.t.value_counts().to_dict()
     seg = b.segment.value_counts().to_dict()
@@ -2398,7 +2413,7 @@ def _policy_doc_section():
 
 ## Part 5 — The policy table, in plain words
 
-`baseline_policy.csv` is one row per **(stocking location, SKU)** carrying three
+`baseline_policy.parquet` is one row per **(stocking location, SKU)** carrying three
 numbers: how much cushion to hold, when to reorder, and how far to top back up.
 That is the whole inventory decision, and it is the only thing an optimizer
 changes.
@@ -2409,9 +2424,9 @@ this dataset; the other two are forward artefacts and are described in
 
 | File | Rows | Sized on | Role |
 |---|---|---|---|
-| `baseline_policy.csv` (here) | {len(b):,} | the **order history** | ran the past, so it is part of the record |
-| `forward_policy.csv` | — | the **forecast** | runs forward scenarios |
-| `policy.csv` (inside a run) | — | whatever was fed in | audit trail of what a run executed |
+| `baseline_policy.parquet` (here) | {len(b):,} | the **order history** | ran the past, so it is part of the record |
+| `forward_policy.parquet` | — | the **forecast** | runs forward scenarios |
+| `policy.parquet` (inside a run) | — | whatever was fed in | audit trail of what a run executed |
 
 ### Column by column
 
@@ -2491,7 +2506,7 @@ order_up_to_level S    = s + mu_demand x {ORDER_COVER_WEEKS} weeks
 ```
 
 `mu` and `sigma` are that location's weekly demand mean and standard deviation
-for that SKU. The lane lead time comes from `sku_sourcing_map.csv` — the route
+for that SKU. The lane lead time comes from `sku_sourcing_map.parquet` — the route
 the SKU actually travels, which matters a great deal: one plant-DC-to-regional-DC
 lane runs half a day and another nearly thirteen.
 
@@ -2547,7 +2562,7 @@ def write_schema_doc():
     OUT = OUTPUT_DIR
     root = os.path.dirname(os.path.abspath(OUT))
     world = sorted(os.path.basename(f) for f in os.listdir(OUT)
-                   if f.endswith(".csv"))
+                   if f.endswith(".parquet"))
     doc = f"""# Supply Brain — data layout
 
 *Auto-generated {dt.datetime.now().strftime('%Y-%m-%d %H:%M')} by
@@ -2567,8 +2582,8 @@ output datasets/     THE FORWARD VIEW — one folder per run
                      and every scenario run with its summaries.
 ```
 
-The historical `inventory.csv`, `replenishment_receipts.csv` and
-`production.csv` sit in `input datasets/` even though the digital twin produces
+The historical `inventory.parquet`, `replenishment_receipts.parquet` and
+`production.parquet` sit in `input datasets/` even though the digital twin produces
 them: they are the record of the past, which is input to any analysis. Only
 what looks *forward* moves to `output datasets/`. The generator prints a
 warning if a forward artefact ever appears in the input folder.
@@ -2605,8 +2620,8 @@ filename and split follows.
                   scenarios, validate, document    ─► input datasets/
 
 forward scenario  twin (forward mode)               ─► output datasets/<scenario>/
-                     --policy <forward_policy.csv>
-                     --state  <opening_position.csv>
+                     --policy <forward_policy.parquet>
+                     --state  <opening_position.parquet>
 ```
 
 Build the dataset:
@@ -2619,8 +2634,8 @@ Score a forward scenario against it:
 
 ```bash
 python models/twin/digital_twin.py --mode forward --run-name baseline \
-    --policy "output datasets/history/forward_policy.csv" \
-    --state  "output datasets/history/opening_position.csv"
+    --policy "output datasets/history/forward_policy.parquet" \
+    --state  "output datasets/history/opening_position.parquet"
 ```
 
 Stages run independently: `--stage world` rebuilds the given data, `--stage
@@ -2653,7 +2668,7 @@ cancelled at week close and re-ordered at the next review.
 
 ## The optimization seam
 
-One standalone CSV, five required columns:
+One standalone table (Parquet; a CSV is accepted too), five required columns:
 
 ```
 dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
@@ -2676,14 +2691,14 @@ def write_documentation():
     """Write the single unified dataset document: business assumptions first, then schema,
     then generation methodology, then the data profile (EDA) folded in from generate_eda()."""
     OUT = OUTPUT_DIR
-    sku = pd.read_csv(f"{OUT}/sku_master.csv")
-    orders = pd.read_csv(f"{OUT}/orders.csv")
-    inv = pd.read_csv(f"{OUT}/inventory.csv")
-    fcst = pd.read_csv(f"{OUT}/demand_forecast.csv")
-    rcpt = pd.read_csv(f"{OUT}/replenishment_receipts.csv")
-    ban = pd.read_csv(f"{OUT}/b2b_customer_master.csv")
-    terms = pd.read_csv(f"{OUT}/b2b_customer_terms.csv")
-    cpf = pd.read_csv(f"{OUT}/cost_parameters.csv")
+    sku = pd.read_parquet(f"{OUT}/sku_master.parquet")
+    orders = pd.read_parquet(f"{OUT}/orders.parquet")
+    inv = pd.read_parquet(f"{OUT}/inventory.parquet")
+    fcst = pd.read_parquet(f"{OUT}/demand_forecast.parquet")
+    rcpt = pd.read_parquet(f"{OUT}/replenishment_receipts.parquet")
+    ban = pd.read_parquet(f"{OUT}/b2b_customer_master.parquet")
+    terms = pd.read_parquet(f"{OUT}/b2b_customer_terms.parquet")
+    cpf = pd.read_parquet(f"{OUT}/cost_parameters.parquet")
     _promo_vol = orders.loc[orders.on_promo, "order_qty"].sum() / orders.order_qty.sum()
     _pocket = (orders.groupby("b2b_customer_id")
                .apply(lambda g: (g.net_price_usd * g.order_qty).sum()
@@ -2693,8 +2708,8 @@ def write_documentation():
     # customer-facing and internal-replenishment service are now separable (audit fix 2)
     _cfill = 1 - inv.unmet_customer_qty.sum() / max(inv.demand_customer_qty.sum(), 1)
     _rfill = 1 - inv.unmet_replen_qty.sum() / max(inv.demand_replen_qty.sum(), 1)
-    _prd = pd.read_csv(f"{OUT}/production.csv")
-    _plm = pd.read_csv(f"{OUT}/plant_master.csv")
+    _prd = pd.read_parquet(f"{OUT}/production.parquet")
+    _plm = pd.read_parquet(f"{OUT}/plant_master.parquet")
     _caplim = float(_prd.capacity_limited_flag.mean())
     _capclip = 1 - _prd.planned_qty.sum() / max(_prd.plan_uncapped_qty.sum(), 1)
     _pu = (_prd.groupby(["plant_id", "period"]).actual_qty.sum().reset_index()
@@ -3176,10 +3191,10 @@ def generate_scenarios(OUT):
     kept in `notes`.
     """
     rng = np.random.default_rng(77)
-    sku = pd.read_csv(f"{OUT}/sku_master.csv"); rdc = pd.read_csv(f"{OUT}/regional_dc_master.csv")
-    cdc = pd.read_csv(f"{OUT}/customer_dc_master.csv"); plants = pd.read_csv(f"{OUT}/plant_master.csv")
-    inv = pd.read_csv(f"{OUT}/inventory.csv")
-    cap = pd.read_csv(f"{OUT}/plant_capability.csv")
+    sku = pd.read_parquet(f"{OUT}/sku_master.parquet"); rdc = pd.read_parquet(f"{OUT}/regional_dc_master.parquet")
+    cdc = pd.read_parquet(f"{OUT}/customer_dc_master.parquet"); plants = pd.read_parquet(f"{OUT}/plant_master.parquet")
+    inv = pd.read_parquet(f"{OUT}/inventory.parquet")
+    cap = pd.read_parquet(f"{OUT}/plant_capability.parquet")
     dos = (inv.groupby("dc_id")
            .apply(lambda x: (x.closing_stock.mean() / (x.shipments.mean() / 7.0))
                   if x.shipments.mean() > 0 else 7.0, include_groups=False))
@@ -3245,7 +3260,7 @@ def generate_scenarios(OUT):
         "scenario_id", "scenario_type", "affected_node_id", "affected_node_type",
         "affected_sku_id", "region", "affected_family", "start_date", "end_date",
         "duration_weeks", "magnitude_value", "magnitude_unit", "ttr_days", "tts_days",
-        "impact_dimension", "probability", "notes"]).to_csv(f"{OUT}/scenarios.csv", index=False)
+        "impact_dimension", "probability", "notes"]).pipe(_write_table, f"{OUT}/scenarios.parquet")
     print(f"  scenarios: {len(rows)} labelled disruptions across "
           f"{len(set(r[1] for r in rows))} classes, all dated in the 2026 forward horizon, "
           f"magnitude numeric")
@@ -3280,7 +3295,7 @@ def _demean(v,keys,passes=6):
     return v
 
 def generate_eda(OUT, as_section=False):
-    R=lambda n: pd.read_csv(f"{OUT}/{n}.csv")
+    R=lambda n: pd.read_parquet(f"{OUT}/{n}.parquet")
     sku=R("sku_master"); orders=R("orders"); fc=R("demand_forecast"); prod=R("production")
     inv=R("inventory"); lanes=R("network_lanes"); ban=R("b2b_customer_master"); serve=R("customer_serving_dc")
     costp=R("cost_parameters"); plants=R("plant_master"); pdc=R("plant_dc_master")
@@ -3583,8 +3598,8 @@ def generate_eda(OUT, as_section=False):
 
     # 2.15 disruption scenario library
     A("## 2.15 Disruption scenario library (digital-twin / bandit input)\n")
-    if os.path.exists(f"{OUT}/scenarios.csv"):
-        scn=pd.read_csv(f"{OUT}/scenarios.csv")
+    if os.path.exists(f"{OUT}/scenarios.parquet"):
+        scn=pd.read_parquet(f"{OUT}/scenarios.parquet")
         A("A labeled library of demand-side and supply-side disruptions with Time-to-Recover (TTR) and "
           "Time-to-Survive (TTS) estimates - the what-if inputs the digital twin, bandit reward, and agentic "
           "layer consume. Each row names the affected node/SKU/region and window.\n")
@@ -3594,7 +3609,7 @@ def generate_eda(OUT, as_section=False):
         A(f"\nTotal scenarios: {len(scn)} across {scn.scenario_type.nunique()} classes (supplier, geographic, "
           "systemic, market-driven).\n")
     else:
-        A("*scenarios.csv not present.*\n")
+        A("*scenarios.parquet not present.*\n")
 
     # 2.16 key findings
     A("## 2.16 Key findings\n")
@@ -3606,7 +3621,7 @@ def generate_eda(OUT, as_section=False):
       f"Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~{(fwdu/histu-1)*100:.0f} pct YoY.",
       f"Network is fully dual-sourced ({int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs with failover) with {n_lat} lateral lanes, but failover and lateral lanes carry no simulated flow; whole-site storage utilization averages {du.util_pct.mean():.0f} pct.",
       f"Customer-facing unit fill rate ~ {_cfill:.1f} pct at ${wk_val.mean():,.0f} avg working capital and {turns:.1f}x annual turns; {100-avail:.0f} pct of DC-SKU-weeks close at zero.",
-      f"No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a {len(pd.read_csv(f'{OUT}/scenarios.csv')) if os.path.exists(f'{OUT}/scenarios.csv') else 0}-scenario disruption library covers demand- and supply-side stresses.",
+      f"No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a {len(pd.read_parquet(f'{OUT}/scenarios.parquet')) if os.path.exists(f'{OUT}/scenarios.parquet') else 0}-scenario disruption library covers demand- and supply-side stresses.",
     ]
     A("\n".join(f"- {x}" for x in findings)+"\n")
     A("\n---\n*End of report.*\n")
@@ -3698,15 +3713,15 @@ def derive_baseline_policy(data_dir: Path,
     own demand.
 
     Demand statistics come from the in-sample window. Lead times come from
-    the lane the SKU actually travels, per sku_sourcing_map.csv — the same
+    the lane the SKU actually travels, per sku_sourcing_map.parquet — the same
     routing the twin will execute, so the policy is sized against the
     network it actually runs on.
     """
-    sku = pd.read_csv(data_dir / "sku_master.csv")
-    lanes = pd.read_csv(data_dir / "network_lanes.csv")
-    dfc = pd.read_csv(data_dir / "demand_forecast.csv")
-    smap = pd.read_csv(data_dir / "sku_sourcing_map.csv")
-    plant_dc = pd.read_csv(data_dir / "plant_dc_master.csv")
+    sku = pd.read_parquet(data_dir / "sku_master.parquet")
+    lanes = pd.read_parquet(data_dir / "network_lanes.parquet")
+    dfc = pd.read_parquet(data_dir / "demand_forecast.parquet")
+    smap = pd.read_parquet(data_dir / "sku_sourcing_map.parquet")
+    plant_dc = pd.read_parquet(data_dir / "plant_dc_master.parquet")
 
     seg = sku.set_index("sku_id").segment.to_dict()
     fam = sku.set_index("sku_id").production_family.to_dict()
@@ -3723,9 +3738,9 @@ def derive_baseline_policy(data_dir: Path,
         # that sold in the early years and went quiet later still has real
         # demand in the record; sizing off the in-sample window alone dropped
         # 136 such pairs from the policy, which made their demand invisible in
-        # the inventory tables and broke reconciliation against orders.csv.
-        oh = pd.read_csv(data_dir / "orders.csv",
-                         usecols=["period", "dc_id", "sku_id", "order_qty"])
+        # the inventory tables and broke reconciliation against orders.parquet.
+        oh = pd.read_parquet(data_dir / "orders.parquet",
+                         columns=["period", "dc_id", "sku_id", "order_qty"])
         wk = (oh.groupby(["period", "dc_id", "sku_id"], as_index=False)
               .order_qty.sum())
         n_weeks = wk.period.nunique()
@@ -3915,12 +3930,12 @@ def acceptance(kpi: dict, rcpt: pd.DataFrame, prod: pd.DataFrame) -> pd.DataFram
 
 # Forward-looking artefacts. These describe the planning horizon, so they
 # belong with the run that produced them, never in input datasets/.
-FORWARD_ARTEFACTS = ["forward_policy.csv", "opening_position.csv"]
+FORWARD_ARTEFACTS = ["forward_policy.parquet", "opening_position.parquet"]
 
 # The historical record. The twin produces these, but they are the past, so
 # they are part of the brief and live in input datasets/.
-HISTORY_TABLES = ["inventory.csv", "replenishment_receipts.csv",
-                  "production.csv", "write_offs.csv"]
+HISTORY_TABLES = ["inventory.parquet", "replenishment_receipts.parquet",
+                  "production.parquet", "write_offs.parquet"]
 
 
 def ramp_capability(data_dir: Path, uplift: float) -> int:
@@ -3943,14 +3958,14 @@ def ramp_capability(data_dir: Path, uplift: float) -> int:
     Applied while the world is built, so the ramped number is the only capacity
     the project ever sees and there is no pre-ramp copy to drift from.
     """
-    pm = pd.read_csv(data_dir / "plant_master.csv")
-    pc = pd.read_csv(data_dir / "plant_capability.csv")
+    pm = pd.read_parquet(data_dir / "plant_master.parquet")
+    pc = pd.read_parquet(data_dir / "plant_capability.parquet")
     pm["production_capacity_units_per_week"] = np.ceil(
         pm.production_capacity_units_per_week * uplift).astype(int)
     pc["family_capacity_units_per_week"] = np.ceil(
         pc.family_capacity_units_per_week * uplift).astype(int)
-    pm.to_csv(data_dir / "plant_master.csv", index=False)
-    pc.to_csv(data_dir / "plant_capability.csv", index=False)
+    pm.pipe(_write_table, data_dir / "plant_master.parquet")
+    pc.pipe(_write_table, data_dir / "plant_capability.parquet")
     return int(pm.production_capacity_units_per_week.sum())
 
 
@@ -4003,7 +4018,7 @@ def main():
             f = DATA / name
             if f.exists():
                 f.unlink()
-        print(f"  {len(list(DATA.glob('*.csv')))} world tables")
+        print(f"  {len(list(DATA.glob('*.parquet')))} world tables")
         if args.stage == "world":
             print(f"\nTotal runtime: {time.time() - t0:.0f}s")
             return
@@ -4014,12 +4029,12 @@ def main():
     # ---- policy ------------------------------------------------------------
     print("\n=== STAGE 2: derive policy ===")
     pol = derive_baseline_policy(DATA, basis="history")
-    pol.to_csv(DATA / "baseline_policy.csv", index=False)
-    print(f"  baseline_policy.csv -> input   {len(pol):>7,} rows  "
+    pol.pipe(_write_table, DATA / "baseline_policy.parquet")
+    print(f"  baseline_policy.parquet -> input   {len(pol):>7,} rows  "
           f"(ran the past, so it is part of the record)")
     fwd_pol = derive_baseline_policy(DATA, basis="forward")
-    fwd_pol.to_csv(out / "forward_policy.csv", index=False)
-    print(f"  forward_policy.csv  -> output  {len(fwd_pol):>7,} rows  "
+    fwd_pol.pipe(_write_table, out / "forward_policy.parquet")
+    print(f"  forward_policy.parquet  -> output  {len(fwd_pol):>7,} rows  "
           f"safety stock {fwd_pol.safety_stock.sum():,.0f} u "
           f"(history basis {pol.safety_stock.sum():,.0f} u)")
 
@@ -4028,7 +4043,7 @@ def main():
           f"{period_label(ACTUAL_WEEKS)} ===")
     inp, notes, twin, inv, rcpt, prod = tw.run_twin(
         DATA, mode="history", seed=args.seed,
-        policy_csv=DATA / "baseline_policy.csv")
+        policy_csv=DATA / "baseline_policy.parquet")
 
     # shelf life exceeds the simulated span by design, so nothing can expire
     wo = pd.DataFrame(columns=["period", "week_start_date", "sku_id", "dc_id",
@@ -4038,24 +4053,24 @@ def main():
 
     # ---- emit: the past to input, the forward view to output ---------------
     print("\n=== STAGE 4: emit ===")
-    for name, df in {"inventory.csv": inv,
-                     "replenishment_receipts.csv": rcpt,
-                     "production.csv": prod,
-                     "write_offs.csv": wo}.items():
-        df.to_csv(DATA / name, index=False)
+    for name, df in {"inventory.parquet": inv,
+                     "replenishment_receipts.parquet": rcpt,
+                     "production.parquet": prod,
+                     "write_offs.parquet": wo}.items():
+        df.pipe(_write_table, DATA / name)
         print(f"  {name:<30} -> input   {len(df):>9,} rows")
-    opening.to_csv(out / "opening_position.csv", index=False)
-    print(f"  {'opening_position.csv':<30} -> output  {len(opening):>9,} rows"
+    opening.pipe(_write_table, out / "opening_position.parquet")
+    print(f"  {'opening_position.parquet':<30} -> output  {len(opening):>9,} rows"
           f"  ({opening.opening_stock.sum():,} u on hand, "
           f"{opening.in_transit_qty.sum():,} u in transit)")
 
     args.mode, args.policy, args.label = (
-        "history", str(DATA / "baseline_policy.csv"),
+        "history", str(DATA / "baseline_policy.parquet"),
         f"{period_label(1)}..{period_label(ACTUAL_WEEKS)} history")
     kpi, svc_node, costs = tw.write_run(out, inv, rcpt, prod, twin, inp,
                                         notes, args, t0)
-    for n in ("inventory.csv", "replenishment_receipts.csv",
-              "production.csv", "policy.csv"):
+    for n in ("inventory.parquet", "replenishment_receipts.parquet",
+              "production.parquet", "policy.parquet"):
         f = out / n
         if f.exists():
             f.unlink()          # the record lives in input; do not duplicate
@@ -4077,7 +4092,7 @@ def main():
     # ---- validate + document ----------------------------------------------
     if not args.skip_docs:
         print("\n=== STAGE 7: validate + document the complete dataset ===")
-        ok = validate(opening_path=out / "opening_position.csv")
+        ok = validate(opening_path=out / "opening_position.parquet")
         write_documentation()
         write_schema_doc()
         # the twin documents the other half: its own mechanics and the
@@ -4088,7 +4103,7 @@ def main():
 
     # ---- guard: no forward artefact may sit in the input folder ------------
     leaked = [n for n in FORWARD_ARTEFACTS if (DATA / n).exists()]
-    print(f"\n  input datasets/: {len(list(DATA.glob('*.csv')))} tables"
+    print(f"\n  input datasets/: {len(list(DATA.glob('*.parquet')))} tables"
           + (f"  WARNING forward artefacts present: {leaked}" if leaked
              else "  (no forward artefacts)"))
 
@@ -4096,11 +4111,10 @@ def main():
     print("\nScore a forward scenario from here:")
     print(f'  python models/twin/digital_twin.py --mode forward '
           f'--run-name baseline \\\n'
-          f'      --policy "{out / "forward_policy.csv"}" \\\n'
-          f'      --state  "{out / "opening_position.csv"}"')
+          f'      --policy "{out / "forward_policy.parquet"}" \\\n'
+          f'      --state  "{out / "opening_position.parquet"}"')
     print(f"\nTotal runtime: {time.time() - t0:.0f}s")
 
 
 if __name__ == "__main__":
     main()
-

@@ -1,6 +1,6 @@
 # Supply Brain — output datasets
 
-*Auto-generated 2026-10-08 18:19 by
+*Auto-generated 2026-10-11 20:15 by
 `models/twin/digital_twin.py`. Do not edit by hand.*
 
 ## Scope
@@ -71,7 +71,7 @@ internal shortfall; the child re-orders at the next review. That is what makes
 
 | Mode | Horizon | Demand | Opening state |
 |---|---|---|---|
-| `history` | the span the order history covers | replayed from `orders.csv` | cold start, zero stock |
+| `history` | the span the order history covers | replayed from `orders.parquet` | cold start, zero stock |
 | `forward` | the planning horizon | forecast x a forecast-error ratio resampled from in-sample history | from `--state` |
 
 ### Assumptions
@@ -80,11 +80,11 @@ Every run records these in its own `run_manifest.json`.
 
 1. Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].
 2. Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.
-3. Lead times are drawn per order line from each lane's own mean and std in network_lanes.csv, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.
+3. Lead times are drawn per order line from each lane's own mean and std in network_lanes.parquet, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.
 4. CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following the fulfilment_type split in the dataset, which is clean by node type.
 5. An internal replenishment order the parent cannot cover is cancelled, not backlogged; the child re-orders at the next weekly review.
 6. A parent holds back its own expected demand for the remainder of the review period before releasing stock downstream, implementing 'customer orders served first'.
-7. Routing comes from sku_sourcing_map.csv, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.
+7. Routing comes from sku_sourcing_map.parquet, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.
 8. Holding cost = (storage_cost_per_unit_year + carrying_pct x unit_cost) / 52, keyed on (dc_id, subcategory).
 9. No shelf life, obsolescence or write-offs; no warehouse or lane capacity limits. Production capacity DOES bind.
 10. Demand, lead-time and production RNG streams are independent, so two runs at the same seed differ only by the policy under test.
@@ -93,7 +93,7 @@ Every run records these in its own `run_manifest.json`.
 
 ## Part 2 — The optimization seam
 
-One standalone CSV, five required columns:
+One standalone table (Parquet, or CSV), five required columns:
 
 ```
 dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
@@ -105,7 +105,7 @@ anything — can be handed over verbatim. A missing required column raises an
 error rather than quietly defaulting to zero.
 
 ```bash
-python models/twin/digital_twin.py --mode forward --run-name meio_v2     --policy "output datasets/meio_v2/policy.csv"     --state  "output datasets/history/opening_position.csv"
+python models/twin/digital_twin.py --mode forward --run-name meio_v2     --policy "output datasets/meio_v2/policy.parquet"     --state  "output datasets/history/opening_position.parquet"
 ```
 
 **Comparison contract.** Two runs are comparable only when they share a seed
@@ -131,18 +131,24 @@ machine-readable `changes` object. It may also contain `scenario_number`,
 or other relevant context. If `scenario_number` is omitted, the next available
 number is assigned automatically.
 
-If `changes` contains `demand_surge_pct`, it is actually APPLIED to the
-simulated demand (see `scenario_engine.py` and Part 5's known limitations) --
-scaled for `affected_region` (or an explicit `affected_nodes` list) over
-`duration_weeks` weeks starting `start_week_offset` weeks into the horizon
-(both optional; default to the whole horizon starting immediately). Any
-other `changes` key is saved for context but has no simulation effect yet.
+Scenario changes live in `changes.overrides` and are applied by the override
+engine (`models/overrides/`; contract `override.schema.json`, meaning
+`catalog.py`). The Twin applies each override's ACTUAL side: demand on the
+forward forecast lines before the error draw, forecast-error spread, the
+opening position, unit economics, lane lead times and outages by dispatch week,
+and plant capacity and attainment by production week. MEIO applies the PLAN
+side to the policy this run executes. An override the engine cannot apply
+exactly stops the run instead of being skipped, and every application is
+recorded in `output datasets/overrides/SCENARIO_####_Name/receipts/` and in
+`run_manifest.json`. A legacy `changes` object (`demand_surge_pct` with
+`affected_region` / `affected_nodes`, `duration_weeks`, `start_week_offset`)
+still takes the `scenario_engine.py` path; any other key is refused.
 
 ```bash
 python models/twin/digital_twin.py --mode forward \
     --scenario-config models/twin/scenario_config.example.json \
-    --policy "output datasets/history/forward_policy.csv" \
-    --state "output datasets/history/opening_position.csv"
+    --policy "output datasets/history/forward_policy.parquet" \
+    --state "output datasets/history/opening_position.parquet"
 ```
 
 The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
@@ -160,10 +166,10 @@ The policy table's full column-by-column dictionary is Part 5 of
 
 | Folder | Mode | Seed | Label | Size |
 |---|---|---|---|---|
-| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.19 MB |
-| `MEIO/` | ? | ? | ? | 15.63 MB |
-| `MEIO artifacts/` | ? | ? | ? | 0.00 MB |
-| `projections/` | ? | ? | ? | 174.89 MB |
+| `history/` | history | 2026 | 2023-W01..2025-W52 history | 0.24 MB |
+| `MEIO/` | ? | ? | ? | 3.08 MB |
+| `MEIO artifacts/` | ? | ? | ? | 8498.18 MB |
+| `projections/` | ? | ? | ? | 27.27 MB |
 | `segmentation/` | ? | ? | ? | 0.69 MB |
 
 A run folder is self-describing: `run_manifest.json` records the exact knobs,
@@ -174,7 +180,7 @@ reference to the code that produced them.
 
 ## Part 4 — Artefact reference
 
-### `opening_position.csv` — history runs only
+### `opening_position.parquet` — history runs only
 
 The position the forward horizon opens on, which is the terminal state of
 history. This is what a forward run consumes via `--state`.
@@ -194,20 +200,20 @@ Built off the terminal inventory rather than the forward policy, so a
 (location, SKU) pair the forward policy does not cover still carries its real
 stock across the cut-over instead of having it silently destroyed.
 
-### `forward_policy.csv` — history runs only
+### `forward_policy.parquet` — history runs only
 
 The operating policy for the planning horizon, sized on the **forecast**. Same
 five-column contract as above, plus `production_family`, `segment` and `z` for
-reference. Its sibling `baseline_policy.csv` — sized on the order history and
+reference. Its sibling `baseline_policy.parquet` — sized on the order history and
 used to simulate the past — lives in `input datasets/` because it ran the past.
 
-### `policy.csv` — every run
+### `policy.parquet` — every run
 
 Exactly the `(safety_stock, reorder_point, order_up_to_level)` that run
 executed, normalised to the five-column contract. The audit trail: whatever was
 fed in via `--policy`, this is what the engine actually used.
 
-### `inventory.csv` — forward runs
+### `inventory.parquet` — forward runs
 
 Grain: **period x dc x sku**. The primary physics output.
 
@@ -232,7 +238,7 @@ Grain: **period x dc x sku**. The primary physics output.
 is an echelon total and counts a unit once per tier it passes through;
 `demand_customer_qty` is the external figure that reconciles to real orders.
 
-### `replenishment_receipts.csv` — forward runs
+### `replenishment_receipts.parquet` — forward runs
 
 Grain: **one row per (ship day, lane, sku)**.
 
@@ -247,7 +253,7 @@ quoted to the child, which is what puts on-time delivery near 90% with a
 genuine late tail rather than a coin flip. `short_qty` is the balance the parent
 could not cover.
 
-### `production.csv` — forward runs
+### `production.parquet` — forward runs
 
 Grain: **period x plant x sku**.
 
@@ -314,14 +320,12 @@ what move.
   regional-DC-to-regional-DC lanes and second inbound lanes, but no flow is
   routed across them.
 - **Single-sourcing per (node, SKU).** Routing is one parent per pair, taken
-  from `sku_sourcing_map.csv`.
-- **Only a demand-surge scenario type is applied.** `--scenario-config`'s
-  `changes` object is read and actually affects the simulation when it
-  contains `demand_surge_pct` (optionally `affected_region`/`affected_nodes`,
-  `duration_weeks`, `start_week_offset` -- see `scenario_engine.py`). Any
-  other key in `changes` is still saved to the self-describing scenario
-  folder for context but has no simulation effect -- lead-time and capacity
-  disruption types are not implemented yet.
+  from `sku_sourcing_map.parquet`.
+- **Scenario overrides have stated limits.** A lane outage holds dispatches
+  until the lane reopens (no failover routing); inventory overrides change the
+  opening position only (no mid-horizon shocks); economics overrides are static
+  for the run; demand can only be scaled where a SKU is already carried. See
+  `models/overrides/catalog.py` for every measure's exact semantics.
 - **Demand is aggregated to (node, SKU, day).** Forward mode synthesises demand
   from the forecast, so there are no discrete order lines and no true
   order-level on-time-in-full; `pct_demand_weeks_in_full` is measured at

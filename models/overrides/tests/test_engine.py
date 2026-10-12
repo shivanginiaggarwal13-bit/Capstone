@@ -22,14 +22,14 @@ import meio_weekly_lib as lib                            # noqa: E402
 from models import overrides                             # noqa: E402
 
 DATA = REPO / "input datasets"
-STATE = REPO / "output datasets" / "history" / "opening_position.csv"
-POLICY = REPO / "output datasets" / "history" / "forward_policy.csv"
+STATE = REPO / "output datasets" / "history" / "opening_position.parquet"
+POLICY = REPO / "output datasets" / "history" / "forward_policy.parquet"
 SEED, WEEKS = 2026, 8
 
 
 def config(*ovs):
     return {"changes": {"override_schema_version": "1.0", "overrides": list(ovs)},
-            "digital_twin": {"data_dir": "input datasets", "state": "output datasets/history/opening_position.csv"}}
+            "digital_twin": {"data_dir": "input datasets", "state": "output datasets/history/opening_position.parquet"}}
 
 
 def ovr(oid, measure, scope, operation, value=None, window=None, sides=None, unit=None):
@@ -139,7 +139,7 @@ class TwinTests(unittest.TestCase):
 
 
 def digital_twin_lane(lane_id):
-    ln = pd.read_csv(DATA / "network_lanes.csv").set_index("lane_id")
+    ln = pd.read_parquet(DATA / "network_lanes.parquet").set_index("lane_id")
     return ln.origin_node_id[lane_id], ln.destination_node_id[lane_id]
 
 
@@ -176,7 +176,7 @@ class MeioTests(unittest.TestCase):
 
     def test_service_level_sets_z(self):
         d = self.demand(self.plan)
-        d["segment"] = d.sku_id.map(pd.read_csv(DATA / "sku_master.csv").set_index("sku_id").segment)
+        d["segment"] = d.sku_id.map(pd.read_parquet(DATA / "sku_master.parquet").set_index("sku_id").segment)
         z = lib.assign_z(d, self.plan, "2026-W28").to_numpy()
         fast = (d.segment == "Fast-Moving").to_numpy()
         np.testing.assert_allclose(z[fast], norm.ppf(0.985))             # 2.17 instead of the segment's 2.05

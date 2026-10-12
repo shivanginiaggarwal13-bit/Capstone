@@ -17,7 +17,9 @@ original. What changed is everything around the physics:
   `_ship` updates the pipeline with one fancy-indexed add and records receipts as
   arrays, the weekly close gathers all active pairs at once, and the output frames are
   assembled from those arrays at the end instead of from 1.2M Python tuples.
-* **Outputs with polars.** inventory.csv alone is ~200 MB for a 156-week history run.
+* **Outputs with polars, as Parquet.** Detail tables (inventory, receipts, production,
+  policy) are Parquet -- a 156-week history inventory is ~20 MB instead of ~200 MB of
+  CSV; the summaries (cost_summary, service_summary, service_by_node) stay CSV.
 * **In-process.** `simulate()` resolves arguments exactly as `main()` does and returns
   the KPIs plus requested window/SKU-group summaries, so the research scripts run the
   twin inside a worker instead of a fresh interpreter that re-reads every input.
@@ -30,8 +32,8 @@ Documentation, assumptions and scenario-folder conventions are imported from the
 original module, so they cannot drift apart.
 
     python digital_twin_fast.py --mode forward --run-name baseline_2026 \\
-        --policy "output datasets/history/forward_policy.csv" \\
-        --state  "output datasets/history/opening_position.csv"
+        --policy "output datasets/history/forward_policy.parquet" \\
+        --state  "output datasets/history/opening_position.parquet"
 """
 from __future__ import annotations
 
@@ -160,7 +162,7 @@ _DEMAND_CACHE: dict = {}
 
 
 def _read(data_dir: Path, name: str) -> pl.DataFrame:
-    return rt.read_csv(data_dir / name)
+    return rt.read_table(data_dir / name)
 
 
 def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026, horizon_weeks: Optional[int] = None,
@@ -173,14 +175,14 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026, horizo
     rng_demand, rng_lt, rng_prod = [np.random.default_rng(s) for s in ss.spawn(3)]
     notes: Dict[str, object] = {"mode": mode, "seed": seed}
 
-    sku_master = _read(data_dir, "sku_master.csv")
-    cost_p = _read(data_dir, "cost_parameters.csv")
-    lanes = _read(data_dir, "network_lanes.csv")
-    sourcing_map = _read(data_dir, "sku_sourcing_map.csv")
-    sourcing = _read(data_dir, "sku_plant_sourcing.csv")
-    plant_dc = _read(data_dir, "plant_dc_master.csv")
-    plant_master = _read(data_dir, "plant_master.csv")
-    plant_cap = _read(data_dir, "plant_capability.csv")
+    sku_master = _read(data_dir, "sku_master.parquet")
+    cost_p = _read(data_dir, "cost_parameters.parquet")
+    lanes = _read(data_dir, "network_lanes.parquet")
+    sourcing_map = _read(data_dir, "sku_sourcing_map.parquet")
+    sourcing = _read(data_dir, "sku_plant_sourcing.parquet")
+    plant_dc = _read(data_dir, "plant_dc_master.parquet")
+    plant_master = _read(data_dir, "plant_master.parquet")
+    plant_cap = _read(data_dir, "plant_capability.parquet")
     if overrides:
         sm_pd, cp_pd, ln_pd = override_engine.twin.economics(overrides, _pd(sku_master), _pd(cost_p), _pd(lanes))
         sku_master, cost_p, lanes = _pl(sm_pd), _pl(cp_pd), _pl(ln_pd)
@@ -251,7 +253,7 @@ def build_inputs(data_dir: Path, mode: str = "forward", seed: int = 2026, horizo
     cap_plant = np.array([cap_of.get(p, np.nan) for p in plants], dtype=float)
     cap_family = {(plant_i[p], f): float(c) for p, f, c in plant_cap.select(
         ["plant_id", "production_family", "family_capacity_units_per_week"]).iter_rows() if p in plant_i}
-    notes["sourcing"] = {"rule": "sku_sourcing_map.csv (input table)", "pairs_resolved": resolved,
+    notes["sourcing"] = {"rule": "sku_sourcing_map.parquet (input table)", "pairs_resolved": resolved,
                          "pairs_on_fallback": n_fallback}
 
     # ---------------------------------------------------------- lead times --
@@ -399,7 +401,7 @@ def _load_policy(nodes, skus, node_idx, sku_idx, w0_date, policy_csv, state_csv,
     opening_stock, op_it = (np.zeros((n_nodes, n_skus)) for _ in range(2))
     op_eta = np.zeros((n_nodes, n_skus), dtype=int)
     if state_csv is not None:
-        state = rt.read_csv(state_csv)
+        state = rt.read_table(state_csv)
         if overrides:
             state = _pl(override_engine.twin.opening_state(overrides, _pd(state)))
         ni = _index(state["dc_id"], node_idx)
@@ -442,7 +444,7 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx, n_node
     if mode == "history":
         key = ("history", str(Path(data_dir).resolve()), tuple(periods), T)
         if key not in _DEMAND_CACHE:
-            o = rt.read_csv(Path(data_dir) / "orders.csv",
+            o = rt.read_table(Path(data_dir) / "orders.parquet",
                             columns=["delivery_date", "period", "sku_id", "dc_id", "order_qty"])
             o = o.filter(pl.col("period").is_in(list(set(periods))))
             day0 = np.datetime64(week_monday(week_index[0]), "D")
@@ -458,7 +460,7 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx, n_node
             daily.setflags(write=False)
             _DEMAND_CACHE[key] = (daily, float(daily.sum()))
         daily, units = _DEMAND_CACHE[key]
-        notes["demand_basis"] = "orders.csv replay at delivery_date"
+        notes["demand_basis"] = "orders.parquet replay at delivery_date"
         notes["realised_demand_units"] = units
         return daily, notes
 
@@ -496,7 +498,7 @@ def _build_demand(data_dir, mode, periods, week_index, node_idx, sku_idx, n_node
 def _forward_base(data_dir, periods, node_idx, sku_idx, n_nodes, n_skus, overrides):
     """The deterministic half of forward demand: forecast tensor, error-ratio pools and
     their volume-weighted CDFs."""
-    dfc = rt.read_csv(Path(data_dir) / "demand_forecast.csv")
+    dfc = rt.read_table(Path(data_dir) / "demand_forecast.parquet")
     n_weeks = len(periods)
     pidx = {p: k for k, p in enumerate(periods)}
     fwd_rows = dfc.filter(pl.col("period").is_in(list(set(periods))))
@@ -985,7 +987,7 @@ def kpis(inv: pl.DataFrame, twin: SupplyBrainTwin, inp: TwinInputs, costs: pl.Da
     }
 
 
-LEAN_SKIPPED = ("inventory.csv", "replenishment_receipts.csv", "production.csv")
+LEAN_SKIPPED = ("inventory.parquet", "replenishment_receipts.parquet", "production.parquet")
 
 
 def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0, scenario_config=None, arrays=None,
@@ -999,18 +1001,18 @@ def write_run(out: Path, inv, rcpt, prod, twin, inp, notes, args, t0, scenario_c
         for name in LEAN_SKIPPED:              # a stale copy from an earlier full run must not pass for this one
             (out / name).unlink(missing_ok=True)
     else:
-        rt.write_csv(inv, out / "inventory.csv")
-        rt.write_csv(rcpt, out / "replenishment_receipts.csv")
-        rt.write_csv(prod, out / "production.csv")
-    rt.write_csv(svc_sku, out / "service_summary.csv")
-    rt.write_csv(svc_node, out / "service_by_node.csv")
-    rt.write_csv(costs, out / "cost_summary.csv")
+        rt.write_table(inv, out / "inventory.parquet")
+        rt.write_table(rcpt, out / "replenishment_receipts.parquet")
+        rt.write_table(prod, out / "production.parquet")
+    rt.write_table(svc_sku, out / "service_summary.csv")
+    rt.write_table(svc_node, out / "service_by_node.csv")
+    rt.write_table(costs, out / "cost_summary.csv")
     (out / "run_kpis.json").write_text(json.dumps(k, indent=2))
     ssk0, rop0, oul0 = _policy_at(inp, 0)
     a, b = twin._ai, twin._aj
-    rt.write_csv(pl.DataFrame({"dc_id": _gather(inp.nodes, a), "sku_id": _gather(inp.skus, b),
+    rt.write_table(pl.DataFrame({"dc_id": _gather(inp.nodes, a), "sku_id": _gather(inp.skus, b),
                                "safety_stock": ssk0[a, b], "reorder_point": rop0[a, b],
-                               "order_up_to_level": oul0[a, b]}), out / "policy.csv")
+                               "order_up_to_level": oul0[a, b]}), out / "policy.parquet")
     manifest = {
         "schema_version": SCHEMA_VERSION, "run_name": args.run_name, "label": args.label, "mode": args.mode,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "seed": args.seed, "policy_override": args.policy,
@@ -1099,9 +1101,9 @@ def summarize(period: np.ndarray, sku: np.ndarray, dc: np.ndarray, cols: dict, r
     return out
 
 
-def summarize_inventory_csv(path, request) -> dict:
+def summarize_inventory_file(path, request) -> dict:
     """summarize() for a run already on disk (a cached baseline)."""
-    inv = pl.read_csv(path, columns=["period", "sku_id", "dc_id"] + SUMMARY_COLS)
+    inv = rt.read_table(path, columns=["period", "sku_id", "dc_id"] + SUMMARY_COLS, cache=False)
     cols = {c: inv[c].cast(pl.Float64).to_numpy() for c in SUMMARY_COLS}
     return summarize(np.array(inv["period"].to_list(), dtype=object), np.array(inv["sku_id"].to_list(), dtype=object),
                      np.array(inv["dc_id"].to_list(), dtype=object), cols, request)
@@ -1191,7 +1193,7 @@ def simulate(*, run_name=None, mode=None, seed=None, horizon_weeks=None, policy=
 
 def simulate_task(job: dict) -> dict:
     """Process-pool entry: job = simulate() keyword arguments, plus "use_cache": reuse a
-    run already on disk (run_kpis.json + inventory.csv), as the originals' baselines did."""
+    run already on disk (run_kpis.json + inventory.parquet), as the originals' baselines did."""
     job = dict(job)
     use_cache = job.pop("use_cache", False)
     if use_cache:
@@ -1199,11 +1201,11 @@ def simulate_task(job: dict) -> dict:
                                   job.get("policy"), job.get("state"), job.get("label", ""),
                                   job.get("scenario_config"), job.get("data_dir"), job.get("out_root"))
         run_dir = run_dir_for(args, Path(args.out_root))
-        if (run_dir / "run_kpis.json").exists() and (run_dir / "inventory.csv").exists():
+        if (run_dir / "run_kpis.json").exists() and (run_dir / "inventory.parquet").exists():
             out = {"kpis": json.loads((run_dir / "run_kpis.json").read_text()), "run_dir": str(run_dir),
                    "cached": True, "seconds": 0.0}
             if job.get("summary"):
-                out["summary"] = summarize_inventory_csv(run_dir / "inventory.csv", job["summary"])
+                out["summary"] = summarize_inventory_file(run_dir / "inventory.parquet", job["summary"])
             return out
     return simulate(**job)
 
@@ -1241,7 +1243,7 @@ def main():
     ap.add_argument("--skip-output-documentation", action="store_true",
                     help="Do not rewrite the shared OUTPUT_DOCUMENTATION.md (for parallel runs).")
     ap.add_argument("--lean-outputs", action="store_true",
-                    help="Skip inventory.csv, replenishment_receipts.csv and production.csv (~250 MB per "
+                    help="Skip inventory.parquet, replenishment_receipts.parquet and production.parquet (~30 MB per "
                          "156-week run); KPIs, summaries, policy and manifest are still written.")
     a = ap.parse_args()
     res = simulate(run_name=a.run_name, mode=a.mode, seed=a.seed, horizon_weeks=a.horizon_weeks, policy=a.policy,

@@ -66,7 +66,7 @@ def forward_job(run_name, policy_csv, scenario_config_path=None, seed=SEED) -> d
 
 def build_job(out_path, scenario_changes=None, seed=SEED) -> dict:
     return {"data_dir": DEFAULT_DATA, "as_of_week": AS_OF_WEEK, "rng": seed, "n_sims": N_SIMS,
-            "scenario_changes": scenario_changes, "max_weeks": sae.ROLLING_WEEKS, "lean": rt.LEAN_TWIN_OUTPUTS,
+            "scenario_changes": scenario_changes, "max_weeks": sae.ROLLING_WEEKS,
             "variants": {"policy": pb.variant_spec(out_path, ALPHA, NETTING_DISCOUNT)}}
 
 
@@ -79,8 +79,8 @@ def run_scenario(ctx, log, scenario_path):
     tag = name.replace(" ", "")
     log(f"=== Scenario: {name} ===\n  changes: {changes}")
 
-    baseline_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_baseline.csv")
-    scenario_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_scenario.csv")
+    baseline_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_baseline.parquet")
+    scenario_policy_csv = os.path.join(RUN_OUT_DIR, f"policy_{tag}_scenario.parquet")
     b_base = ctx.submit(pb.rolling_task, build_job(baseline_policy_csv), priority=2)
     b_scen = ctx.submit(pb.rolling_task, build_job(scenario_policy_csv, scenario_changes=changes), priority=2)
 
@@ -116,7 +116,7 @@ def run_scenario(ctx, log, scenario_path):
         {"arm": "C: prepared (scenario demand, scenario-aware policy)", **{k: kpi_c[k] for k in KPI_KEYS}},
     ])
     out_csv = os.path.join(RESULTS_DIR, f"scenario_{tag}_comparison.csv")
-    rt.write_csv(summary, out_csv)
+    rt.write_table(summary, out_csv)
     log("\n" + rt.show(summary))
 
     # DC-level stocking recommendation diff (inner merge, left order; groupby dc sums)
@@ -134,7 +134,7 @@ def run_scenario(ctx, log, scenario_path):
     by_dc = pl.DataFrame({"dc_id": dcs, "baseline_safety_stock": base_ss, "scenario_safety_stock": scen_ss,
                           "safety_stock_delta": delta, "safety_stock_delta_pct": pct})
     by_dc_csv = os.path.join(RESULTS_DIR, f"scenario_{tag}_stocking_by_dc.csv")
-    rt.write_csv(by_dc, by_dc_csv)
+    rt.write_table(by_dc, by_dc_csv)
     log(f"\nRecommended stocking change by DC (scenario-aware vs baseline):\n{rt.show(by_dc)}")
 
     a_vs_b_fill = (kpi_b["customer_fill_rate"] - kpi_a["customer_fill_rate"]) * 100
@@ -146,7 +146,10 @@ def run_scenario(ctx, log, scenario_path):
 
 
 def run(ctx, log, scenario_path):
-    return run_scenario(ctx, log, scenario_path)
+    out = run_scenario(ctx, log, scenario_path)
+    # as the original's twin runs (no --skip-output-documentation, --out-root RUN_OUT_DIR)
+    twin.write_output_documentation(Path(RUN_OUT_DIR))
+    return out
 
 
 def main(argv=None):
@@ -158,7 +161,6 @@ def main(argv=None):
     ctx = rt.Context(args.workers)
     try:
         run(ctx, rt.StepLog(), args.scenario)
-        twin.write_output_documentation(Path(RUN_OUT_DIR))
     finally:
         ctx.close()
 

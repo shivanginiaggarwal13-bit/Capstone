@@ -58,7 +58,7 @@ def sweep_one_alpha(alpha):
         # position than customer_fill_rate -- a 4pp swing was observed from that alone).
         rng = np.random.default_rng(vrd.SEED)
         policy_csv = vrd.build_walkforward_policy_csv2(
-            vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_netting_{tag}.csv"),
+            vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_netting_{tag}.parquet"),
             alpha=alpha, rng=rng, netting_discount=nd)
         kpi, inv = vrd.run_twin_history(f"netting_{tag}", policy_csv)
         test_inv = inv[(inv.period >= TEST_START) & (inv.period <= TEST_END)]
@@ -89,13 +89,13 @@ def multiseed_check(alpha=vrd.HEADLINE_ALPHA, discounts=(0.0, 1.0), seeds=vrd.MU
                 import json
                 with open(os.path.join(actual_out, "run_kpis.json")) as f:
                     actual_kpi = json.load(f)
-                inv_actual = pd.read_csv(os.path.join(actual_out, "inventory.csv"))
+                inv_actual = pd.read_parquet(os.path.join(actual_out, "inventory.parquet"))
             else:
                 actual_kpi, inv_actual = vrd.run_twin_history(actual_run, vrd.BASELINE_POLICY_CSV, seed=seed)
 
             rng = np.random.default_rng(seed)
             policy_csv = vrd.build_walkforward_policy_csv2(
-                vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_netting_ms_{tag}.csv"),
+                vrd.DEFAULT_DATA, os.path.join(RUN_OUT_DIR, f"policy_netting_ms_{tag}.parquet"),
                 alpha=alpha, rng=rng, netting_discount=nd)
             kpi, inv = vrd.run_twin_history(f"netting_ms_{tag}", policy_csv, seed=seed)
 

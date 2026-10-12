@@ -128,9 +128,9 @@ class _Rows:
 def _warmup_frame(data_dir: str, baseline_policy_csv: str, warmup_start: str, warmup_end: str) -> pl.DataFrame:
     """validate_real_data's warm-up: the baseline policy repeated for every order-history
     week in [warmup_start, warmup_end]."""
-    base = rt.read_csv(baseline_policy_csv).select(POLICY_COLS).with_columns(
+    base = rt.read_table(baseline_policy_csv).select(POLICY_COLS).with_columns(
         [pl.col(c).cast(pl.Float64) for c in POLICY_COLS[2:]])
-    periods = sorted(rt.read_csv(f"{data_dir}/orders.csv", columns=["period"])["period"].unique().to_list())
+    periods = sorted(rt.read_table(f"{data_dir}/orders.parquet", columns=["period"])["period"].unique().to_list())
     weeks = [p for p in periods if warmup_start <= p <= warmup_end]
     if not weeks:
         return pl.DataFrame(schema={"period": pl.String, **{c: base.schema[c] for c in POLICY_COLS}})
@@ -141,7 +141,7 @@ def _warmup_frame(data_dir: str, baseline_policy_csv: str, warmup_start: str, wa
 
 def walkforward_policies(data_dir: str, variants: dict, rng, n_sims: int = 1200, *, model: str = "clark_scarf_v2",
                          baseline_policy_csv: str, warmup: tuple, test: tuple, log=None,
-                         threads: int = 1, lean: bool = False) -> dict:
+                         threads: int = 1) -> dict:
     """validate_real_data's walk-forward policy for every variant in `variants`
     ({key: (Variant, out_path)}), all on one generator. Week wn is sized as of wn - 1.
     model 'meio_weekly' is the closed-form MEIO Weekly tool (no draws, variants ignored
@@ -157,7 +157,7 @@ def walkforward_policies(data_dir: str, variants: dict, rng, n_sims: int = 1200,
     warm = _warmup_frame(data_dir, baseline_policy_csv, *warmup)
     paths = {}
     for key, (_, out_path) in variants.items():
-        paths[key] = rt.write_policy(pl.concat([warm, rows[key].frame()]), out_path, lean)
+        paths[key] = rt.write_policy(pl.concat([warm, rows[key].frame()]), out_path)
     msg = (f"[walk-forward {model}] {len(variants)} variant(s) on one stream: built in {t_build:.0f}s, "
            f"wrote {len(paths)} file(s) in {time.time() - t0 - t_build:.0f}s")
     if log:
@@ -236,7 +236,7 @@ def _append(rows: _Rows, period, arrays, pdc, pss, prop, poul):
 
 def rolling_policies(data_dir: str, as_of_week: str, variants: dict, rng, n_sims: int, *,
                      scenario_changes: dict | None = None, log=None, threads: int = 1,
-                     max_weeks: int | None = None, lean: bool = False) -> dict:
+                     max_weeks: int | None = None) -> dict:
     """clark_scarf_v2.build_rolling_policy for every variant in `variants`
     ({key: (Variant, out_path)}) on one generator: all weeks after `as_of_week`, sized as
     of it. A scenario's demand surge (legacy `changes`) bumps what each week is sized
@@ -267,7 +267,7 @@ def rolling_policies(data_dir: str, as_of_week: str, variants: dict, rng, n_sims
     paths = {}
     for key, (_, out_path) in variants.items():
         frame = rows[key].frame()
-        paths[key] = rt.write_policy(frame, out_path, lean)
+        paths[key] = rt.write_policy(frame, out_path)
         lines.append(f"Wrote {frame.height:,} rows -> {paths[key]}")
     lines.append(f"[rolling] {len(variants)} variant(s) on one stream in {time.time() - t0:.0f}s")
     if log:
@@ -285,14 +285,13 @@ def walkforward_task(job: dict) -> dict:
     return walkforward_policies(job["data_dir"], _variants(job), job["rng"], job.get("n_sims", 1200),
                                 model=job.get("model", "clark_scarf_v2"),
                                 baseline_policy_csv=job["baseline_policy_csv"], warmup=tuple(job["warmup"]),
-                                test=tuple(job["test"]), threads=job.get("threads", 1),
-                                lean=job.get("lean", False))
+                                test=tuple(job["test"]), threads=job.get("threads", 1))
 
 
 def rolling_task(job: dict) -> dict:
     return rolling_policies(job["data_dir"], job["as_of_week"], _variants(job), job["rng"], job["n_sims"],
                             scenario_changes=job.get("scenario_changes"), threads=job.get("threads", 1),
-                            max_weeks=job.get("max_weeks"), lean=job.get("lean", False))
+                            max_weeks=job.get("max_weeks"))
 
 
 def variant_spec(out_path, alpha=0.2, netting_discount=1.0, alpha_by_sku=None, z_by_sku=None) -> dict:

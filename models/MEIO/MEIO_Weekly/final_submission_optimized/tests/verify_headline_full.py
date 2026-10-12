@@ -34,8 +34,8 @@ dfc = lib.load_demand_forecast(DATA); pi = lib.load_period_index(DATA)
 ar, ac = lib.active_nodes(dfc); r, c, prim = lib.build_leadtime_graph(DATA, ar, ac); lt = {{**r, **c}}
 cost = lib.load_sku_cost(DATA); si = lib.build_seasonal_index(DATA); sub = lib.load_sku_subcategory(DATA)
 cols = ["dc_id", "sku_id", "safety_stock", "reorder_point", "order_up_to_level"]
-base = pd.read_csv({policy!r})[cols]
-periods = sorted(pd.read_csv(DATA + "/orders.csv", usecols=["period"]).period.unique())
+base = pd.read_parquet({policy!r})[cols]
+periods = sorted(pd.read_parquet(DATA + "/orders.parquet", columns=["period"]).period.unique())
 frames = [base.assign(period=p)[["period"] + cols] for p in periods if "2023-W01" <= p <= "2025-W01"]
 wk = lambda p: int(pi.loc[pi.period == p, "week_num"].iloc[0])
 rng = np.random.default_rng(2026)
@@ -46,15 +46,15 @@ for wn in range(wk("2025-W02"), wk("2025-W52") + 1):
         policy = pd.concat([policy, pdc], ignore_index=True)
     policy["period"] = pi.loc[pi.week_num == wn, "period"].iloc[0]
     frames.append(policy[["period"] + cols])
-pd.concat(frames, ignore_index=True).to_csv({out!r}, index=False)
+pd.concat(frames, ignore_index=True).to_parquet({out!r}, index=False)
 '''
 
 
 def main():
     tmp = Path(tempfile.mkdtemp(prefix="verify_headline_"))
     data = str(REPO / "input datasets")
-    policy = str(REPO / "output datasets" / "history" / "forward_policy.csv")
-    orig_csv, fast_csv = tmp / "original_policy.csv", tmp / "optimized_policy.csv"
+    policy = str(REPO / "output datasets" / "history" / "forward_policy.parquet")
+    orig_csv, fast_csv = tmp / "original_policy.parquet", tmp / "optimized_policy.parquet"
 
     t = time.time()
     code = ORIGINAL_BUILD.format(orig=str(REPO / "models/MEIO/MEIO_Weekly/final_submission"),
@@ -76,7 +76,7 @@ def main():
     pb.walkforward_policies(data, {"h": (csv2.Variant(0.2, 1.0), fast_csv)}, 2026, 1200, baseline_policy_csv=policy,
                             warmup=("2023-W01", "2025-W01"), test=("2025-W02", "2025-W52"))
     t_fast_build = time.time() - t
-    a, b = pd.read_csv(orig_csv), pl.read_csv(fast_csv).to_pandas()
+    a, b = pd.read_parquet(orig_csv), pl.read_parquet(fast_csv).to_pandas()
     policy_same = list(a.columns) == list(b.columns) and len(a) == len(b) and all(
         np.array_equal(a[c].to_numpy(), b[c].to_numpy()) for c in a.columns)
     print(f"policy: {len(a):,} rows, identical={policy_same}  (original build {t_orig_build:.0f}s, "

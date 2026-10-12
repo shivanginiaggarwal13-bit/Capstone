@@ -9,31 +9,30 @@ original folder is untouched.
 python run_all.py                     # all nine steps, concurrently
 python run_all.py --steps 5,6,7       # same --from / --steps as before
 python run_all.py --workers 8         # pool size (default: logical CPUs - 2)
-python run_all.py --lean-twin-outputs # ~6 GB on disk instead of ~70 GB (see Disk)
+python run_all.py --lean-twin-outputs # skip most runs' detail tables (see Disk)
 python run_weekly_tools.py            # the two production tools
 python -m pytest tests -q             # equivalence + the original's own tests
 ```
 
 ## Disk
 
-Like the original, a full `run_all` writes every twin run's detail tables. Each
-156-week history run writes `inventory.csv` (~200 MB), `replenishment_receipts.csv` and
-`production.csv`, so ~260 runs come to about **60 GB**. Add ~11 GB of walk-forward
-policy CSVs, each of which repeats the 105-week warm-up baseline. The original needs
-the same space. Check free space before running.
+Data tables are Parquet across the project (generator, MEIO, twin); summaries stay
+CSV. Like the original, a full `run_all` writes every twin run's detail tables. Each
+156-week history run writes `inventory.parquet` (~20 MB; it was ~200 MB as CSV),
+`replenishment_receipts.parquet` and `production.parquet`, about 30 MB in all. ~260
+runs come to roughly **8 GB**, plus ~0.1 GB of walk-forward policy files. The same
+policies took ~11 GB as CSV, each repeating the 105-week warm-up baseline.
 
 `--lean-twin-outputs` (on `run_all.py` and on each research script) is the opt-in
-alternative, at about 6 GB:
-* research twin runs keep `run_kpis.json`, `run_manifest.json`, `policy.csv` and the
-  cost/service summaries, but skip the three detail CSVs. The manifest records this
+alternative, at under 1 GB:
+* research twin runs keep `run_kpis.json`, `run_manifest.json`, `policy.parquet` and the
+  cost/service summaries, but skip the three detail tables. The manifest records this
   under `lean_outputs`.
 * runs whose inventory a later step reads back keep everything: the `actual` /
   `ms_actual_s*` / `synthetic_baseline` caches, `csv2_headline`, and the
   segment-explore and scenario runs.
-* policy files are written as Parquet next to the CSV name (56x smaller). The twin
-  reads either format, with identical results.
 
-The default writes exactly what the original wrote.
+By default every table the original wrote is written, in Parquet instead of CSV.
 
 ## Where the ~10 hours went
 
@@ -58,10 +57,12 @@ published `segment_alpha_sweep_*.csv`.
 
 ## Libraries
 
-* **polars** for every CSV read and write and the table work. `runtime.read_csv` caches static inputs per
-  process; `runtime.write_csv` writes NaN as empty and booleans as `True`/`False`, the
-  way pandas did. CSV text can differ cosmetically (`1e-05` vs `0.00001`), but parsed
-  values are identical.
+* **polars** for every table read and write and the table work. Data tables are
+  Parquet; summaries (the `results/` evidence, `cost_summary`, `service_*`,
+  `meio_summary_*`) stay CSV. `runtime.read_table` / `write_table` pick the format from
+  the suffix and cache static inputs per process. A CSV is written the way pandas did
+  (NaN as empty, booleans as `True`/`False`, `os.linesep` line endings), so it parses to
+  the same values.
 * **numpy** for the arithmetic, in the original's operation order.
 * **Multithreading/multiprocessing:** a process pool across steps and combos. Inside a task,
   thread pools for GIL-free numpy/scipy chunks (Monte Carlo parameter maths by rows,
@@ -119,7 +120,7 @@ Two known non-differences:
 * `service_summary.csv` / `service_by_node.csv` (diagnostic tables) are summed with polars, and a value
   there can differ from the original in the last floating-point digit. Nothing reads
   them back.
-* The original re-parsed each twin run's `inventory.csv` text with pandas' parser before
+* The original re-parsed each twin run's `inventory.parquet` text with pandas' parser before
   computing fill-rate KPIs. Here they're computed from the in-memory values. The two can
   differ by 1 ULP on a fractional value, which is far below the 4-decimal rounding of every reported KPI.
 
@@ -141,7 +142,7 @@ Two known non-differences:
 
 | File | Role |
 |---|---|
-| `runtime.py` | paths, thread caps, polars CSV I/O, pandas-exact reductions, the priority process pool (`Context`), per-step logs |
+| `runtime.py` | paths, thread caps, polars Parquet/CSV I/O, pandas-exact reductions, the priority process pool (`Context`), per-step logs |
 | `meio_weekly_lib.py` | demand panel and estimator (port of the original) |
 | `clark_scarf_v2.py` | Clark-Scarf v2 split into WeekPlan / endpoints / per-variant finish |
 | `policy_builds.py` | walk-forward and rolling builds, many variants per RNG stream; pool tasks |
@@ -150,8 +151,32 @@ Two known non-differences:
 | `run_all.py`, `run_weekly_tools.py` | orchestration |
 | `meio_parameters.py`, `meio_optimizer_weekly.py`, `roll_forward_policy.py` | production tools on the port |
 
-Outputs go to the same places as the original's (`output datasets/MEIO artifacts/…`,
-`output datasets/projections/…`). Running this folder's `run_all.py` therefore refreshes
-the evidence `meio_parameters.py` reads, exactly as the original would. Cached baselines
-(`actual`, `ms_actual_s*`, `synthetic_baseline`) from a previous run of either version
-are reused.
+## Outputs
+
+The same folders, file names and file types as the original's `run_all.py`, all under
+the scenario config's `artifacts` section:
+
+| What | Where |
+|---|---|
+| results (`*.csv`), read by `meio_parameters.py` | `<artifacts.scenario>/results/` |
+| walk-forward and rolling policies (`policy_*.parquet`), real-data partials, step 8's twin runs | `<artifacts.scenario>/validation_output/` |
+| every other twin run (`actual`, `ms_actual_s*`, `synthetic_baseline`, sweeps…) | `<artifacts.twin_output_root>/projections/SCENARIO_####_Name/<run>/` |
+| a copy of the scenario config | `<artifacts.scenario>/` and each `projections/SCENARIO_####_Name/` |
+| per-step logs | `run_logs/` in this folder |
+
+With the root `scenario_config.json`, `<artifacts.scenario>` is
+`output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2` and the twin runs go
+to its `twin_runs/` subfolder. `OUTPUT_DOCUMENTATION.md` is written where the original's
+twin calls write it: `twin_runs/` (step 5) and `validation_output/` (step 8). The
+real-data steps skip it, as the original passes `--skip-output-documentation`.
+
+Each run folder has the same files as the original's. CSVs have pandas' text, CRLF line
+endings included. Parquet files hold the same tables (same columns, dtypes and values
+with `pd.read_parquet`), but polars encodes them with ZSTD and without pandas' schema
+metadata, so they aren't byte-identical. The service tables can also differ in the last
+digit (see Exactness).
+
+So running this folder's `run_all.py` refreshes the evidence `meio_parameters.py` reads,
+exactly as the original would. Cached baselines in `twin_runs/` from a previous run of
+either version are reused. Runs in `output datasets/projections/SCENARIO_0002_…/`, where
+both versions wrote before the switch to `artifacts.twin_output_root`, are not read.

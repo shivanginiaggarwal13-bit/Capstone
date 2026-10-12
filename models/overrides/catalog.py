@@ -294,7 +294,7 @@ AGENT_DOMAINS = {
     "economics_agent": ("economics",),
 }
 
-# Published category elasticities recovered from orders.csv
+# Published category elasticities recovered from orders.parquet
 # (input datasets/DATASET_DOCUMENTATION.md, section 6.8). The generator draws
 # per-SKU elasticities from these groups and applies lift = (1 - discount) ** e_promo
 # for deals and (price / list) ** e_base for everyday prices.

@@ -42,7 +42,7 @@ DAYS_PER_WEEK = 7
 
 def resolve_affected_nodes(data_dir, changes: dict) -> list:
     """'affected_region' (e.g. 'Southeast') -> CDC + RDC node ids in that
-    region, from customer_dc_master.csv + regional_dc_master.csv (both have
+    region, from customer_dc_master.parquet + regional_dc_master.parquet (both have
     a `region` column). An explicit 'affected_nodes' list in `changes`
     takes precedence if given. Returns [] if neither is present -- callers
     should treat that as "nothing to do", not an error."""
@@ -51,8 +51,8 @@ def resolve_affected_nodes(data_dir, changes: dict) -> list:
     region = changes.get("affected_region")
     if not region:
         return []
-    cdc = pd.read_csv(data_dir / "customer_dc_master.csv", usecols=["customer_dc_id", "region"])
-    rdc = pd.read_csv(data_dir / "regional_dc_master.csv", usecols=["regional_dc_id", "region"])
+    cdc = pd.read_parquet(data_dir / "customer_dc_master.parquet", columns=["customer_dc_id", "region"])
+    rdc = pd.read_parquet(data_dir / "regional_dc_master.parquet", columns=["regional_dc_id", "region"])
     nodes = list(cdc.loc[cdc.region == region, "customer_dc_id"])
     nodes += list(rdc.loc[rdc.region == region, "regional_dc_id"])
     return nodes

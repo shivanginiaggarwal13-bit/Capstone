@@ -1,6 +1,6 @@
 # Supply Brain — Synthetic CPG Supply-Chain Dataset
 
-*Auto-generated 2026-10-08 18:18 by `supply_brain_generator_v5.py`.
+*Auto-generated 2026-10-11 18:52 by `supply_brain_generator_v5.py`.
 This document and the data are produced in the same run, so the figures below always describe the
 current instance. It supersedes the separate EDA report, whose content is folded in as Part 6.*
 
@@ -386,7 +386,7 @@ All monetary fields are USD and suffixed `_usd`. `inventory_carrying_pct_annual`
 
 ## Part 5 — The policy table, in plain words
 
-`baseline_policy.csv` is one row per **(stocking location, SKU)** carrying three
+`baseline_policy.parquet` is one row per **(stocking location, SKU)** carrying three
 numbers: how much cushion to hold, when to reorder, and how far to top back up.
 That is the whole inventory decision, and it is the only thing an optimizer
 changes.
@@ -397,9 +397,9 @@ this dataset; the other two are forward artefacts and are described in
 
 | File | Rows | Sized on | Role |
 |---|---|---|---|
-| `baseline_policy.csv` (here) | 7,768 | the **order history** | ran the past, so it is part of the record |
-| `forward_policy.csv` | — | the **forecast** | runs forward scenarios |
-| `policy.csv` (inside a run) | — | whatever was fed in | audit trail of what a run executed |
+| `baseline_policy.parquet` (here) | 7,768 | the **order history** | ran the past, so it is part of the record |
+| `forward_policy.parquet` | — | the **forecast** | runs forward scenarios |
+| `policy.parquet` (inside a run) | — | whatever was fed in | audit trail of what a run executed |
 
 ### Column by column
 
@@ -483,7 +483,7 @@ order_up_to_level S    = s + mu_demand x 1.5 weeks
 ```
 
 `mu` and `sigma` are that location's weekly demand mean and standard deviation
-for that SKU. The lane lead time comes from `sku_sourcing_map.csv` — the route
+for that SKU. The lane lead time comes from `sku_sourcing_map.parquet` — the route
 the SKU actually travels, which matters a great deal: one plant-DC-to-regional-DC
 lane runs half a day and another nearly thirteen.
 
@@ -639,7 +639,7 @@ Recommended method -- one regression with BOTH price terms and SKU + week fixed 
 Minimal snippet (statsmodels):
 
     import pandas as pd, numpy as np, statsmodels.formula.api as smf
-    o = pd.read_csv("orders.csv").merge(pd.read_csv("sku_master.csv")[["sku_id","category"]], on="sku_id")
+    o = pd.read_parquet("orders.parquet").merge(pd.read_parquet("sku_master.parquet")[["sku_id","category"]], on="sku_id")
     o = o[(o.order_qty>0) & (o.base_price_usd>0)].copy()
     o["ln_q"]=np.log(o.order_qty); o["ln_base"]=np.log(o.base_price_usd); o["ln_promo"]=np.log(1-o.discount_pct)
     for cat, g in o.groupby("category"):
@@ -656,9 +656,9 @@ are near-zero/positive and kept verbatim, so a pooled category value can be pull
 """
 doc += _facility_cost_doc_section()
 
-### 5.3 Holding cost — how `cost_parameters.csv` is derived
+### 5.3 Holding cost — how `cost_parameters.parquet` is derived
 
-`cost_parameters.csv` has **675 rows** on a **dc_id x subcategory** key (27 storage facilities x 25 subcategories) and ships 5 columns:
+`cost_parameters.parquet` has **675 rows** on a **dc_id x subcategory** key (27 storage facilities x 25 subcategories) and ships 5 columns:
 
 | Column | Meaning |
 |---|---|

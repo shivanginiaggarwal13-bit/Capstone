@@ -1,0 +1,22 @@
+{
+  "scenario": "SCENARIO_0005_SE_Beverage_July_Surge_25pct",
+  "state": "succeeded",
+  "started_at": "2026-10-14T04:45:10Z",
+  "arms": {
+    "prepared": {
+      "state": "succeeded",
+      "started_at": "2026-10-14T04:45:10Z",
+      "returncode": 0,
+      "finished_at": "2026-10-14T04:58:18Z",
+      "output": "output datasets/projections/SCENARIO_0005_SE_Beverage_July_Surge_25pct/prepared"
+    },
+    "unprepared": {
+      "state": "succeeded",
+      "started_at": "2026-10-14T04:58:18Z",
+      "returncode": 0,
+      "finished_at": "2026-10-14T04:58:28Z",
+      "output": "output datasets/projections/SCENARIO_0005_SE_Beverage_July_Surge_25pct/unprepared"
+    }
+  },
+  "finished_at": "2026-10-14T04:58:28Z"
+}

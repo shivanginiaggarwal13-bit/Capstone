@@ -1,0 +1,61 @@
+{
+  "draft_id": "D0003",
+  "created_at": "2026-10-14T04:33:47Z",
+  "created_by": "orchestrator",
+  "scenario_name": "SE_Beverage_July_Surge_25pct",
+  "description": "Southeast Beverages demand scales +25% for July 2026 (2026-W28..W31); MEIO plans for it, Twin simulates it; compare prepared vs unprepared vs baseline.",
+  "hypothesis": "A 25% July demand surge in Southeast Beverages will strain Southeast DC stock and PDC01 replenishment, lowering CDC/RDC fill rates in the unprepared arm; a prepared run (MEIO anticipates) recovers most of the lost service at the cost of higher inventory.",
+  "request_text": "What if Southeast beverage demand rises 25% in July?",
+  "meio": {
+    "model": "clark_scarf_v2",
+    "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/roll_forward_policy.py",
+    "source": "scenario_config.json"
+  },
+  "evaluation": {
+    "baseline_scenario": "SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+    "baseline_run": "meio_policy",
+    "seed": 2026
+  },
+  "overrides": [
+    {
+      "id": "OVR-0001",
+      "measure": "demand.volume",
+      "scope": {
+        "category": [
+          "Beverages"
+        ],
+        "region": [
+          "Southeast"
+        ]
+      },
+      "window": {
+        "start_period": "2026-W28",
+        "end_period": "2026-W31"
+      },
+      "operation": "scale",
+      "value": 1.25,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "Planned +25% Southeast beverage demand in July (seasonal peak): \"What if Southeast beverage demand rises 25% in July?\" Assumptions recorded: magnitude exactly +25% (scale 1.25); window = the 4 ISO weeks whose Monday falls in July 2026 (2026-W28..W31, 2026-07-06 to 2026-08-02); scope = all Beverages SKUs at all Southeast DCs (100 SKUs across RDC02, RDC03, CDC03\u2013CDC06, 397 demand lines); visibility = both sides (planner did not say whether the business sees it coming, so MEIO plans for it and the Twin simulates it; the unprepared arm already covers the surprise case). Pure volume surge: no price event, no volatility change, no capacity change.",
+      "provenance": {
+        "agent": "demand_agent",
+        "created_at": "2026-10-14T04:35:26Z"
+      }
+    }
+  ],
+  "next_seq": 2,
+  "scenario_number": 5,
+  "history": [
+    {
+      "at": "2026-10-14T04:35:26Z",
+      "agent": "demand_agent",
+      "action": "add",
+      "override_id": "OVR-0001"
+    }
+  ],
+  "updated_at": "2026-10-14T04:40:29Z",
+  "scenario_folder": "SCENARIO_0005_SE_Beverage_July_Surge_25pct"
+}

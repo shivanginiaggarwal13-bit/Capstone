@@ -16,6 +16,7 @@ from unittest import mock
 
 os.environ.setdefault("SUPPLY_BRAIN_AGENT_WORKSPACE", tempfile.mkdtemp(prefix="sb_agents_"))
 os.environ.setdefault("SUPPLY_BRAIN_OVERRIDES_ROOT", tempfile.mkdtemp(prefix="sb_overrides_"))
+os.environ.setdefault("NVIDIA_API_KEY", "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")
 
 from langchain_core.language_models import BaseChatModel        # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage  # noqa: E402
@@ -155,20 +156,26 @@ class EvidenceTests(unittest.TestCase):
 
 
 class ProfileTests(unittest.TestCase):
-    def payload(self, agent, profile):
-        return llm.chat_model(agent, profile)._get_request_payload([HumanMessage("hi")])
+    def test_nvidia_profile_uses_openai(self):
+        from langchain_openai import ChatOpenAI
+        model = llm.chat_model("orchestrator", "nvidia")
+        self.assertIsInstance(model, ChatOpenAI)
+        self.assertEqual(model.model_name, "z-ai/glm-5.3-flash")
+        self.assertEqual(model.max_tokens, 1024)
+        self.assertEqual(model.temperature, 0.5)
+        self.assertEqual(model.openai_api_base, llm.NVIDIA_API_URL)
 
-    def test_test_profile_models(self):
-        orch, worker = self.payload("orchestrator", "test"), self.payload("validator_agent", "test")
-        self.assertEqual((orch["model"], orch["output_config"], orch["thinking"]),
-                         ("claude-sonnet-4-6", {"effort": "medium"}, {"type": "adaptive"}))
-        self.assertEqual(worker["model"], "claude-haiku-4-5")
-        self.assertFalse(worker.get("output_config") or worker.get("thinking"))   # Haiku 4.5 takes neither
+    def test_nvidia_profile_settings(self):
+        settings = llm.agent_settings("orchestrator", "nvidia")
+        self.assertEqual(settings["model"], "z-ai/glm-5.3-flash")
+        self.assertEqual(settings["max_tokens"], 1024)
+        self.assertEqual(settings["temperature"], 0.5)
 
-    def test_production_profile_fallback(self):
-        p = self.payload("orchestrator", "production")
-        self.assertEqual((p["model"], p["fallbacks"], p["betas"]),
-                         ("claude-opus-5-5", "default", [llm.FALLBACK_BETA]))
+    def test_production_profile_settings(self):
+        settings = llm.agent_settings("orchestrator", "production")
+        self.assertEqual(settings["model"], "z-ai/glm-5.3-flash")
+        self.assertEqual(settings["max_tokens"], 2048)
+        self.assertEqual(settings["temperature"], 0.3)
 
     def test_desktop_profile_uses_bridge(self):
         self.assertIsInstance(llm.chat_model("orchestrator", "desktop"), bridge.DesktopBridgeChatModel)

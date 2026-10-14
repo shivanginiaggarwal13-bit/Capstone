@@ -1,4 +1,4 @@
 # Agent scratch: drafts, generated scenario configs awaiting approval, run logs.
 # Approved configs are preserved by the pipeline itself -- every MEIO and Twin
 # scenario folder receives a copy of the scenario_config.json it ran.
-workspace/
+# workspace/

@@ -17,6 +17,7 @@ import os
 import sys
 
 from . import bridge, graph, llm
+from .utils import StreamingCallbackHandler
 
 
 def _terminal_decision(approver: str | None):
@@ -37,13 +38,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("request", nargs="*", help="a planner request; omit for an interactive session")
     ap.add_argument("--profile", default=None, help="model profile from runtime/profiles.yaml")
     ap.add_argument("--approver", default=None, help="name recorded when you approve at the terminal")
+    ap.add_argument("--no-stream", action="store_true", help="disable streaming output")
     args = ap.parse_args(argv)
 
     profile = llm.profile_name(args.profile)
     desktop = llm.provider_of(profile) == "desktop"
+    streaming = not args.no_stream and not desktop
     if desktop:
         print(f"Claude Desktop bridge session: {bridge.start_session()}", flush=True)
-    session = graph.Session(graph.Team(profile),
+    session = graph.Session(graph.Team(profile, streaming=streaming), streaming=streaming,
                             decide=bridge.await_approval if desktop else _terminal_decision(args.approver))
     print(f"profile {profile}; transcript {session.transcript}", flush=True)
     reply = ""

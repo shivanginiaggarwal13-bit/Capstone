@@ -1,0 +1,61 @@
+{
+  "draft_id": "D0001",
+  "created_at": "2026-10-14T04:30:37Z",
+  "created_by": "orchestrator",
+  "scenario_name": "SE_Beverage_July_Surge_25",
+  "description": "Southeast Beverages demand +25% during July 2026 (2026-W28..W31); known event, plan+actual, to test network absorption and the value of re-planning.",
+  "hypothesis": "A 25% July beverage surge in the Southeast strains PDC01/RDC02/RDC03 and their CDCs; the prepared arm recovers fill rate and lost sales versus the unprepared arm, at the cost of higher inventory and holding cost.",
+  "request_text": "What if Southeast beverage demand rises 25% in July?",
+  "meio": {
+    "model": "clark_scarf_v2",
+    "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/roll_forward_policy.py",
+    "source": "scenario_config.json"
+  },
+  "evaluation": {
+    "baseline_scenario": "SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+    "baseline_run": "meio_policy",
+    "seed": 2026
+  },
+  "overrides": [
+    {
+      "id": "OVR-0001",
+      "measure": "demand.volume",
+      "scope": {
+        "category": [
+          "Beverages"
+        ],
+        "region": [
+          "Southeast"
+        ]
+      },
+      "window": {
+        "start_period": "2026-W28",
+        "end_period": "2026-W31"
+      },
+      "operation": "scale",
+      "value": 1.25,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "Summer demand surge on Southeast beverages, +25% for the 4 July weeks (2026-W28..W31). Assumptions carried in: magnitude +25% exactly; window = weeks whose Monday falls in July 2026; scope = all 100 beverage SKUs already carried in the Southeast (RDC02, RDC03, CDC03-CDC06; no new distribution); event is anticipated, so MEIO pre-builds (plan) and the Twin realises it (actual).",
+      "provenance": {
+        "agent": "demand_agent",
+        "created_at": "2026-10-14T04:31:44Z"
+      }
+    }
+  ],
+  "next_seq": 2,
+  "scenario_number": 3,
+  "history": [
+    {
+      "at": "2026-10-14T04:31:44Z",
+      "agent": "demand_agent",
+      "action": "add",
+      "override_id": "OVR-0001"
+    }
+  ],
+  "updated_at": "2026-10-14T04:36:59Z",
+  "scenario_folder": "SCENARIO_0003_SE_Beverage_July_Surge_25"
+}

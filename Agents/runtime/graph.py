@@ -88,10 +88,10 @@ class Team:
     """Compiled graphs for every agent, built from one model profile."""
 
     def __init__(self, profile: str | None = None, model_factory: Callable | None = None,
-                 checkpointer=None):
+                 checkpointer=None, streaming: bool = False):
         if model_factory is None:
             profile = llm.profile_name(profile)
-            model_factory = lambda agent: llm.chat_model(agent, profile)  # noqa: E731
+            model_factory = lambda agent: llm.chat_model(agent, profile, streaming=streaming)  # noqa: E731
         self.profile = profile
         self._factory = model_factory
         self.workers = {a: self._compile(a, checkpointer=False) for a in registry.AGENTS if a != "orchestrator"}
@@ -193,17 +193,26 @@ class Team:
 class Session:
     """One planner conversation with the orchestrator."""
 
-    def __init__(self, team: Team, decide: Callable[[dict], dict], thread_id: str | None = None):
+    def __init__(self, team: Team, decide: Callable[[dict], dict], thread_id: str | None = None,
+                 streaming: bool = False):
         self.team, self.decide = team, decide
         self.thread_id = thread_id or uuid.uuid4().hex[:12]
         self.config = {"configurable": {"thread_id": self.thread_id}, "recursion_limit": ORCHESTRATOR_RECURSION}
         self.transcript = paths.WORKSPACE / "transcripts" / f"{self.thread_id}.jsonl"
+        self.streaming = streaming
 
     def ask(self, text: str) -> str:
-        result = self.team.orchestrator.invoke({"messages": [HumanMessage(text)]}, self.config)
+        from .utils import StreamingCallbackHandler
+
+        config = self.config.copy()
+        if self.streaming:
+            callback_handler = StreamingCallbackHandler()
+            config["callbacks"] = [callback_handler]
+
+        result = self.team.orchestrator.invoke({"messages": [HumanMessage(text)]}, config)
         while result.get("__interrupt__"):
             decision = self.decide(result["__interrupt__"][0].value)
-            result = self.team.orchestrator.invoke(Command(resume=decision), self.config)
+            result = self.team.orchestrator.invoke(Command(resume=decision), config)
         self._save(result["messages"])
         return text_of(result["messages"][-1])
 

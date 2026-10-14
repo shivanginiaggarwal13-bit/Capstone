@@ -1,0 +1,97 @@
+{
+  "model": "clark_scarf_v2",
+  "selection": "validated",
+  "alpha": 0.6,
+  "netting_discount": 0.0,
+  "ddlt": "quadrature",
+  "n_sims": 4000,
+  "seed": 2026,
+  "alpha_by_sku": 0,
+  "z_by_sku": 0,
+  "decisions": [
+    {
+      "parameter": "netting_discount",
+      "value": 0.0,
+      "reason": "moved off the reference: better fill, cost not worse, on paired seeds",
+      "reference": 1.0,
+      "at_alpha": 0.2,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": 0.492,
+          "fill_gain_se": 0.0282,
+          "cost_delta_usd": -98179.0,
+          "cost_delta_se": 22025.0,
+          "passes": true
+        }
+      }
+    },
+    {
+      "parameter": "alpha",
+      "value": 0.6,
+      "reason": "moved off the reference: better fill, cost not worse, on paired seeds",
+      "reference": 0.2,
+      "at_netting_discount": 0.0,
+      "tests": {
+        "0.6": {
+          "seeds": 5,
+          "fill_gain": 1.246,
+          "fill_gain_se": 0.0306,
+          "cost_delta_usd": -247851.0,
+          "cost_delta_se": 31858.0,
+          "passes": true
+        }
+      },
+      "not_counted": {
+        "0.4": "evidence only at netting_discount [1.0]"
+      }
+    },
+    {
+      "parameter": "service_level_by_cluster",
+      "value": null,
+      "reason": "not used; segment ladder kept: run at alpha [0.2], netting_discount [0.0]; selected alpha 0.6, netting_discount 0"
+    },
+    {
+      "parameter": "alpha_by_cluster",
+      "value": null,
+      "reason": "not used; portfolio alpha everywhere: run at netting_discount [1.0]; selected 0; run around alpha 0.2; selected 0.6"
+    }
+  ],
+  "sources": [
+    {
+      "kind": "netting_multiseed",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/netting_discount_multiseed.csv",
+      "sha256": "28a1feb029baafcb7586ae8126332050371651f5b6d4858fbaa413cb4b100d9a",
+      "rows": 10,
+      "context_assumed": {}
+    },
+    {
+      "kind": "netting_multiseed",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/netting_discount_multiseed_alpha0_6.csv",
+      "sha256": "e09d11aeeb1b86670085394367cb096aac148bb042228c80325ab6a5b82a6f06",
+      "rows": 10,
+      "context_assumed": {}
+    },
+    {
+      "kind": "alpha_multiseed",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/multiseed_alpha_04_06.csv",
+      "sha256": "73c88e33a79fe3088295b548f8977df101cbfe4277773a3a5f6dd915053d6b78",
+      "rows": 10,
+      "context_assumed": {}
+    },
+    {
+      "kind": "cluster_alpha",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/segment_alpha_real_data_multiseed.csv",
+      "sha256": "e226cc42f67b19ec2530da7fe8e2716670f7d3b181e0efce04210d0049fdd743",
+      "rows": 120,
+      "context_assumed": {}
+    },
+    {
+      "kind": "cluster_csl",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/service_level_real_data_multiseed.csv",
+      "sha256": "b488bd15beb6e397c69cc751c7a705da4db0ee42fb353955beafd1bda169fcd8",
+      "rows": 80,
+      "context_assumed": {}
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Supply Brain — output datasets
 
-*Auto-generated 2026-10-11 20:15 by
+*Auto-generated 2026-10-14 10:28 by
 `models/twin/digital_twin.py`. Do not edit by hand.*
 
 ## Scope
@@ -167,9 +167,10 @@ The policy table's full column-by-column dictionary is Part 5 of
 | Folder | Mode | Seed | Label | Size |
 |---|---|---|---|---|
 | `history/` | history | 2026 | 2023-W01..2025-W52 history | 0.24 MB |
-| `MEIO/` | ? | ? | ? | 3.08 MB |
-| `MEIO artifacts/` | ? | ? | ? | 8498.18 MB |
-| `projections/` | ? | ? | ? | 27.27 MB |
+| `MEIO/` | ? | ? | ? | 6.27 MB |
+| `MEIO artifacts/` | ? | ? | ? | 0.08 MB |
+| `overrides/` | ? | ? | ? | 0.01 MB |
+| `projections/` | ? | ? | ? | 57.82 MB |
 | `segmentation/` | ? | ? | ? | 0.69 MB |
 
 A run folder is self-describing: `run_manifest.json` records the exact knobs,

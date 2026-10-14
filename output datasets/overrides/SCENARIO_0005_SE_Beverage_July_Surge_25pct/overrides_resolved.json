@@ -1,0 +1,42 @@
+{
+  "engine_version": "1.0",
+  "overrides": [
+    {
+      "id": "OVR-0001",
+      "measure": "demand.volume",
+      "scope": {
+        "category": [
+          "Beverages"
+        ],
+        "region": [
+          "Southeast"
+        ]
+      },
+      "window": {
+        "start_period": "2026-W28",
+        "end_period": "2026-W31"
+      },
+      "operation": "scale",
+      "value": 1.25,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "Planned +25% Southeast beverage demand in July (seasonal peak): \"What if Southeast beverage demand rises 25% in July?\" Assumptions recorded: magnitude exactly +25% (scale 1.25); window = the 4 ISO weeks whose Monday falls in July 2026 (2026-W28..W31, 2026-07-06 to 2026-08-02); scope = all Beverages SKUs at all Southeast DCs (100 SKUs across RDC02, RDC03, CDC03\u2013CDC06, 397 demand lines); visibility = both sides (planner did not say whether the business sees it coming, so MEIO plans for it and the Twin simulates it; the unprepared arm already covers the surprise case). Pure volume surge: no price event, no volatility change, no capacity change.",
+      "provenance": {
+        "agent": "demand_agent",
+        "created_at": "2026-10-14T04:35:26Z"
+      },
+      "options": {},
+      "matched_rows": 397,
+      "universe": "demand_lines",
+      "weeks": [
+        "2026-W28",
+        "2026-W29",
+        "2026-W30",
+        "2026-W31"
+      ]
+    }
+  ]
+}

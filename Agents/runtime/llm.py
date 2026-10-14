@@ -1,7 +1,9 @@
 """
 Model profiles (profiles.yaml) and the chat-model factory the graph uses.
 
-Two providers:
+Three providers:
+  nvidia     NVIDIA Build API (OpenAI-compatible) -- uses langchain-openai's ChatOpenAI
+             with custom base_url pointing to https://integrate.api.nvidia.com/v1
   anthropic  langchain-anthropic's ChatAnthropic -- the API, with per-agent model,
              effort, adaptive thinking and (for the Opus 5.5 family) server-side
              refusal fallback
@@ -23,6 +25,7 @@ import yaml
 PROFILES_PATH = Path(__file__).with_name("profiles.yaml")
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 MAX_TOKENS = 16000
+NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1"
 
 
 @lru_cache(maxsize=1)
@@ -39,7 +42,7 @@ def profile_name(name: str | None = None) -> str:
 
 
 def provider_of(profile: str | None = None) -> str:
-    return _profiles()["profiles"][profile_name(profile)].get("provider", "anthropic")
+    return _profiles()["profiles"][profile_name(profile)].get("provider", "nvidia")
 
 
 def agent_settings(agent: str, profile: str | None = None) -> dict:
@@ -48,14 +51,32 @@ def agent_settings(agent: str, profile: str | None = None) -> dict:
     settings = {**(prof.get(role) or {}), **(prof.get(agent) or {})}
     if "model" not in settings:
         raise ValueError(f"profile {profile_name(profile)!r} gives no model for {agent} (or for {role})")
-    settings["provider"] = prof.get("provider", "anthropic")
+    settings["provider"] = prof.get("provider", "nvidia")
     if prof.get("fallbacks"):
         settings.setdefault("fallbacks", prof["fallbacks"])
     return settings
 
 
-def chat_model(agent: str, profile: str | None = None):
+def chat_model(agent: str, profile: str | None = None, streaming: bool = False):
     s = agent_settings(agent, profile)
+    if s["provider"] == "nvidia":
+        from langchain_openai import ChatOpenAI
+        api_key = os.environ.get("NVIDIA_API_KEY")
+        if not api_key:
+            raise ValueError("NVIDIA_API_KEY environment variable is required for nvidia provider")
+        kwargs = {
+            "model": s["model"],
+            "max_tokens": s.get("max_tokens", MAX_TOKENS),
+            "temperature": s.get("temperature", 0.5),
+            "api_key": api_key,
+            "base_url": NVIDIA_API_URL,
+            "max_retries": 2,
+            "top_p": s.get("top_p", 1),
+            "frequency_penalty": s.get("frequency_penalty", 0),
+            "presence_penalty": s.get("presence_penalty", 0),
+            "streaming": streaming,
+        }
+        return ChatOpenAI(**kwargs)
     if s["provider"] == "anthropic":
         from langchain_anthropic import ChatAnthropic
         kwargs = {"model": s["model"], "max_tokens": s.get("max_tokens", MAX_TOKENS), "max_retries": 2}

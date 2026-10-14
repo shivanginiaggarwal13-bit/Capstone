@@ -1,0 +1,20 @@
+{
+  "model": "meio",
+  "engine_version": "1.0",
+  "overrides": [
+    {
+      "override_id": "OVR-0001",
+      "measure": "demand.volume",
+      "applications": 4,
+      "periods": [
+        "2026-W28",
+        "2026-W29",
+        "2026-W30",
+        "2026-W31"
+      ],
+      "pair_weeks": 1300.0,
+      "target_units_before": 28708.0345,
+      "target_units_after": 35885.0431
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "schema_version": "3.0",
+  "run_name": "prepared",
+  "label": "",
+  "mode": "forward",
+  "generated_at": "2026-10-14T10:28:17",
+  "seed": 2026,
+  "policy_override": "G:\\MEIO Personal\\MEIO\\output datasets\\MEIO\\SCENARIO_0005_SE_Beverage_July_Surge_25pct\\rolling_2026\\meio_policy_rolling.parquet",
+  "margin_basis": "margin_usd",
+  "runtime_seconds": 8.0,
+  "assumptions": [
+    "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
+    "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
+    "Lead times are drawn per order line from each lane's own mean and std in network_lanes.parquet, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.",
+    "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following the fulfilment_type split in the dataset, which is clean by node type.",
+    "An internal replenishment order the parent cannot cover is cancelled, not backlogged; the child re-orders at the next weekly review.",
+    "A parent holds back its own expected demand for the remainder of the review period before releasing stock downstream, implementing 'customer orders served first'.",
+    "Routing comes from sku_sourcing_map.parquet, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.",
+    "Holding cost = (storage_cost_per_unit_year + carrying_pct x unit_cost) / 52, keyed on (dc_id, subcategory).",
+    "No shelf life, obsolescence or write-offs; no warehouse or lane capacity limits. Production capacity DOES bind.",
+    "Demand, lead-time and production RNG streams are independent, so two runs at the same seed differ only by the policy under test."
+  ],
+  "build_notes": {
+    "mode": "forward",
+    "seed": 2026,
+    "sourcing": {
+      "rule": "sku_sourcing_map.parquet (input table)",
+      "pairs_resolved": 11500,
+      "pairs_on_fallback": 0
+    },
+    "policy_source": "G:\\MEIO Personal\\MEIO\\output datasets\\MEIO\\SCENARIO_0005_SE_Beverage_July_Surge_25pct\\rolling_2026\\meio_policy_rolling.parquet",
+    "policy_rows": 422552,
+    "policy_time_varying": true,
+    "state_source": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\opening_position.parquet",
+    "demand_basis": "forecast_qty x volume-weighted resampled forecast-error ratio",
+    "forecast_units": 13249672.25,
+    "realised_demand_units": 14167102.0,
+    "realised_over_forecast": 1.0692,
+    "overrides_applied": [
+      {
+        "override_id": "OVR-0001",
+        "measure": "demand.volume",
+        "applications": 1,
+        "demand_lines": 397,
+        "forecast_rows": 1588,
+        "weeks": 4,
+        "forecast_units_before": 29381.0,
+        "forecast_units_after": 36726.25
+      }
+    ],
+    "margin_basis": "margin_usd",
+    "n_nodes": 27,
+    "n_skus": 500,
+    "n_plants": 4,
+    "n_active_pairs": 8126,
+    "horizon_weeks": 52,
+    "horizon_days": 364,
+    "first_period": "2026-W01",
+    "last_period": "2026-W52"
+  },
+  "scenario": {
+    "schema_version": "1.1",
+    "scenario_number": 5,
+    "scenario_name": "SE_Beverage_July_Surge_25pct",
+    "description": "Southeast Beverages demand scales +25% for July 2026 (2026-W28..W31); MEIO plans for it, Twin simulates it; compare prepared vs unprepared vs baseline.",
+    "changes": {
+      "override_schema_version": "1.0",
+      "overrides": [
+        {
+          "id": "OVR-0001",
+          "measure": "demand.volume",
+          "scope": {
+            "category": [
+              "Beverages"
+            ],
+            "region": [
+              "Southeast"
+            ]
+          },
+          "window": {
+            "start_period": "2026-W28",
+            "end_period": "2026-W31"
+          },
+          "operation": "scale",
+          "value": 1.25,
+          "unit": "multiplier",
+          "applies_to": [
+            "plan",
+            "actual"
+          ],
+          "rationale": "Planned +25% Southeast beverage demand in July (seasonal peak): \"What if Southeast beverage demand rises 25% in July?\" Assumptions recorded: magnitude exactly +25% (scale 1.25); window = the 4 ISO weeks whose Monday falls in July 2026 (2026-W28..W31, 2026-07-06 to 2026-08-02); scope = all Beverages SKUs at all Southeast DCs (100 SKUs across RDC02, RDC03, CDC03\u2013CDC06, 397 demand lines); visibility = both sides (planner did not say whether the business sees it coming, so MEIO plans for it and the Twin simulates it; the unprepared arm already covers the surprise case). Pure volume surge: no price event, no volatility change, no capacity change.",
+          "provenance": {
+            "agent": "demand_agent",
+            "created_at": "2026-10-14T04:35:26Z"
+          }
+        }
+      ]
+    },
+    "digital_twin": {
+      "entrypoint": "models/twin/digital_twin.py",
+      "mode": "forward",
+      "run_name": "prepared",
+      "seed": 2026,
+      "data_dir": "input datasets",
+      "policy": "output datasets/history/forward_policy.parquet",
+      "state": "output datasets/history/opening_position.parquet",
+      "output_root": "output datasets"
+    },
+    "meio": {
+      "runner_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/run_weekly_tools.py",
+      "weekly_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/meio_optimizer_weekly.py",
+      "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission/roll_forward_policy.py",
+      "data_dir": "input datasets",
+      "as_of_week": "2025-W52",
+      "policy_filename": "meio_policy_rolling.parquet",
+      "output_root": "output datasets/MEIO",
+      "parameters": {
+        "model": "clark_scarf_v2",
+        "selection": "validated",
+        "min_seeds": 5,
+        "evidence": [
+          "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results",
+          "models/MEIO/MEIO_Weekly/final_submission/results"
+        ],
+        "clusters": "Clustering & Segmentation/segmentation_v4/sku_clusters.csv",
+        "ddlt": "quadrature",
+        "n_sims": 4000,
+        "seed": 2026
+      }
+    },
+    "artifacts": {
+      "entrypoint": "models/MEIO/MEIO_Weekly/final_submission/run_all.py",
+      "scenario": "output datasets/MEIO artifacts/SCENARIO_0005_SE_Beverage_July_Surge_25pct",
+      "twin_output_root": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/twin_runs"
+    },
+    "overrides": {
+      "engine": "models/overrides",
+      "output_root": "output datasets/overrides"
+    },
+    "evaluation": {
+      "baseline_scenario": "SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+      "baseline_run": "meio_policy",
+      "arms": [
+        "prepared",
+        "unprepared"
+      ]
+    },
+    "details": {
+      "owner": "Supply Planning",
+      "hypothesis": "A 25% July demand surge in Southeast Beverages will strain Southeast DC stock and PDC01 replenishment, lowering CDC/RDC fill rates in the unprepared arm; a prepared run (MEIO anticipates) recovers most of the lost service at the cost of higher inventory.",
+      "request": "What if Southeast beverage demand rises 25% in July?",
+      "created_by": "Agents draft D0003",
+      "created_at": "2026-10-14T04:40:27Z",
+      "notes": "Generated by the scenario agents; overrides apply only through models/overrides."
+    },
+    "execution": {
+      "mode": "forward",
+      "seed": 2026,
+      "horizon_weeks": null,
+      "policy": "G:\\MEIO Personal\\MEIO\\output datasets\\MEIO\\SCENARIO_0005_SE_Beverage_July_Surge_25pct\\rolling_2026\\meio_policy_rolling.parquet",
+      "state": "G:\\MEIO Personal\\MEIO\\output datasets\\history\\opening_position.parquet",
+      "output_folder": "G:\\MEIO Personal\\MEIO\\output datasets\\projections\\SCENARIO_0005_SE_Beverage_July_Surge_25pct\\prepared"
+    }
+  }
+}

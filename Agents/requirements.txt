@@ -2,6 +2,8 @@
 # Versions the LangGraph runtime was built and tested against (9 Oct 2026).
 langgraph==1.2.14
 langchain-anthropic==1.7.5
+langchain-openai>=0.1.0
+requests>=2.31.0
 jsonschema>=4.20
 pyyaml>=6.0
 pytest>=8

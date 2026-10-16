@@ -26,11 +26,7 @@
 
 - WARNING (set): the installed pipeline does not yet apply ['demand.volume', 'service.target_csl', 'supply.plant_capacity']; run_scenario will refuse until those engine phases land (see pipeline_readiness)
 
-## Engine support
 
-- NOT READY: Phase 0: the MEIO runner must accept --scenario-config and scenario paths must resolve from the repository root (IMPLEMENTATION_PLAN.md 5.0).
-- NOT READY: Phase 1: models/overrides is not installed, so MEIO and the Twin would apply no override at all (IMPLEMENTATION_PLAN.md 5.1).
-- Measures awaiting engine support: demand.volume, service.target_csl, supply.plant_capacity
 
 ## Approval
 

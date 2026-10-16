@@ -1,7 +1,6 @@
-"""Supply Brain -- MEIO Optimiser front end (Streamlit build of supply_brain_meio_mockup.html).
+"""Supply Brain -- MEIO Optimiser front end (Streamlit app).
 
-Every button in the mockup is wired to a real resource in this repository, or is shown
-as "not mapped" with the reason. See BUTTON_MAPPING.md for the full table.
+Every button is wired to a real resource in this repository, or is shown as "not mapped" with the reason. See BUTTON_MAPPING.md for the full table.
 
     python -m streamlit run App/streamlit_app.py
 
@@ -37,7 +36,24 @@ st.set_page_config(page_title="Supply Brain - MEIO Optimiser", page_icon=":mater
 # --------------------------------------------------------------------------- styling
 st.markdown("""
 <style>
-.block-container {padding-top: 1.2rem;}
+.block-container {padding-top: 4rem;}
+[data-testid="stMetricLabel"] p, [data-testid="stMetricValue"], [data-testid="stWidgetLabel"] p {white-space: normal !important; overflow: visible !important; text-overflow: clip !important;}
+button, button p, label p, [data-testid="stCaptionContainer"] p, [data-testid="stMarkdownContainer"] p {text-overflow: clip !important;}
+button p {white-space: normal !important; overflow: visible !important; line-height: 1.25;}
+button[kind] {height: auto !important; min-height: 2.4rem; padding: .4rem .9rem;}
+[data-testid="stMetricValue"] > div {white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; font-size: 1.9rem; line-height: 1.15;}
+[data-testid="stSidebar"] [data-testid="stRadio"] label {width: 100%; padding: 9px 14px; margin-bottom: 4px; border-radius: 10px; border: 1px solid rgba(0,0,0,.08); background: #FFFFFF; cursor: pointer; transition: all .12s;}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {background: #F5F4F1; border-color: rgba(0,0,0,.18);}
+[data-testid="stSidebar"] [data-testid="stRadio"] label > div:first-child {display: none;}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {background: #E5F0FB; border-color: #2374CC; box-shadow: inset 4px 0 0 #2374CC;}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) p {color: #1558A0; font-weight: 600;}
+[data-testid="stSidebar"] [data-testid="stRadio"] label p {font-size: 14px;}
+.mod-head {border-radius: 10px 10px 0 0; padding: 10px 14px; font-weight: 600; font-size: 16px; margin: -4px -4px 8px -4px;}
+.mod-teal {background:#E0F5EE; color:#0A6650; border-top:4px solid #14956E;}
+.mod-blue {background:#E5F0FB; color:#1558A0; border-top:4px solid #2374CC;}
+.mod-amber {background:#FAF0D8; color:#7A4C0A; border-top:4px solid #D68D15;}
+.mod-purple {background:#EEEDF9; color:#4A42AC; border-top:4px solid #6860D1;}
+.mod-steps {font-size:13px; color:#52524E; margin:0 0 6px 0; padding-left:18px;}
 .sb-badge {display:inline-block; font-size:12px; font-weight:500; padding:2px 10px; border-radius:20px; border:1px solid;}
 .sb-green {background:#E8F5E2; color:#2E6E12; border-color:#2E6E12;}
 .sb-amber {background:#FAF0D8; color:#7A4C0A; border-color:#7A4C0A;}
@@ -56,6 +72,9 @@ PAGES = {
     "alpha": "Periodic alpha check",
     "simulation": "Simulation centre",
 }
+PAGE_ICONS = {"dashboard": ":material/dashboard:", "segmentation": ":material/pie_chart:",
+              "service-levels": ":material/percent:", "allocation": ":material/calendar_view_week:",
+              "alpha": ":material/refresh_alert:", "simulation": ":material/monitoring:"}
 st.session_state.setdefault("page", "dashboard")
 
 
@@ -168,7 +187,9 @@ def jobs_panel(keys: tuple[str, ...] | None = None):
                     proc = j.get("proc")
                     if proc:
                         proc.terminate()
-            tail = Path(j["log"]).read_text(encoding="utf-8", errors="replace").splitlines()[-25:]
+            log_file = Path(j["log"])
+            tail = (log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-25:]
+                    if log_file.exists() else [])
             st.code("\n".join(tail) or "(no output yet)", language="text")
 
 
@@ -178,7 +199,7 @@ def kpis(path: Path) -> dict | None:
 
 
 def alpha_flags() -> pd.DataFrame:
-    """Proxy for the mockup's '3 SKUs flagged': clusters whose own-fill-best alpha differs
+    """Proxy for per-SKU alpha flags: clusters whose own-fill-best alpha differs
     from the alpha the pipeline adopted. The repo has cluster-level evidence only."""
     p = paths()
     ev = read_csv(str(p["evidence"] / "segment_alpha_real_data_summary.csv"))
@@ -203,7 +224,7 @@ def topbar():
     flags = alpha_flags()
     n_flag = int(flags["flagged"].sum()) if len(flags) else 0
     badge = ("sb-amber", f"{n_flag} flags") if page == "alpha" and n_flag else ("sb-green", "Up to date")
-    c1, c2, c3, c4 = st.columns([6, 1, 1, 1.2], vertical_alignment="center")
+    c1, c2, c3, c4 = st.columns([4, 1.3, 1.3, 1.5], vertical_alignment="center")
     c1.markdown(f"<span class='sb-title'>{PAGES[page]}</span><span class='sb-badge {badge[0]}'>{badge[1]}</span>",
                 unsafe_allow_html=True)
     export_col = c2
@@ -261,6 +282,26 @@ def sim_steps(policy: str, horizon: int, seed: int) -> tuple[str, list]:
 
 
 # --------------------------------------------------------------------------- pages
+def start_sim(policy_opt: str, horizon: int, seed: int) -> None:
+    p = paths()
+    policy = (next(iter(p["meio_dir"].rglob("meio_policy_rolling.parquet")), None)
+              if policy_opt.startswith("MEIO") else ROOT / p["cfg"]["digital_twin"]["policy"])
+    if policy is None or not Path(policy).exists():
+        st.error("Policy file not found. Run Weekly MEIO allocation first.")
+        return
+    root, steps = sim_steps(str(policy), int(horizon), int(seed))
+    st.session_state["sim_root"] = root
+    launch("sim", "Simulation (sandbox)", steps)
+
+
+def module_head(css: str, title: str):
+    st.markdown(f"<div class='mod-head mod-{css}'>{title}</div>", unsafe_allow_html=True)
+
+
+def steps_html(items: list[str]):
+    st.markdown("<ol class='mod-steps'>" + "".join(f"<li>{i}</li>" for i in items) + "</ol>", unsafe_allow_html=True)
+
+
 def page_dashboard(slot: dict, run_all_clicked: bool):
     p = paths()
     sku = read_csv(str(p["clusters"]))
@@ -277,55 +318,92 @@ def page_dashboard(slot: dict, run_all_clicked: bool):
 
     st.caption("SUMMARY")
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total SKUs", f"{len(sku):,}" if sku is not None else "n/a",
-              f"across {sku['cluster'].nunique()} clusters" if sku is not None else None, delta_color="off")
-    if k_meio and k_base:
-        m2.metric("Customer fill rate (forward plan)", f"{k_meio['customer_fill_rate']:.1%}",
-                  f"{(k_meio['customer_fill_rate'] - k_base['customer_fill_rate']) * 100:+.2f} pp vs baseline plan")
-        m3.metric("Avg inventory value", f"${k_meio['avg_inventory_value_usd'] / 1e6:.2f}M",
-                  f"{(k_meio['avg_inventory_value_usd'] / k_base['avg_inventory_value_usd'] - 1) * 100:+.1f}% vs baseline",
-                  delta_color="inverse")
+    if sku is not None:
+        m1.metric("Total SKUs", f"{len(sku):,}")
+        m1.caption(f"across {sku['cluster'].nunique()} clusters")
     else:
-        m2.metric("Customer fill rate", "n/a")
+        m1.metric("Total SKUs", "n/a")
+    if k_meio and k_base:
+        m2.metric("Fill rate (forward plan)", f"{k_meio['customer_fill_rate']:.1%}")
+        m2.caption(f"Baseline plan: {k_base['customer_fill_rate']:.1%}. The MEIO plan is "
+                   f"{(k_meio['customer_fill_rate'] - k_base['customer_fill_rate']) * 100:+.2f} percentage points higher "
+                   f"(share of customer demand filled from stock).")
+        m3.metric("Avg inventory value", f"${k_meio['avg_inventory_value_usd'] / 1e6:.2f}M")
+        m3.caption(f"Baseline plan: ${k_base['avg_inventory_value_usd'] / 1e6:.2f}M. The MEIO plan holds "
+                   f"{(k_meio['avg_inventory_value_usd'] / k_base['avg_inventory_value_usd'] - 1) * 100:+.1f}% more stock value.")
+    else:
+        m2.metric("Fill rate (forward plan)", "n/a")
         m3.metric("Avg inventory value", "n/a")
     n_sims = p["cfg"]["meio"].get("parameters", {}).get("n_sims")
-    m4.metric("MEIO sim draws (n_sims)", f"{n_sims:,}" if n_sims else "n/a",
-              f"last twin run: {mtime(p['twin_dir'] / 'run_kpis.json')}", delta_color="off")
-    st.caption("Mockup tile 'Inventory turns' has no pipeline output, so it is replaced by average inventory value. "
-               "Mockup 'Sim iterations 10,000' maps to config n_sims (4,000; the pipeline itself uses deterministic quadrature).")
+    m4.metric("MEIO n_sims", f"{n_sims:,}" if n_sims else "n/a")
+    m4.caption(f"last Twin run: {mtime(p['twin_dir'] / 'run_kpis.json')}")
 
     st.caption("MODULES")
-    g1, g2 = st.columns(2)
-    with g1.container(border=True):
-        st.markdown("**:material/pie_chart: SKU segmentation**")
-        st.write("Cluster SKUs by value, variability, forecastability and supply risk into archetypes with a service ladder.")
-        a, b, _ = st.columns([1.4, 1.8, 1])
-        a.button("Run segmentation", icon=":material/play_arrow:", key="d_seg", on_click=goto, args=("segmentation",))
-        b.button("Suggested service levels", icon=":material/percent:", key="d_sl", on_click=goto, args=("service-levels",))
+    cs = read_csv(str(p["cluster_sl"]))
+    summ = read_csv(str(p["weekly_dir"] / "meio_summary_by_dc_weekly.csv"))
+    par = read_json(str(p["weekly_dir"] / "meio_parameters.json")) or {}
+    tabs = st.tabs([":material/pie_chart: SKU segmentation", ":material/calendar_view_week: Weekly MEIO allocation",
+                    ":material/refresh_alert: Periodic alpha check", ":material/monitoring: Simulation centre"])
+
+    with tabs[0]:
+        if cs is not None:
+            st.caption("Latest output: SKUs per archetype")
+            st.bar_chart(cs.set_index("archetype")["n_skus"], height=170, color="#14956E")
+        a, b = st.columns(2)
+        if a.button("Run segmentation (sandbox)", icon=":material/play_arrow:", key="d_seg", width="stretch"):
+            launch("seg", "SKU segmentation", seg_steps(False))
+        b.button("Open details & charts", icon=":material/open_in_new:", key="d_sl", width="stretch",
+                 on_click=goto, args=("segmentation",))
         st.caption(f"Last run: {mtime(p['clusters'])}")
-    with g1.container(border=True):
-        st.markdown("**:material/monitoring: Simulation centre**")
-        st.write("Digital Twin replay of a policy over the forward year (discrete-event, seeded) with scenario overrides.")
-        a, b, _ = st.columns([1.6, 1.2, 1])
-        a.button("Configure & launch", icon=":material/settings:", key="d_sim", on_click=goto, args=("simulation",))
-        b.button("Last results", key="d_simres", on_click=goto, args=("simulation",))
-        reg = job_registry()
-        running = [j for j in reg.values() if j["key"] == "sim" and j["state"] == "running"]
-        st.caption("Running" if running else f"Last run: {mtime(p['twin_dir'] / 'run_kpis.json')}")
-    with g2.container(border=True):
-        st.markdown("**:material/calendar_view_week: Weekly MEIO allocation**")
-        st.write("Clark-Scarf v2 multi-echelon safety stock, reorder point and order-up-to per DC x SKU, rolled forward weekly.")
-        a, b, _ = st.columns([1.4, 1.4, 1])
-        a.button("Run allocation", icon=":material/play_arrow:", key="d_alloc", on_click=goto, args=("allocation",))
-        b.button("View last output", key="d_allocview", on_click=goto, args=("allocation",))
+        jobs_panel(("seg",))
+
+    with tabs[1]:
+        if summ is not None:
+            st.caption("Latest output: safety stock value by DC (USD)")
+            st.bar_chart(summ.set_index("dc_id")["total_safety_stock_usd"], height=170, color="#2374CC")
+        ok = st.checkbox(f"Allow overwrite of output datasets/MEIO/{p['name']}", key="d_alloc_ok")
+        a, b = st.columns(2)
+        if a.button("Run allocation", icon=":material/play_arrow:", key="d_alloc", width="stretch", disabled=not ok):
+            launch("alloc", "Weekly MEIO allocation", meio_steps(False))
+        b.button("View weekly policy", icon=":material/open_in_new:", key="d_allocview", width="stretch",
+                 on_click=goto, args=("allocation",))
         st.caption(f"Last run: {mtime(p['weekly_dir'] / 'meio_policy_weekly.parquet')}")
-    with g2.container(border=True):
-        st.markdown("**:material/refresh_alert: Periodic alpha check**")
-        st.write("Re-resolve the pooling alpha (and netting discount) from the multi-seed evidence and review clusters that prefer another alpha.")
-        a, b, _ = st.columns([1.4, 1.6, 1])
-        a.button("Run alpha check", icon=":material/play_arrow:", key="d_alpha", on_click=goto, args=("alpha",))
-        b.button(f"Review flags ({n_flag})", key="d_flags", on_click=goto, args=("alpha",))
+        jobs_panel(("alloc",))
+
+    with tabs[3]:
+        rows = {n: kpis(d) for n, d in (("Baseline plan", p["baseline_dir"]), ("MEIO plan", p["twin_dir"]))}
+        if all(rows.values()):
+            st.caption("Latest output: baseline vs MEIO plan")
+            st.dataframe(pd.DataFrame({
+                n: {"Fill rate": f"{k['customer_fill_rate']:.1%}",
+                    "Avg inventory value": f"${k['avg_inventory_value_usd'] / 1e6:.2f}M",
+                    "Total landed cost": f"${k['total_landed_cost_usd'] / 1e6:.2f}M"} for n, k in rows.items()}),
+                width="stretch")
+        a, b = st.columns(2)
+        if a.button("Run default simulation", icon=":material/play_arrow:", key="d_sim", width="stretch"):
+            start_sim("MEIO rolling policy (Clark-Scarf v2)", 52, int(p["cfg"]["digital_twin"].get("seed", 2026)))
+        b.button("Configure & compare", icon=":material/settings:", key="d_simres", width="stretch",
+                 on_click=goto, args=("simulation",))
+        st.caption(f"Last run: {mtime(p['twin_dir'] / 'run_kpis.json')}. Default = MEIO policy, 52 weeks, sandbox output.")
+        jobs_panel(("sim",))
+
+    with tabs[2]:
+        if par:
+            x, y = st.columns(2)
+            x.metric("Adopted alpha", par.get("alpha"))
+            y.metric("Netting discount", par.get("netting_discount"))
+        if len(flags):
+            st.caption("Latest output: best alpha per cluster")
+            st.dataframe(flags[["cluster", "best_alpha_own_fill", "adopted_alpha", "gain_pp"]].rename(columns={
+                "cluster": "Cluster", "best_alpha_own_fill": "Best alpha", "adopted_alpha": "Adopted",
+                "gain_pp": "Fill gain (pp)"}), hide_index=True, width="stretch")
+        a, b = st.columns(2)
+        if a.button("Run alpha check", icon=":material/play_arrow:", key="d_alpha", width="stretch"):
+            launch("alpha", "Periodic alpha check", alpha_steps())
+        b.button(f"Review flags ({n_flag})", icon=":material/open_in_new:", key="d_flags", width="stretch",
+                 on_click=goto, args=("alpha",))
         st.caption(f"{n_flag} cluster(s) flagged")
+        jobs_panel(("alpha",))
 
     st.divider()
     run_all_panel(run_all_clicked)
@@ -349,10 +427,102 @@ def run_all_panel(clicked: bool):
     jobs_panel(("runall",))
 
 
+FEATURES = {"log_annual_net_margin": "Log net margin", "net_margin_pct": "Net margin %",
+            "demand_cv_base": "Demand CV", "promo_depth_share": "Promo share",
+            "forecast_baseline_wmape": "Baseline WMAPE", "forecast_lift_wmape": "Promo-lift WMAPE",
+            "lead_time_mean_days": "Lead time (days)", "lead_time_cv": "Lead-time CV"}
+
+
+def seg_charts(sku: pd.DataFrame, cs: pd.DataFrame, art: Path, imgs: list):
+    import altair as alt
+    if sku is None:
+        st.info("No SKU data.")
+        return
+    f1, f2, f3 = st.columns(3)
+    arch = f1.multiselect("Archetype", sorted(sku["archetype"].unique()), key="ch_arch")
+    cat = f2.multiselect("Category", sorted(sku["category"].unique()), key="ch_cat")
+    ids = f3.multiselect("SKU", sorted(sku["sku_id"].unique()), key="ch_sku")
+    v = sku
+    if arch:
+        v = v[v["archetype"].isin(arch)]
+    if cat:
+        v = v[v["category"].isin(cat)]
+    if ids:
+        v = v[v["sku_id"].isin(ids)]
+    st.caption(f"Filters apply to all four charts below. {len(v):,} of {len(sku):,} SKUs selected.")
+    if v.empty:
+        st.warning("No SKUs match the filters.")
+        return
+    order = list(cs.sort_values("recommended_csl", ascending=False)["archetype"])
+    color = alt.Color("archetype:N", sort=order, title="Archetype")
+
+    st.subheader("1. Cluster fingerprints")
+    z = (sku[list(FEATURES)] - sku[list(FEATURES)].mean()) / sku[list(FEATURES)].std()
+    z["archetype"] = sku["archetype"]
+    fp = z.loc[v.index].groupby("archetype").mean().rename(columns=FEATURES).reset_index().melt(
+        "archetype", var_name="feature", value_name="z")
+    st.altair_chart(alt.Chart(fp).mark_rect().encode(
+        x=alt.X("feature:N", title=None, axis=alt.Axis(labelAngle=-30)), y=alt.Y("archetype:N", sort=order, title=None),
+        color=alt.Color("z:Q", scale=alt.Scale(scheme="redblue", domain=[-2, 2], reverse=True), title="Std. dev."),
+        tooltip=["archetype", "feature", alt.Tooltip("z:Q", format=".2f")]).properties(height=260),
+        width="stretch")
+    st.caption("Each cell is how far an archetype's average sits from the all-SKU average on that feature, in standard "
+               "deviations (red = above average, blue = below). It shows what makes each archetype distinct, for "
+               "example high forecast error for the long-tail groups.")
+
+    st.subheader("2. Cluster separation (PCA map)")
+    from sklearn.decomposition import PCA
+    zz = z[list(FEATURES)].fillna(0)
+    pca = PCA(n_components=2, random_state=0)
+    xy = pd.DataFrame(pca.fit_transform(zz.values), index=sku.index, columns=["PC1", "PC2"])
+    xy = xy.loc[v.index].assign(archetype=v["archetype"], sku_id=v["sku_id"], category=v["category"])
+    st.altair_chart(alt.Chart(xy).mark_circle(size=45, opacity=.7).encode(
+        x="PC1:Q", y="PC2:Q", color=color, tooltip=["sku_id", "category", "archetype"]).properties(height=360).interactive(),
+        width="stretch")
+    st.caption(f"Each dot is a SKU, projected from the 8 clustering features onto two axes "
+               f"({pca.explained_variance_ratio_.sum():.0%} of variance). Dots of one colour sitting together mean a tight "
+               "group; overlap marks boundary SKUs worth a business review. Recomputed here with plain standardised "
+               "features, so it approximates the saved static PCA chart.")
+
+    st.subheader("3. Recommended vs economically implied service level")
+    sl = v.groupby("archetype").agg(skus=("sku_id", "count"), newsvendor_cr=("newsvendor_cr", "median")).reset_index()
+    sl = sl.merge(cs[["archetype", "recommended_csl"]], on="archetype")
+    sl = sl.melt(["archetype", "skus"], value_vars=["newsvendor_cr", "recommended_csl"], var_name="measure", value_name="level")
+    sl["measure"] = sl["measure"].map({"newsvendor_cr": "Economic (newsvendor) CR", "recommended_csl": "Recommended CSL"})
+    st.altair_chart(alt.Chart(sl).mark_bar(clip=True).encode(
+        x=alt.X("archetype:N", sort=order, title=None, axis=alt.Axis(labelAngle=-25, labelLimit=240, labelPadding=8)),
+        y=alt.Y("level:Q", scale=alt.Scale(domain=[0.85, 1.0]), axis=alt.Axis(format="%", labelLimit=100), title="Service level"),
+        xOffset="measure:N", color=alt.Color("measure:N", title=None),
+        tooltip=["archetype", "measure", "skus", alt.Tooltip("level:Q", format=".1%")]).properties(
+            height=320, padding={"left": 10, "right": 10, "top": 10, "bottom": 30}),
+        width="stretch")
+    st.caption("For each archetype: the service level the cost trade-off implies (median newsvendor critical ratio of the "
+               "selected SKUs) next to the level the ladder recommends. Core groups are lifted to 97% because of their "
+               "revenue share; low-value groups are capped at 90%. Axis starts at 85%.")
+
+    st.subheader("4. Forecast error: baseline vs promo-lift")
+    lim = float(max(v["forecast_baseline_wmape"].max(), v["forecast_lift_wmape"].max())) * 1.05
+    pts = alt.Chart(v).mark_circle(size=45, opacity=.65).encode(
+        x=alt.X("forecast_baseline_wmape:Q", title="Baseline WMAPE", scale=alt.Scale(domain=[0, lim])),
+        y=alt.Y("forecast_lift_wmape:Q", title="Promo-lift WMAPE", scale=alt.Scale(domain=[0, lim])),
+        color=color, tooltip=["sku_id", "category", "archetype", alt.Tooltip("forecast_baseline_wmape:Q", format=".2f"),
+                              alt.Tooltip("forecast_lift_wmape:Q", format=".2f")])
+    diag = alt.Chart(pd.DataFrame({"x": [0, lim], "y": [0, lim]})).mark_line(strokeDash=[4, 4], color="grey").encode(x="x", y="y")
+    st.altair_chart((pts + diag).properties(height=360).interactive(), width="stretch")
+    st.caption("WMAPE is the weighted forecast error (lower is better). Dots above the dashed line forecast worse once "
+               "promotions are modelled than with the plain baseline; dots below benefit from the promo-lift model. "
+               "Far-right dots are the hard-to-forecast long-tail SKUs.")
+    with st.expander("Original static charts saved by the segmentation run"):
+        c = st.columns(2)
+        for i, (f, cap) in enumerate(imgs):
+            if (art / f).exists():
+                c[i % 2].image(str(art / f), caption=cap)
+
+
 def page_segmentation(slot: dict):
     p = paths()
     sku, cs = read_csv(str(p["clusters"])), read_csv(str(p["cluster_sl"]))
-    c1, c2 = st.columns([1, 3], vertical_alignment="center")
+    c1, c2 = st.columns([2, 3], vertical_alignment="center")
     with c1:
         canonical = st.toggle("Overwrite canonical output", value=False,
                               help="Off: write to App/runs/. On: rewrite output datasets/segmentation/ (used by MEIO).")
@@ -372,28 +542,39 @@ def page_segmentation(slot: dict):
         st.error("No segmentation output found.")
         return
     tot = cs["n_skus"].sum()
-    cols = ["cluster", "archetype", "n_skus", "revenue_share", "net_margin_share", "forecast_baseline_wmape",
+    cols = ["archetype", "n_skus", "revenue_share", "net_margin_share", "forecast_baseline_wmape",
             "recommended_csl", "target_case_fill_rate", "safety_factor_z"]
     st.subheader("Segment portfolio")
     st.dataframe(cs[cols].sort_values("recommended_csl", ascending=False), hide_index=True, width="stretch",
-                 column_config={"revenue_share": st.column_config.NumberColumn(format="percent"),
-                                "net_margin_share": st.column_config.NumberColumn(format="percent"),
-                                "recommended_csl": st.column_config.NumberColumn(format="percent"),
-                                "target_case_fill_rate": st.column_config.NumberColumn(format="percent")})
-    st.caption(f"{tot} SKUs in {len(cs)} clusters. Mockup shows 4 segments A/B/C/D; the pipeline produces {len(cs)} named archetypes.")
+                 column_config={"archetype": st.column_config.TextColumn("Archetype", width="medium"),
+                                "n_skus": st.column_config.NumberColumn("SKUs", width="small"),
+                                "revenue_share": st.column_config.NumberColumn("Revenue %", format="percent", width="small"),
+                                "net_margin_share": st.column_config.NumberColumn("Margin %", format="percent", width="small"),
+                                "forecast_baseline_wmape": st.column_config.NumberColumn("WMAPE", format="%.2f", width="small"),
+                                "recommended_csl": st.column_config.NumberColumn("CSL", format="percent", width="small"),
+                                "target_case_fill_rate": st.column_config.NumberColumn("Case fill", format="percent", width="small"),
+                                "safety_factor_z": st.column_config.NumberColumn("z", format="%.3f", width="small")})
+    st.caption(f"{tot} SKUs in {len(cs)} clusters.")
     art = SEG / "report_artifacts"
     imgs = [("chart_fingerprints.png", "Cluster fingerprints"), ("chart_pca.png", "PCA map"),
             ("chart_service_ladder.png", "Service ladder"), ("chart_failure_modes.png", "Failure modes")]
     t1, t2, t3 = st.tabs(["Charts", "SKU table", "Report"])
     with t1:
-        c = st.columns(2)
-        for i, (f, cap) in enumerate(imgs):
-            if (art / f).exists():
-                c[i % 2].image(str(art / f), caption=cap)
+        seg_charts(sku, cs, art, imgs)
     with t2:
         if sku is not None:
-            pick = st.multiselect("Archetype", sorted(sku["archetype"].unique()))
-            view = sku if not pick else sku[sku["archetype"].isin(pick)]
+            f1, f2, f3 = st.columns(3)
+            arch = f1.multiselect("Archetype", sorted(sku["archetype"].unique()))
+            cat = f2.multiselect("Category", sorted(sku["category"].unique()))
+            ids = f3.multiselect("SKU", sorted(sku["sku_id"].unique()))
+            view = sku
+            if arch:
+                view = view[view["archetype"].isin(arch)]
+            if cat:
+                view = view[view["category"].isin(cat)]
+            if ids:
+                view = view[view["sku_id"].isin(ids)]
+            st.caption(f"{len(view):,} of {len(sku):,} SKUs")
             st.dataframe(view[["sku_id", "sku_code", "category", "subcategory", "segment", "archetype", "recommended_csl",
                                "annual_net_margin_usd", "demand_cv_base", "forecast_baseline_wmape", "lead_time_cv"]],
                          hide_index=True, width="stretch")
@@ -439,7 +620,7 @@ def page_service_levels(slot: dict):
     p = paths()
     cs = read_csv(str(p["cluster_sl"]))
     ev = read_csv(str(p["evidence"] / "service_level_real_data_summary.csv"))
-    st.write("Compute target service levels per cluster. The mockup's three methods map as follows.")
+    st.write("Compute target service levels per cluster.")
     with st.form("sl"):
         method = st.selectbox("Optimisation method", ["Newsvendor (critical ratio)", "Cost-minimisation",
                                                       "Fill-rate target"])
@@ -528,6 +709,32 @@ def page_allocation(slot: dict):
     b.metric("Total safety stock (units)", f"{summ['total_safety_stock'].sum():,.0f}")
     c.metric("Safety stock value", f"${summ['total_safety_stock_usd'].sum() / 1e6:.2f}M")
     st.dataframe(summ, hide_index=True, width="stretch")
+    pol = read_parquet(str(p["meio_dir"] / "rolling_2026" / "meio_policy_rolling.parquet"))
+    sku_cat = read_csv(str(p["clusters"]))
+    if pol is not None:
+        st.subheader("Weekly policy (rolling 2026)")
+        if sku_cat is not None:
+            pol = pol.merge(sku_cat[["sku_id", "category"]], on="sku_id", how="left")
+        weeks = sorted(pol["period"].unique())
+        w1, w2 = st.select_slider("Weeks", options=weeks, value=(weeks[0], weeks[-1]))
+        g1, g2, g3 = st.columns(3)
+        dcs = g1.multiselect("DC", sorted(pol["dc_id"].unique()), key="pol_dc")
+        cats = g2.multiselect("Category", sorted(pol["category"].dropna().unique()), key="pol_cat")
+        ids = g3.multiselect("SKU", sorted(pol["sku_id"].unique()), key="pol_sku")
+        v = pol[(pol["period"] >= w1) & (pol["period"] <= w2)]
+        if dcs:
+            v = v[v["dc_id"].isin(dcs)]
+        if cats:
+            v = v[v["category"].isin(cats)]
+        if ids:
+            v = v[v["sku_id"].isin(ids)]
+        st.caption(f"{len(v):,} rows, {v['period'].nunique()} week(s)")
+        if len(v):
+            st.line_chart(v.groupby("period")[["safety_stock", "reorder_point", "order_up_to_level"]].sum())
+        st.dataframe(v.head(5000), hide_index=True, width="stretch")
+        if len(v) > 5000:
+            st.caption("Showing the first 5,000 rows; use Export for the full filtered table.")
+        slot["df"] = v
     if rec is not None:
         with st.expander(f"Recommendations by DC x SKU ({len(rec):,} rows)"):
             dc = st.multiselect("DC", sorted(rec["dc_id"].unique()))
@@ -541,7 +748,8 @@ def page_allocation(slot: dict):
     if par:
         with st.expander("Parameters used (meio_parameters.json)"):
             st.json({k: par[k] for k in ("model", "selection", "alpha", "netting_discount", "ddlt", "n_sims", "seed")})
-    slot["df"] = summ
+    if slot.get("df") is None:
+        slot["df"] = summ
 
 
 def page_alpha(slot: dict):
@@ -558,7 +766,7 @@ def page_alpha(slot: dict):
         for d in par.get("decisions", []):
             st.markdown(f"- **{d['parameter']}** = `{d['value']}` - {d['reason']}")
     st.info("Note: in this repo alpha is the Clark-Scarf v2 pooling factor, not the exponential-smoothing alpha "
-            "the mockup's description implies.")
+            "a demand-smoothing alpha.")
     st.subheader("Review flags (cluster-level proxy)")
     flags = alpha_flags()
     if len(flags):
@@ -591,18 +799,11 @@ def page_simulation(slot: dict):
         horizon = c2.number_input("Horizon (weeks)", 4, 104, 52, 1,
                                   help="Forward data covers 2026 (52 weeks); longer values are untested.")
         seed = c3.number_input("Seed", 0, 99999, int(p["cfg"]["digital_twin"].get("seed", 2026)), 1)
-        st.caption("Not mapped from the mockup: Iterations (the Twin is a single seeded replay), Segment scope, and the "
+        st.caption("Not available: Iterations (the Twin is a single seeded replay), Segment scope, and the "
                    "free demand-scenario list. Scenarios come from the Agents' override engine - see below.")
         go = st.form_submit_button("Launch simulation", icon=":material/play_arrow:", type="primary")
     if go:
-        policy = (next(iter(p["meio_dir"].rglob("meio_policy_rolling.parquet")), None)
-                  if policy_opt.startswith("MEIO") else ROOT / p["cfg"]["digital_twin"]["policy"])
-        if policy is None or not Path(policy).exists():
-            st.error("Policy file not found. Run Weekly MEIO allocation first.")
-        else:
-            root, steps = sim_steps(str(policy), int(horizon), int(seed))
-            st.session_state["sim_root"] = root
-            launch("sim", "Simulation (sandbox)", steps)
+        start_sim(policy_opt, int(horizon), int(seed))
     jobs_panel(("sim",))
 
     st.subheader("Results")
@@ -652,7 +853,8 @@ def page_simulation(slot: dict):
 with st.sidebar:
     st.markdown("### :material/psychology: Supply Brain\nMEIO Optimiser")
     st.caption("OVERVIEW")
-    st.radio("Navigation", list(PAGES), format_func=PAGES.get, key="page", label_visibility="collapsed")
+    st.radio("Navigation", list(PAGES), format_func=lambda k: f"{PAGE_ICONS[k]} {PAGES[k]}", key="page",
+             label_visibility="collapsed")
 
 slot: dict = {}
 header = st.container()

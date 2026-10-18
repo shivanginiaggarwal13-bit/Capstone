@@ -5,7 +5,7 @@
   "description": "Shared scenario input for MEIO and Digital Twin runs. Ported in from Vishwajeet's final_submission_optimized port (multi_agent_orchastration branch) so its scripts can resolve paths; `meio.parameters.clusters` updated to the canonical, live v5 segmentation output (this branch's adopted default, see models/MEIO/MEIO_Weekly/meio_weekly_lib.py) instead of the frozen v4 path his original config pointed at.",
   "changes": {},
   "digital_twin": {
-    "entrypoint": "models/twin/digital_twin.py",
+    "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py",
     "mode": "forward",
     "run_name": "meio_policy",
     "seed": 2026,
@@ -20,7 +20,7 @@
     "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py",
     "data_dir": "input datasets",
     "as_of_week": "2025-W52",
-    "policy_filename": "meio_policy_rolling.csv",
+    "policy_filename": "meio_policy_rolling.parquet",
     "output_root": "output datasets/MEIO",
     "parameters": {
       "model": "clark_scarf_v2",

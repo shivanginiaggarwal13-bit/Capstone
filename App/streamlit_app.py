@@ -315,10 +315,15 @@ def sim_steps(policy: str, horizon: int, seed: int) -> tuple[str, list]:
     root.mkdir(parents=True, exist_ok=True)
     cfg_file = root / "scenario_config.json"
     cfg_file.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-    return str(root), [("digital_twin.py", [PY, "models/twin/digital_twin.py", "--scenario-config", cfg_file,
-                                             "--mode", "forward", "--policy", policy, "--seed", seed,
-                                             "--horizon-weeks", horizon, "--run-name", "ui_sandbox",
-                                             "--skip-output-documentation"])]
+    # The MEIO policy option resolves to meio_policy_rolling.parquet (the optimized MEIO
+    # tools write parquet, not CSV) -- models/twin/digital_twin.py only reads CSV
+    # (pd.read_csv(pol_path)), so it would crash on that file. digital_twin_fast.py reads
+    # either format and is what scenario_config.json's digital_twin.entrypoint uses too.
+    return str(root), [("digital_twin_fast.py",
+                        [PY, "models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py",
+                         "--scenario-config", cfg_file, "--mode", "forward", "--policy", policy, "--seed", seed,
+                         "--horizon-weeks", horizon, "--run-name", "ui_sandbox",
+                         "--skip-output-documentation"])]
 
 
 # --------------------------------------------------------------------------- pages

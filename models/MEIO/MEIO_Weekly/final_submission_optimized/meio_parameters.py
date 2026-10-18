@@ -19,7 +19,7 @@ Config (`scenario_config.json`):
         "min_seeds": 5,
         "evidence": ["output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results",
                      "models/MEIO/MEIO_Weekly/final_submission/results"],
-        "clusters": "Clustering & Segmentation/segmentation_v4/sku_clusters.csv",
+        "clusters": "output datasets/segmentation/sku_clusters.csv",
         "ddlt": "quadrature",               # or "monte_carlo" (the research scripts' method)
         "n_sims": 4000, "seed": 2026,
         "fixed": {"alpha": 0.2, "netting_discount": 0.0}}}
@@ -40,8 +40,11 @@ errors without raising landed cost by more than two standard errors.
    netting_discount does not count: multiseed_alpha_04_06.csv was run at 1.0, before
    the netting fix.
 3. Per-cluster service level and per-cluster alpha. These are used only when the sweep
-   is complete (every candidate has min_seeds seeds) and was run at the chosen alpha
-   and netting_discount.
+   is complete (every candidate has min_seeds seeds) and was run at the chosen
+   netting_discount, and at the reference alpha each sweep was actually built around --
+   CLUSTER_ALPHA_REFERENCE for alpha, a fixed-in-the-evidence alpha for CSL -- which is
+   NOT necessarily params.alpha's own reference (REFERENCE_ALPHA, item 2's historical
+   0.2): the two answer different questions and can legitimately differ.
    - Service level. The sweep's reference is the segmentation deliverable's cluster
      CSL ladder. That ladder must first beat today's segment ladder (the netting
      evidence at the chosen settings) on portfolio fill.
@@ -71,14 +74,30 @@ import runtime as rt
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
-REFERENCE_ALPHA = 0.2          # validate_real_data.HEADLINE_ALPHA, segment_alpha_explore.REFERENCE_ALPHA
+REFERENCE_ALPHA = 0.2          # validate_real_data.HEADLINE_ALPHA, segment_alpha_explore.REFERENCE_ALPHA --
+                               # the PORTFOLIO-level reference only (netting_multiseed/alpha_multiseed evidence
+                               # was built around this). Not used for the per-cluster alpha gate below -- see
+                               # CLUSTER_ALPHA_REFERENCE, a genuinely different value as of 2026-10-19.
 REFERENCE_NETTING = 1.0        # clark_scarf_v2.solve's original behaviour
-CLUSTERS = ("Flagship Promo-Driven", "Mid-Tier Core", "Long-Tail Erratic", "Long-Tail Supply-Risk")
-CLUSTER_ALPHAS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)     # segment_alpha_explore.ALPHAS
-CLUSTER_CSLS = (0.90, 0.95, 0.97, 0.99)             # service_level_real_data.CANDIDATE_CSL
+CLUSTER_ALPHA_REFERENCE = 0.6  # segment_alpha_v5_real_data.REFERENCE_ALPHA: today's live portfolio alpha
+                               # (meio_parameters resolves alpha=0.6, not the historical 0.2). The per-cluster
+                               # alpha sweep holds every OTHER cluster at this value while testing one cluster's
+                               # alpha across the grid, so for that evidence to mean anything the CURRENTLY
+                               # resolved params.alpha must equal it too -- if a future sweep re-validates
+                               # netting/alpha and params.alpha moves again, this constant needs updating by
+                               # hand (re-run segment_alpha_v5_real_data.py at the new value first) and is
+                               # deliberately not derived from params.alpha automatically: the point is that
+                               # adopting per-cluster alpha requires evidence built AT the value actually
+                               # chosen, not an assumption that any old sweep still applies.
+CLUSTERS = ("Flagship Core", "Mid-Tier Core", "Long-Tail Erratic", "Long-Tail Erratic 2",
+           "Long-Tail Erratic 3", "Long-Tail Supply-Risk")   # canonical v5 archetypes (output datasets/
+                               # segmentation/sku_clusters.csv) -- NOT v4's 4-name scheme used until 2026-10-18.
+CLUSTER_ALPHAS = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)     # segment_alpha_v5_real_data.ALPHAS
+CLUSTER_CSLS = (0.90, 0.95, 0.97, 0.99)             # service_level_v5_real_data.CANDIDATE_CSL (subset; that
+                               # sweep also has 0.957, Long-Tail Erratic 2's own exact recommendation)
 DEFAULTS = {"selection": "validated", "min_seeds": 5, "ddlt": "quadrature", "n_sims": 4000, "seed": 2026,
             "evidence": ["models/MEIO/MEIO_Weekly/final_submission/results"],
-            "clusters": "Clustering & Segmentation/segmentation_v4/sku_clusters.csv"}
+            "clusters": "output datasets/segmentation/sku_clusters.csv"}
 
 # name: (file glob, required columns, settings the script fixed but did not write)
 EVIDENCE = {
@@ -86,10 +105,10 @@ EVIDENCE = {
                           {"netting_discount", "seed", "fill_delta_pp", "cost_delta_usd"}, {"alpha": 0.2}),
     "alpha_multiseed": ("multiseed_alpha_*.csv",
                         {"alpha", "seed", "fill_delta_pp", "cost_delta_usd"}, {"netting_discount": 1.0}),
-    "cluster_alpha": ("segment_alpha_real_data_multiseed.csv",
+    "cluster_alpha": ("segment_alpha_v5_real_data_multiseed.csv",
                       {"cluster", "alpha", "seed", "own_fill_rate", "portfolio_fill_rate", "cost_delta_usd"},
-                      {"netting_discount": 1.0}),
-    "cluster_csl": ("service_level_real_data_multiseed.csv",
+                      {"netting_discount": 0.0}),
+    "cluster_csl": ("service_level_v5_real_data_multiseed.csv",
                     {"cluster", "csl", "seed", "own_fill_rate", "portfolio_fill_rate", "fill_delta_vs_actual_pp",
                      "cost_delta_usd"}, {"alpha": 0.2, "netting_discount": 0.0}),
 }
@@ -328,25 +347,32 @@ def _clusters(ev: dict, params: Parameters, clusters_csv: Path, min_seeds: int) 
         params.decide("alpha_by_cluster", None, "no per-cluster alpha sweep found; portfolio alpha everywhere")
         return
     df = df.with_columns(pl.col("alpha").cast(pl.Float64))
-    ref_ok = params.alpha == REFERENCE_ALPHA
+    # Compare against the sweep's OWN reference (the alpha held fixed for every other
+    # cluster while one was swept, CLUSTER_ALPHA_REFERENCE) -- not the portfolio-level
+    # REFERENCE_ALPHA constant, which is a different value answering a different
+    # question (was the *netting* decision's reference alpha). Using REFERENCE_ALPHA
+    # here would make this gate permanently unable to adopt any evidence the moment
+    # params.alpha (resolved by _portfolio() above) moves off 0.2, regardless of
+    # whether the cluster evidence is current and correctly built.
+    ref_ok = params.alpha == CLUSTER_ALPHA_REFERENCE
     nds = sorted(set(float(x) for x in df["netting_discount"].to_list()))
     complete, how = _complete(df, "alpha", CLUSTER_ALPHAS, min_seeds)
     reasons = [how] if not complete else []
     if nds != [params.netting_discount]:
         reasons.append(f"run at netting_discount {nds}; selected {params.netting_discount:g}")
     if not ref_ok:
-        reasons.append(f"run around alpha {REFERENCE_ALPHA:g}; selected {params.alpha:g}")
+        reasons.append(f"run around alpha {CLUSTER_ALPHA_REFERENCE:g}; selected {params.alpha:g}")
     if reasons:
         params.decide("alpha_by_cluster", None, "not used; portfolio alpha everywhere: " + "; ".join(reasons))
         return
     chosen = {}
     for cluster in CLUSTERS:
         sub = df.filter(pl.col("cluster") == cluster)
-        best, tests = _best(_groups(sub, "alpha"), REFERENCE_ALPHA, fill="own_fill_rate", guards=guards,
+        best, tests = _best(_groups(sub, "alpha"), CLUSTER_ALPHA_REFERENCE, fill="own_fill_rate", guards=guards,
                             min_seeds=min_seeds)
         chosen[cluster] = float(best)
-        params.decide(f"alpha[{cluster}]", float(best), "paired test on own fill", reference=REFERENCE_ALPHA,
-                      tests=tests)
+        params.decide(f"alpha[{cluster}]", float(best), "paired test on own fill",
+                      reference=CLUSTER_ALPHA_REFERENCE, tests=tests)
     params.alpha_by_sku = {s: chosen[a] for s, a in zip(skus["sku_id"].to_list(), skus["archetype"].to_list())
                            if a in chosen and chosen[a] != params.alpha}
     params.decide("alpha_by_cluster", chosen, "per-cluster alpha adopted (measured one cluster at a time, "

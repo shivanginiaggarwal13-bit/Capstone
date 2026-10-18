@@ -201,15 +201,53 @@ archetypes, not v4's 4:
 |---|---|
 | Flagship Promo-Driven, Mid-Tier Core → z=1.881 | Flagship Core, Mid-Tier Core → z=1.881 |
 | Long-Tail Erratic, Long-Tail Supply-Risk → z=1.282 | Long-Tail Erratic, Long-Tail Erratic 3, Long-Tail Supply-Risk → z=1.282 |
-| — | **Long-Tail Erratic 2 → z=1.717 (NEW — never tested against real demand)** |
+| — | Long-Tail Erratic 2 → z=1.717 (NEW — see below) |
 
-Every multi-seed validation this project has — the netting-discount
-decision, the per-cluster alpha sweep, the per-cluster CSL sweep — was run
-against v4's 4-cluster, 2-distinct-z scheme specifically. v5's extra
-granularity, and especially the new z=1.717 value, have not been separately
-validated. The headline table above is real and was generated against the
-live v5 link, but "is 1.717 the right target for Long-Tail Erratic 2" is an
-open question, not a validated answer.
+Every multi-seed validation this project had going into 2026-10-18 — the
+netting-discount decision, the per-cluster alpha sweep, the per-cluster CSL
+sweep — was run against v4's 4-cluster, 2-distinct-z scheme specifically.
+That gap is now closed for z/CSL specifically (see
+`service_level_v5_real_data.py` below); alpha and the combined
+alpha+netting_discount+z configuration still have not been separately
+validated for v5 and remain open (see "Next steps").
+
+### v5's 6-cluster CSL validated against real demand (2026-10-18)
+
+Built `service_level_v5_real_data.py` — structurally identical to
+`service_level_real_data.py` (parallel, resumable, real 2025 demand, 5
+seeds), but swept against v5's 6 archetypes and candidate CSLs {90%, 95%,
+95.7%, 97%, 99%} (95.7% added specifically to test Long-Tail Erratic 2's
+exact, previously-untested recommendation). Full 5-seed run, every
+(cluster, CSL) row at `n_seeds=5`:
+
+| Cluster | Recommended CSL | Own-fill at recommended CSL (5-seed mean) | Gap vs. target |
+|---|---|---|---|
+| Flagship Core | 97.0% | 94.3% | 2.7pp short |
+| Mid-Tier Core | 97.0% | 95.2% | 1.8pp short |
+| Long-Tail Erratic | 90.0% | 93.6% | beats target |
+| **Long-Tail Erratic 2** | **95.7%** | **88.1%** | **7.6pp short** |
+| Long-Tail Erratic 3 | 90.0% | 90.9% | beats target |
+| Long-Tail Supply-Risk | 90.0% | 91.9% | beats target |
+
+**Five of six clusters hold up** — within a few points of target or beating
+it, consistent with the mild general under-delivery this project has
+documented elsewhere (forecast bias, trailing-CV lag). **Long-Tail Erratic 2
+does not.** Its shortfall (7.6pp) is markedly larger than every other
+cluster's, and the gap is not a seed artifact: own-fill std across the 5
+seeds is ~0.0019 (tiny) at every CSL tested. Pushing it to the most
+aggressive candidate tried (CSL=99%) still only reaches 89.9% own-fill —
+never closing in on its own nominal target anywhere in the tested range.
+That points at the newsvendor z-formula itself being a poor fit for this
+archetype's demand profile, not just "the wrong CSL was picked." Raw results:
+`output datasets/agent output/service_level_v5_real_data_multiseed.csv`
+(150 rows); aggregated: `..._summary.csv`.
+
+**Not yet decided**: whether to revise Long-Tail Erratic 2's z directly, fold
+it back into a neighboring cluster (it split out of Long-Tail Erratic/3 in
+v5's finer segmentation), or flag it to the segmentation workstream as a
+cluster boundary worth revisiting. Nothing has been changed in
+`sku_clusters.csv` or the live default as a result of this finding — it's
+reported, not yet acted on.
 
 `assign_z()` now resolves, in order: `Z_OVERRIDE_BY_SKU` (explicit, for
 research scripts only) → the canonical segmentation's cluster ladder (the
@@ -400,15 +438,18 @@ impact if ignored) is −0.06pp fill, +$226K cost.
 
 ## Next steps, in priority order
 
-1. **Decide whether to validate v5 directly, or fall back to v4 until it
-   is.** `segment_alpha_real_data.py` and `service_level_real_data.py` both
-   still hardcode v4's 4-cluster list — none of this project's multi-seed
-   evidence says anything about v5's 6 clusters, and the new z=1.717 value
-   (Long-Tail Erratic 2) has no real-data evidence behind it at all. Either
-   re-run the sweeps against v5's archetypes (more work, but validates what's
-   actually live now), or treat v4 as the validated reference and keep
-   canonical segmentation's output reconciled to those 4 groupings until v5
-   earns its own evidence.
+1. **Decide what to do about Long-Tail Erratic 2's miscalibrated z.**
+   v5's CSL/z is now validated against real demand (see
+   "v5's 6-cluster CSL validated against real demand" above) — 5 of 6
+   clusters hold up, but Long-Tail Erratic 2 (z=1.717, CSL=95.7%) undershoots
+   its target by 7.6pp, consistently across 5 seeds, and doesn't close the
+   gap even at the most aggressive CSL tested. `sku_clusters.csv` and the
+   live default are unchanged pending this decision — options: revise its z
+   directly, fold it back into Long-Tail Erratic/3, or route it to the
+   segmentation workstream as a cluster-boundary question. `alpha` and the
+   combined alpha+netting_discount+z configuration still need v5-specific
+   validation (`segment_alpha_real_data.py` still hardcodes v4's 4-cluster
+   list — no v5 equivalent built yet).
 2. **Multi-seed confirmation of the combined configuration** (live
    segmentation z + netting_discount=0.0 together). The single-seed check
    above is promising but this exact combination has never been run 5

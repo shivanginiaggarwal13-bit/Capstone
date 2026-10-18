@@ -104,16 +104,18 @@ def monte_carlo_ddlt(target_mean, target_std, lt_mean_wk, lt_std_wk, target_csl,
 
 def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtime_by_dc,
           cost, active_rdc, active_cdc, cdc_primary_rdc, target_week_num, alpha: float, rng,
-          n_sims: int = N_SIMS, netting_discount: float = 1.0,
+          n_sims: int = N_SIMS, netting_discount: float = 0.0,
           scenario_changes: dict = None, scenario_affected_nodes: list = None):
     """One target week's RDC+CDC policy. Call directly for a walk-forward
     loop (advancing as_of_week_num each call); see `build_rolling_policy`
     for the fixed-as-of 52-week build.
 
     netting_discount in [0, 1]: how much of a CDC's own safety stock the
-    pooled RDC endpoint nets against (1.0 = full netting, today's original
-    behavior; 0.0 = no netting -- the RDC holds its full pooled SS on top of
-    whatever the CDCs already hold). See the netting comment below.
+    pooled RDC endpoint nets against. Default 0.0 (no netting -- the RDC
+    holds its full pooled SS on top of whatever the CDCs already hold) is
+    the adopted, validated recommendation (see README "Netting-discount
+    fix"), NOT 1.0 (full netting), the model's original pre-fix behavior --
+    still available by passing it explicitly. See the netting comment below.
 
     scenario_changes/scenario_affected_nodes (both None by default -- a
     complete no-op for every existing call site): a Feature-2 scenario's
@@ -206,13 +208,16 @@ def solve(dfc, as_of_week_num, period_index, seasonal_index, sku_subcat, leadtim
     return out
 
 
-def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, netting_discount: float = 1.0,
+def build_rolling_policy(data_dir, as_of_week, alpha, n_sims, rng, out_path, netting_discount: float = 0.0,
                           scenario_changes: dict = None):
     """Full 52-week rolling policy from a SINGLE fixed as-of point (used for
     the synthetic-2026 basis -- there's no real future data past as_of_week
     to refit on). For the real-data walk-forward's week-by-week refit with
     an ADVANCING as-of, call `solve()` directly in a loop instead (see
     `validate_real_data.py`).
+
+    netting_discount default 0.0 is the adopted recommendation, not 1.0
+    (the original pre-fix behavior) -- see solve()'s docstring.
 
     scenario_changes: None by default (a complete no-op). If given, affected
     nodes are resolved ONCE here (not once per target week -- see

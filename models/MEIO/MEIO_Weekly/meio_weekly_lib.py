@@ -196,6 +196,8 @@ the previous weekly tool was lost from the repo and this is a rebuild):
 """
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -221,24 +223,45 @@ Z_MIN, Z_MAX = 0.84, 3.10        # clip service level to [80%, 99.9%] (diagnosti
 SHORT_WINDOW_WEEKS = 13
 LONG_WINDOW_WEEKS = 52
 
-# Per-SKU z override, empty by default so every existing call site is
-# unaffected. Populated by callers that want to size against a different
-# service-level ladder than sku_master.csv's baked-in 3-way segment (e.g.
-# the Clustering & Segmentation deliverable's own 4-cluster CSL ladder,
-# which cuts across the original segment boundaries -- see
-# `rerun_with_cluster_csl.py`). Keyed by sku_id, not (sku_id, dc_id): the
-# ladder this overrides is itself a pure per-SKU attribute.
+# Per-SKU z override, empty by default. Populated by research scripts that want
+# to test a service-level ladder other than the live default below for a single
+# run (e.g. service_level_real_data.py sweeping candidate CSLs). Keyed by
+# sku_id, not (sku_id, dc_id): every ladder here is a pure per-SKU attribute.
+# Takes priority over the live default when set.
 Z_OVERRIDE_BY_SKU: dict = {}
+
+_CLUSTER_Z_CACHE: dict | None = None
+
+
+def _cluster_z_by_sku() -> dict:
+    """sku_id -> safety_factor_z from the Clustering & Segmentation deliverable's
+    own 4-cluster analysis (segmentation_v4/sku_clusters.csv) -- adopted as MEIO's
+    live default service-level source (project decision, 2026-10-18), replacing
+    sku_master.csv's baked-in 3-way segment (Fast-Moving/Seasonal/Intermediate),
+    which the dataset generator supplies directly and isn't something this
+    project's own analysis produced. Z_BY_SEGMENT is kept below as the fallback
+    for any SKU the cluster file doesn't cover (none, as of segmentation_v4 --
+    defensive only) and for legacy research scripts that still read it directly."""
+    global _CLUSTER_Z_CACHE
+    if _CLUSTER_Z_CACHE is None:
+        repo_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+        path = os.path.join(repo_root, "Clustering & Segmentation", "segmentation_v4", "sku_clusters.csv")
+        c = pd.read_csv(path, usecols=["sku_id", "safety_factor_z"])
+        _CLUSTER_Z_CACHE = dict(zip(c.sku_id, c.safety_factor_z.astype(float)))
+    return _CLUSTER_Z_CACHE
 
 
 def assign_z(df: pd.DataFrame) -> pd.Series:
-    """z per row: Z_OVERRIDE_BY_SKU[sku_id] if set, else the segment-based
-    Z_BY_SEGMENT lookup (original behavior, unchanged when the override is
-    empty)."""
+    """z per row: Z_OVERRIDE_BY_SKU[sku_id] (explicit per-call override, for
+    research scripts only) if set; else the Clustering & Segmentation
+    deliverable's own cluster-based CSL ladder (the live default); else the
+    original sku_master.csv segment-based Z_BY_SEGMENT lookup, for any SKU the
+    cluster file doesn't cover; else Z_DEFAULT."""
+    cluster_z = df.sku_id.map(_cluster_z_by_sku())
     if Z_OVERRIDE_BY_SKU:
         overridden = df.sku_id.map(Z_OVERRIDE_BY_SKU)
-        return overridden.fillna(df.segment.map(Z_BY_SEGMENT)).fillna(Z_DEFAULT)
-    return df.segment.map(Z_BY_SEGMENT).fillna(Z_DEFAULT)
+        return overridden.fillna(cluster_z).fillna(df.segment.map(Z_BY_SEGMENT)).fillna(Z_DEFAULT)
+    return cluster_z.fillna(df.segment.map(Z_BY_SEGMENT)).fillna(Z_DEFAULT)
 
 
 # --------------------------------------------------------------------- IO ---

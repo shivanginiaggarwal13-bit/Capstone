@@ -12,35 +12,42 @@ order.
 
 ## The recommendation
 
-**Clark-Scarf v2 at alpha=0.2, netting_discount=0.0**, a continuous-pooling-factor,
-Monte Carlo-DDLT echelon model (`clark_scarf_v2.py`), chosen over the
-hand-tuned MEIO Weekly tool because it holds up better against **real
-replayed 2025 demand**, not just synthetic noise — and because its core
-mechanism (deciding how much safety stock an RDC pools with the CDCs it
-feeds) is a direct answer to the charter's own ask: decide not just how much
-buffer to hold, but **where**.
+**Clark-Scarf v2 at alpha=0.2, netting_discount=0.0, cluster-based service
+levels**, a continuous-pooling-factor, Monte Carlo-DDLT echelon model
+(`clark_scarf_v2.py`), chosen over the hand-tuned MEIO Weekly tool because it
+holds up better against **real replayed 2025 demand**, not just synthetic
+noise — and because its core mechanism (deciding how much safety stock an
+RDC pools with the CDCs it feeds) is a direct answer to the charter's own
+ask: decide not just how much buffer to hold, but **where**.
 
-`netting_discount=0.0` is a fix validated this session (see "Netting-discount
-fix" below) — it removes the original model's assumption that an RDC's
-pooled safety stock can be credited against what its CDCs already hold, and
-it wins on every axis tested, 5/5 seeds, with no tradeoff found. The table
-below reflects it; the original `netting_discount=1.0` figures (what shipped
-before this fix) are in that section for comparison.
+Two fixes are now both live defaults, not opt-in flags — see "Netting-discount
+fix" and "Cluster-based service level" below for each one's own validation:
+- `netting_discount=0.0` removes the original model's assumption that an
+  RDC's pooled safety stock can be credited against what its CDCs already
+  hold. Won on every axis tested, 5/5 seeds, no tradeoff found.
+- **Service level (z) now comes from the Clustering & Segmentation
+  deliverable's own 4-cluster analysis by default**, not `sku_master.csv`'s
+  baked-in 3-way segment label (which the dataset generator supplies
+  directly — not something this project's analysis produced). Project
+  decision (2026-10-18): adopted as the default regardless of whether it
+  statistically "beats" the old segment ladder, because it's the
+  segmentation workstream's actual deliverable, not an optional refinement.
 
 | | Actual (as happened) | MEIO Weekly | **Clark-Scarf v2 (chosen)** |
 |---|---|---|---|
-| Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.83% (+1.75pp)** |
-| Internal replenishment fill | 93.21% | −4.60pp | **82.11% (−11.10pp, still degraded, but better than nd=1.0's 81.99%)** |
-| Total landed cost delta, 5-seed mean | — | — | **+$1.83M (vs. +$1.95M at nd=1.0 — cheaper, not just better)** |
+| Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.76% (+1.68pp)** |
+| Internal replenishment fill | 93.21% | −4.60pp | **82.23% (−10.98pp, still degraded, but the best achieved so far)** |
+| Total landed cost delta | — | — | **+$1.82M** |
 
-Full detail: `results/headline_report.md`,
-`results/headline_clark_scarf_v2_vs_actual.csv`, `results/headline_cost_summary.csv`,
-`results/chart_headline.png` (these still reflect the pre-fix `netting_discount=1.0`
-run — see "Netting-discount fix" below for the current recommended
-configuration's numbers). MEIO Weekly's own real-data result (context for
-why it wasn't chosen) is in `results/meio_weekly_vs_actual_report.md` and
-`results/meio_weekly_vs_actual.csv` (its own cost breakdown, computed
-separately, is in `results/meio_weekly_vs_actual_cost.csv`).
+These are a fresh, single-seed real-data check with **both** fixes applied
+together (`results/headline_clark_scarf_v2_vs_actual.csv`,
+`results/headline_cost_summary.csv` — regenerated 2026-10-18; not yet
+multi-seed confirmed as a *combined* configuration — see "Next steps").
+MEIO Weekly's own real-data result (context for why it wasn't chosen) is in
+`results/meio_weekly_vs_actual_report.md` and `results/meio_weekly_vs_actual.csv`
+(its own cost breakdown, computed separately, is in
+`results/meio_weekly_vs_actual_cost.csv`) — not regenerated under the new
+cluster-z default, since MEIO Weekly wasn't the chosen model either way.
 
 ## Where the win actually comes from
 
@@ -147,6 +154,52 @@ Caveats this does *not* resolve: internal replenishment fill is improved
 removing the netting discount is not a full fix, just a real improvement.
 Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
 "Next steps."
+
+## Cluster-based service level adopted as default (2026-10-18)
+
+`meio_weekly_lib.py::assign_z()` previously defaulted to `sku_master.csv`'s
+baked-in 3-way segment (`Fast-Moving`/`Seasonal`/`Intermediate` →
+z=2.05/1.64/1.28) — a label the dataset generator supplies directly, not
+something this project's own analysis produced. The Clustering &
+Segmentation deliverable's own 4-cluster analysis
+(`segmentation_v4/sku_clusters.csv`) has always had a per-cluster
+`safety_factor_z` (Flagship Promo-Driven & Mid-Tier Core → z=1.881 / 97%
+CSL; Long-Tail Erratic & Long-Tail Supply-Risk → z=1.282 / 90% CSL), but it
+sat behind an opt-in override seam (`Z_OVERRIDE_BY_SKU`), used only by
+research scripts testing it, never by the live pipeline.
+
+**Project decision: adopt it as the default regardless of whether it
+statistically beats the old segment ladder on a validated-rule test.** It's
+the segmentation workstream's actual deliverable; sizing stock off a label
+the dataset happened to ship with, instead of off the team's own
+segmentation analysis, was the bigger problem to fix. (A parallel branch's
+`meio_parameters.py` implements a formal "only adopt if it wins" gate for
+this same decision — this project explicitly chose not to wait on that
+gate here.)
+
+`assign_z()` now resolves, in order: `Z_OVERRIDE_BY_SKU` (explicit, for
+research scripts only) → the cluster ladder (the new live default) →
+`Z_BY_SEGMENT` (fallback for any SKU the cluster file doesn't cover — none,
+all 500 are covered, so this is defensive only) → `Z_DEFAULT`.
+
+**Found and fixed while making this change**: `netting_discount`'s adopted
+value (0.0) had never actually been wired into the pipeline's *defaults* —
+`build_walkforward_policy_csv2()`, `clark_scarf_v2.solve()`, and
+`build_rolling_policy()` all still defaulted to `1.0` (the original,
+pre-fix value), so `stage_headline()`, `stage_alpha_sweep()`,
+`stage_multiseed()`, and `segment_alpha_explore.py` had all been silently
+running at the stale default since the fix was "adopted" — only scripts
+that passed it explicitly (`netting_discount_sweep.py`,
+`service_level_real_data.py`, `scenario_test.py`) were actually using it.
+Fixed by changing the defaults themselves, not just documenting the
+recommendation in prose.
+
+**Validated**: a fresh real-data check with both fixes together (cluster z
++ netting_discount=0.0) reproduces the headline table above — better fill,
+better internal replen fill, *and* lower cost than netting_discount=0.0
+alone under the old segment-based z. **Not yet validated**: multi-seed
+confirmation of this specific *combined* configuration (the 5-seed netting
+confirmation was run before this change, under the old segment-z default).
 
 ## Scenario testing (Feature 2, front-end agent — demand surge only so far)
 
@@ -312,42 +365,43 @@ impact if ignored) is −0.06pp fill, +$226K cost.
 
 ## Next steps, in priority order
 
-1. **Find the rest of the internal-replenishment-fill gap.** The
-   netting-discount fix closed some of it (82.11% vs. 81.99%) but 93.21% is
-   still 11pp away. The netting step wasn't the only cause — likely
-   candidates: the PDC real-variance formula fix (see below, also
-   unresolved), or the RDC's `order_up_to_level` sizing more generally.
-2. **Test netting_discount at alpha=0.6** (the real-data fill-optimal
-   alpha, not yet combined with this fix) and consider whether
-   netting_discount should itself vary by alpha or by segment.
-3. **Fresh-holdout confirmation of netting_discount=0.0 and alpha 0.4/0.6**
-   once more real weeks (2026 actuals) are available — everything here is
-   still one real year.
-4. **Multi-seed validation of the per-segment alpha direction** before it's
-   anything more than a diagnostic. `segment_alpha_real_data.py` now exists
-   to do exactly this (real demand, 5 seeds, same 4-way split as the
-   synthetic diagnostic) but is only partially run — finish it with
-   `python segment_alpha_real_data.py` (resumable, ~1.5-2 hrs for the rest)
-   or `run_all.py --from 6`, then re-read `output datasets/agent output/
-   segment_alpha_real_data_summary.csv` before trusting any per-cluster
-   alpha claim. A 2-way (core vs. long-tail) split rather than the full
-   4-way may still be the better final call, to limit overfitting risk —
-   the full run will show whether the 4-way direction holds up or not.
+1. **Multi-seed confirmation of the combined configuration** (cluster-based
+   z + netting_discount=0.0 together). The single-seed check above is
+   promising but this exact combination has never been run 5 seeds deep —
+   every prior multi-seed confirmation (netting-discount at α=0.2 and
+   α=0.6, the per-segment alpha sweep, the service-level sweep) was run
+   under the *old* segment-based z default. Highest priority: the current
+   headline table rests on one seed.
+2. **Re-point or re-run the evidence that was computed elsewhere under the
+   old z default.** Checking GitHub (2026-10-18) found that a teammate's
+   branch (`multi_agent_orchastration`) already completed both sweeps this
+   README previously listed as "partially run" — `segment_alpha_real_data_
+   summary.csv` (full 4-cluster x 6-alpha x 5-seed grid) and
+   `service_level_real_data_summary.csv` (full 4-cluster x 4-CSL x 5-seed
+   grid) both exist there, plus a 5-seed netting_discount confirmation at
+   alpha=0.6. None of that work has been merged into this branch, and all
+   of it predates adopting cluster-z as the default here — so even once
+   merged, it describes the old configuration, not the current one.
+3. **Find the rest of the internal-replenishment-fill gap.** The
+   netting-discount fix closed some of it (82.11% → 82.23% with cluster z
+   added) but 93.21% is still ~11pp away. Likely candidates: the PDC
+   real-variance formula fix (below, unresolved), or the RDC's
+   `order_up_to_level` sizing more generally.
+4. **Fresh-holdout confirmation** once more real weeks (2026 actuals) are
+   available — everything here is still one real year.
 5. **PDC real-variance formula fix.** `meio_weekly_lib.py::solve_pdc_policy`
    sizes PDC safety stock as `z * sqrt(lt_mean_wk) * mu * SIGMA_UPLIFT["PDC"]
    * 0.5` — using throughput mean (`mu`) as a stand-in for variability
    instead of a real measured σ from RDC pull-order history. Not started.
-6. **Finish Feature 1's service-level sweep** (`service_level_real_data.py`
-   — see that section above and its own "not yet run" note).
-7. **Wire PDC policy into the scenario engine.** `scenario_test.py`'s test
+6. **Wire PDC policy into the scenario engine.** `scenario_test.py`'s test
    run confirmed PDCs don't respond to a scenario at all (`solve_pdc_policy`
    isn't touched) — a demand surge big/long enough to matter at the plant
    level would currently be invisible to PDC sizing.
-8. **Build the lead-time and capacity disruption scenario types.** Only
+7. **Build the lead-time and capacity disruption scenario types.** Only
    demand surge exists; `scenario_engine.py`'s docstring and
    `digital_twin.py`'s "Known limitations" section both say so. Same
    pattern as demand surge (scale an already-computed value, don't touch
    RNG draws) should apply to both.
-9. **Multi-seed / multi-scenario validation of the scenario-testing
+8. **Multi-seed / multi-scenario validation of the scenario-testing
    feature** before the +0.09pp "value of preparing" number (or any future
    scenario's number) is treated as more than a single working example.

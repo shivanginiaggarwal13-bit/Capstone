@@ -173,11 +173,16 @@ def build_walkforward_policy_meio(data_dir, out_path):
 
 # --------------------------------------------------------- Clark-Scarf v2 walk-forward policy
 def build_walkforward_policy_csv2(data_dir, out_path, alpha=HEADLINE_ALPHA, rng=None, alpha_override=None,
-                                   netting_discount=1.0):
+                                   netting_discount=0.0):
     """alpha_override: optional {sku_id: alpha} dict for a per-segment sweep
     (see segment_alpha_explore.py); leave None for the single-alpha case.
-    netting_discount: see clark_scarf_v2.solve (1.0 = original full-netting
-    behavior)."""
+    netting_discount: see clark_scarf_v2.solve. Default 0.0 is the adopted,
+    validated recommendation (see README "Netting-discount fix") -- NOT
+    1.0, the model's original behavior before that fix. Every caller here
+    that didn't pass this explicitly (stage_headline, stage_alpha_sweep,
+    stage_multiseed) was silently still running at the stale 1.0 default
+    until this change; found while adopting the cluster-based CSL default
+    in meio_weekly_lib.py and re-validating the headline (2026-10-18)."""
     rng = rng if rng is not None else np.random.default_rng(SEED)
     dfc = lib.load_demand_forecast(data_dir)
     period_index = lib.load_period_index(data_dir)

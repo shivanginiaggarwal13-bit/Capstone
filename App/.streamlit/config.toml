@@ -1,0 +1,57 @@
+# Supply Brain design system. Script-level theme (applies regardless of the
+# working directory the app is launched from) -- see App/streamlit_app.py's
+# own <style> block for the complementary component-level CSS.
+
+[client]
+# Hide the dev-mode chrome (Deploy button, rerun/clear-cache menu items) so the
+# app reads as a finished product rather than a Streamlit app still in development.
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#2374CC"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F7FA"
+textColor = "#1C1E26"
+borderColor = "#E6E7EC"
+linkColor = "#1D63B0"
+
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+headingFont = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+baseFontSize = 15
+baseFontWeight = 400
+headingFontWeights = [650, 600, 600, 600, 600, 600]
+metricValueFontSize = "1.75rem"
+metricValueFontWeight = 650
+
+codeFont = "SF Mono, 'Roboto Mono', Consolas, monospace"
+codeFontSize = "0.85rem"
+
+baseRadius = "0.5rem"
+buttonRadius = "0.5rem"
+showWidgetBorder = true
+showSidebarBorder = false
+dataframeBorderColor = "#E6E7EC"
+dataframeHeaderBackgroundColor = "#F6F7FA"
+
+# One cohesive, evenly-spaced categorical palette shared by every chart
+# (Altair/Vega-Lite and the native st.bar_chart/st.line_chart alike), built
+# around the module accent colors already used in the sidebar/headers so the
+# charts and the chrome read as one system rather than two different apps.
+chartCategoricalColors = [
+    "#2374CC", # blue    -- MEIO allocation module
+    "#14956E", # teal    -- SKU segmentation module
+    "#D68D15", # amber   -- Periodic alpha check module
+    "#6860D1", # violet  -- Simulation centre module
+    "#0E7490", # cyan
+    "#C2410C", # rust
+    "#64748B", # slate (neutral/baseline series)
+    "#9B2828", # muted red (reserved for risk/shortfall series)
+]
+chartSequentialColors = [
+    "#EAF2FC", "#CFE3F8", "#9EC7F0", "#6BA8E6", "#3E87D6", "#2374CC", "#1D63B0", "#164A86", "#0F3560",
+]
+
+[theme.sidebar]
+backgroundColor = "#F6F7FA"
+borderColor = "#E6E7EC"

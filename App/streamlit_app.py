@@ -232,9 +232,16 @@ def kpis(path: Path) -> dict | None:
 
 def alpha_flags() -> pd.DataFrame:
     """Proxy for per-SKU alpha flags: clusters whose own-fill-best alpha differs
-    from the alpha the pipeline adopted. The repo has cluster-level evidence only."""
+    from the alpha the pipeline adopted. The repo has cluster-level evidence only.
+
+    Reads the v5 evidence (segment_alpha_v5_real_data_summary.csv: v5's 6 clusters,
+    built at today's live reference alpha=0.6) -- NOT segment_alpha_real_data_summary.csv,
+    which is v4's 4 clusters built at the stale reference alpha=0.2. That file doesn't
+    even cover the adopted alpha (0.6) at all, so comparing "own-fill at adopted" against
+    it was silently comparing against the wrong configuration everywhere this function
+    is used (this table, and the sidebar/topbar flag badge on every page)."""
     p = paths()
-    ev = read_csv(str(p["evidence"] / "segment_alpha_real_data_summary.csv"))
+    ev = read_csv(str(p["evidence"] / "segment_alpha_v5_real_data_summary.csv"))
     par = read_json(str(p["weekly_dir"] / "meio_parameters.json")) or {}
     adopted = par.get("alpha")
     if ev is None or adopted is None:
@@ -644,13 +651,14 @@ def newsvendor_recompute(holding_pct: float | None, shortage_mult: float | None)
     return g.drop(columns="rev")
 
 
-SL_ALIAS = {"Flagship Core": "Flagship Promo-Driven"}  # evidence was swept on v4 cluster names
-
-
 def page_service_levels(slot: dict):
     p = paths()
     cs = read_csv(str(p["cluster_sl"]))
-    ev = read_csv(str(p["evidence"] / "service_level_real_data_summary.csv"))
+    # v5 evidence (service_level_v5_real_data_summary.csv): v5's 6 clusters, same archetype
+    # names cs["archetype"] already uses -- no alias needed (the old v4 evidence,
+    # service_level_real_data_summary.csv, only covered 4 of v5's 6 clusters and needed a
+    # name translation for the one shared-but-renamed cluster; this replaces it outright).
+    ev = read_csv(str(p["evidence"] / "service_level_v5_real_data_summary.csv"))
     st.write("Compute target service levels per cluster.")
     with st.form("sl"):
         method = st.selectbox("Optimisation method", ["Newsvendor (critical ratio)", "Cost-minimisation",
@@ -674,16 +682,15 @@ def page_service_levels(slot: dict):
             st.dataframe(res, hide_index=True, width="stretch")
             slot["df"] = res
         elif ev is None:
-            st.error("service_level_real_data_summary.csv not found.")
+            st.error("service_level_v5_real_data_summary.csv not found.")
         else:
             e = ev.copy()
             rows = []
             for arche in cs["archetype"]:
-                name = SL_ALIAS.get(arche, arche)
-                sub = e[e["cluster"] == name]
+                sub = e[e["cluster"] == arche]
                 if sub.empty:
                     rows.append({"archetype": arche, "evidence_cluster": None, "pick_csl": None,
-                                 "note": "no twin-validated sweep for this cluster (sweep covers 4 v4 clusters)"})
+                                 "note": "no twin-validated sweep for this cluster"})
                     continue
                 if method == "Cost-minimisation":
                     r = sub.loc[sub["cost_delta_mean"].idxmin()]
@@ -692,13 +699,12 @@ def page_service_levels(slot: dict):
                     ok = sub[sub["own_fill_mean"] >= fill_target]
                     r = ok.loc[ok["csl"].idxmin()] if len(ok) else sub.loc[sub["own_fill_mean"].idxmax()]
                     note = "lowest CSL reaching the target own fill" if len(ok) else "target not reached; highest-fill CSL shown"
-                rows.append({"archetype": arche, "evidence_cluster": name, "pick_csl": r["csl"],
+                rows.append({"archetype": arche, "evidence_cluster": arche, "pick_csl": r["csl"],
                              "own_fill": r["own_fill_mean"], "cost_delta_usd": r["cost_delta_mean"], "note": note})
             res = pd.DataFrame(rows)
             st.subheader(f"{method} - lookup in Twin-validated sweep")
             st.dataframe(res, hide_index=True, width="stretch")
-            st.caption("Holding / shortage inputs do not apply here: the sweep was run at fixed cost parameters. "
-                       "Sweep used v4 cluster names (Flagship Promo-Driven = v5 Flagship Core).")
+            st.caption("Holding / shortage inputs do not apply here: the sweep was run at fixed cost parameters.")
             slot["df"] = res
     st.subheader("Current recommendation (output datasets/segmentation/cluster_service_levels.csv)")
     if cs is not None:
@@ -805,6 +811,29 @@ def page_alpha(slot: dict):
                      column_config={"own_fill_at_best": st.column_config.NumberColumn(format="percent"),
                                     "own_fill_at_adopted": st.column_config.NumberColumn(format="percent")})
         slot["df"] = flags
+
+    ev5 = read_csv(str(p["evidence"] / "segment_alpha_v5_real_data_summary.csv"))
+    if ev5 is not None:
+        import altair as alt
+        st.subheader("Own-fill vs alpha, by segment (5 seeds, real replayed demand)")
+        st.caption("Each cluster's own fill rate as ITS alpha varies, with every other cluster held at the "
+                   "live reference (0.6) -- not a portfolio-wide number. The vertical line marks the "
+                   "adopted alpha. Y-axis is NOT forced to 0-100%: at that scale every line looks flat and "
+                   "the real spread (0.9pp for Mid-Tier Core, 11.6pp for Long-Tail Erratic 2) disappears.")
+        adopted_alpha = (par or {}).get("alpha")
+        line = alt.Chart(ev5).mark_line(point=True, strokeWidth=2).encode(
+            x=alt.X("alpha:Q", title="Alpha (pooling factor)"),
+            y=alt.Y("own_fill_mean:Q", title="Own-cluster fill rate", axis=alt.Axis(format="%"),
+                   scale=alt.Scale(zero=False)),
+            color=alt.Color("cluster:N", title=None),
+            tooltip=["cluster", "alpha", alt.Tooltip("own_fill_mean:Q", format=".2%")],
+        ).properties(height=380)
+        if adopted_alpha is not None:
+            rule = alt.Chart(pd.DataFrame({"alpha": [adopted_alpha]})).mark_rule(
+                color="#8C8F99", strokeDash=[4, 4]).encode(x="alpha:Q")
+            line = line + rule
+        st.altair_chart(line, width="stretch")
+
     sw_fill = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
     if sw_fill is not None:
         import altair as alt

@@ -234,18 +234,37 @@ _CLUSTER_Z_CACHE: dict | None = None
 
 
 def _cluster_z_by_sku() -> dict:
-    """sku_id -> safety_factor_z from the Clustering & Segmentation deliverable's
-    own 4-cluster analysis (segmentation_v4/sku_clusters.csv) -- adopted as MEIO's
-    live default service-level source (project decision, 2026-10-18), replacing
+    """sku_id -> safety_factor_z from the CANONICAL, LIVE segmentation output
+    (output datasets/segmentation/sku_clusters.csv) -- adopted as MEIO's live
+    default service-level source (project decision, 2026-10-18), replacing
     sku_master.csv's baked-in 3-way segment (Fast-Moving/Seasonal/Intermediate),
     which the dataset generator supplies directly and isn't something this
-    project's own analysis produced. Z_BY_SEGMENT is kept below as the fallback
-    for any SKU the cluster file doesn't cover (none, as of segmentation_v4 --
-    defensive only) and for legacy research scripts that still read it directly."""
+    project's own analysis produced.
+
+    Deliberately NOT a frozen path to one segmentation version (it originally
+    pointed at Clustering & Segmentation/segmentation_v4/sku_clusters.csv,
+    found to be disconnected from a planner's actual workflow: "Run
+    segmentation" in the front-end overwrites output datasets/segmentation/,
+    which this frozen path never saw -- a planner re-running segmentation had
+    no effect on what MEIO sized against). Reading the canonical output
+    instead means a planner's latest approved segmentation run genuinely
+    determines the next MEIO build's service levels.
+
+    Caveat, stated directly: canonical segmentation is currently v5, whose
+    6-archetype ladder (vs. v4's 4) includes a z value -- 1.717, "Long-Tail
+    Erratic 2" -- that has NEVER been tested against real demand. Every
+    multi-seed validation this project has (netting_discount, per-cluster
+    alpha, per-cluster CSL) was run against v4's 4 clusters specifically. See
+    README "Known limitations" for what that does and doesn't mean for the
+    validated headline numbers.
+
+    Z_BY_SEGMENT is kept below as the fallback for any SKU the cluster file
+    doesn't cover (none observed so far -- defensive only) and for legacy
+    research scripts that still read it directly."""
     global _CLUSTER_Z_CACHE
     if _CLUSTER_Z_CACHE is None:
         repo_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
-        path = os.path.join(repo_root, "Clustering & Segmentation", "segmentation_v4", "sku_clusters.csv")
+        path = os.path.join(repo_root, "output datasets", "segmentation", "sku_clusters.csv")
         c = pd.read_csv(path, usecols=["sku_id", "safety_factor_z"])
         _CLUSTER_Z_CACHE = dict(zip(c.sku_id, c.safety_factor_z.astype(float)))
     return _CLUSTER_Z_CACHE

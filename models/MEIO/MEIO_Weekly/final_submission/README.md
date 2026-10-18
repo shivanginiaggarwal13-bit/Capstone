@@ -25,22 +25,30 @@ fix" and "Cluster-based service level" below for each one's own validation:
 - `netting_discount=0.0` removes the original model's assumption that an
   RDC's pooled safety stock can be credited against what its CDCs already
   hold. Won on every axis tested, 5/5 seeds, no tradeoff found.
-- **Service level (z) now comes from the Clustering & Segmentation
-  deliverable's own 4-cluster analysis by default**, not `sku_master.csv`'s
-  baked-in 3-way segment label (which the dataset generator supplies
-  directly — not something this project's analysis produced). Project
-  decision (2026-10-18): adopted as the default regardless of whether it
+- **Service level (z) now comes from the canonical, LIVE Clustering &
+  Segmentation output** (`output datasets/segmentation/sku_clusters.csv` —
+  currently segmentation_v5, 6 archetypes), not `sku_master.csv`'s baked-in
+  3-way segment label (which the dataset generator supplies directly — not
+  something this project's analysis produced). Project decision
+  (2026-10-18): adopted as the default regardless of whether it
   statistically "beats" the old segment ladder, because it's the
-  segmentation workstream's actual deliverable, not an optional refinement.
+  segmentation workstream's actual deliverable. Updated again the same day
+  to read the *canonical* output instead of a frozen `segmentation_v4`
+  snapshot — found that the front-end's "Run segmentation" button
+  overwrites the canonical file, which the frozen path never saw, so a
+  planner re-running segmentation had no effect on what MEIO sized
+  against. See "Cluster-based service level" below for the validation
+  caveat this introduces.
 
 | | Actual (as happened) | MEIO Weekly | **Clark-Scarf v2 (chosen)** |
 |---|---|---|---|
-| Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.76% (+1.68pp)** |
-| Internal replenishment fill | 93.21% | −4.60pp | **82.23% (−10.98pp, still degraded, but the best achieved so far)** |
-| Total landed cost delta | — | — | **+$1.82M** |
+| Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.51% (+1.43pp)** |
+| Internal replenishment fill | 93.21% | −4.60pp | **82.38% (−10.83pp, still degraded, but the best achieved so far)** |
+| Total landed cost delta | — | — | **+$1.67M** |
 
-These are a fresh, single-seed real-data check with **both** fixes applied
-together (`results/headline_clark_scarf_v2_vs_actual.csv`,
+These are a fresh, single-seed real-data check with the netting fix and the
+canonical (v5) segmentation link both applied together
+(`results/headline_clark_scarf_v2_vs_actual.csv`,
 `results/headline_cost_summary.csv` — regenerated 2026-10-18; not yet
 multi-seed confirmed as a *combined* configuration — see "Next steps").
 MEIO Weekly's own real-data result (context for why it wasn't chosen) is in
@@ -161,12 +169,9 @@ Only tested at alpha=0.2, one real year, 5 seeds of one RNG family — see
 baked-in 3-way segment (`Fast-Moving`/`Seasonal`/`Intermediate` →
 z=2.05/1.64/1.28) — a label the dataset generator supplies directly, not
 something this project's own analysis produced. The Clustering &
-Segmentation deliverable's own 4-cluster analysis
-(`segmentation_v4/sku_clusters.csv`) has always had a per-cluster
-`safety_factor_z` (Flagship Promo-Driven & Mid-Tier Core → z=1.881 / 97%
-CSL; Long-Tail Erratic & Long-Tail Supply-Risk → z=1.282 / 90% CSL), but it
-sat behind an opt-in override seam (`Z_OVERRIDE_BY_SKU`), used only by
-research scripts testing it, never by the live pipeline.
+Segmentation deliverable has always computed a per-cluster `safety_factor_z`,
+but it sat behind an opt-in override seam (`Z_OVERRIDE_BY_SKU`), used only
+by research scripts testing it, never by the live pipeline.
 
 **Project decision: adopt it as the default regardless of whether it
 statistically beats the old segment ladder on a validated-rule test.** It's
@@ -177,29 +182,59 @@ segmentation analysis, was the bigger problem to fix. (A parallel branch's
 this same decision — this project explicitly chose not to wait on that
 gate here.)
 
+**Second fix, same day: the link was frozen to one segmentation version,
+not the live canonical output.** The first version of this change pointed
+`assign_z()` at `Clustering & Segmentation/segmentation_v4/sku_clusters.csv`
+— a specific, static file. That meant a planner clicking "Run segmentation"
+in the front-end app (which overwrites `output datasets/segmentation/`, the
+canonical location) had **zero effect** on what MEIO actually sized
+against — the frozen v4 path never changed. Fixed by re-pointing at
+`output datasets/segmentation/sku_clusters.csv` instead: whatever a
+planner's most recently approved segmentation run produced is now what the
+next MEIO build genuinely uses.
+
+**This closes the wiring gap but opens a real validation gap, stated
+directly.** Canonical segmentation is currently **v5**, with **6**
+archetypes, not v4's 4:
+
+| v4 (4 clusters, what all multi-seed evidence was built on) | v5 (6 clusters, now live) |
+|---|---|
+| Flagship Promo-Driven, Mid-Tier Core → z=1.881 | Flagship Core, Mid-Tier Core → z=1.881 |
+| Long-Tail Erratic, Long-Tail Supply-Risk → z=1.282 | Long-Tail Erratic, Long-Tail Erratic 3, Long-Tail Supply-Risk → z=1.282 |
+| — | **Long-Tail Erratic 2 → z=1.717 (NEW — never tested against real demand)** |
+
+Every multi-seed validation this project has — the netting-discount
+decision, the per-cluster alpha sweep, the per-cluster CSL sweep — was run
+against v4's 4-cluster, 2-distinct-z scheme specifically. v5's extra
+granularity, and especially the new z=1.717 value, have not been separately
+validated. The headline table above is real and was generated against the
+live v5 link, but "is 1.717 the right target for Long-Tail Erratic 2" is an
+open question, not a validated answer.
+
 `assign_z()` now resolves, in order: `Z_OVERRIDE_BY_SKU` (explicit, for
-research scripts only) → the cluster ladder (the new live default) →
-`Z_BY_SEGMENT` (fallback for any SKU the cluster file doesn't cover — none,
-all 500 are covered, so this is defensive only) → `Z_DEFAULT`.
+research scripts only) → the canonical segmentation's cluster ladder (the
+live default) → `Z_BY_SEGMENT` (fallback for any SKU the cluster file
+doesn't cover — none observed so far, defensive only) → `Z_DEFAULT`.
 
-**Found and fixed while making this change**: `netting_discount`'s adopted
-value (0.0) had never actually been wired into the pipeline's *defaults* —
-`build_walkforward_policy_csv2()`, `clark_scarf_v2.solve()`, and
-`build_rolling_policy()` all still defaulted to `1.0` (the original,
-pre-fix value), so `stage_headline()`, `stage_alpha_sweep()`,
-`stage_multiseed()`, and `segment_alpha_explore.py` had all been silently
-running at the stale default since the fix was "adopted" — only scripts
-that passed it explicitly (`netting_discount_sweep.py`,
-`service_level_real_data.py`, `scenario_test.py`) were actually using it.
-Fixed by changing the defaults themselves, not just documenting the
-recommendation in prose.
+**Also found and fixed while making the first version of this change**:
+`netting_discount`'s adopted value (0.0) had never actually been wired into
+the pipeline's *defaults* — `build_walkforward_policy_csv2()`,
+`clark_scarf_v2.solve()`, and `build_rolling_policy()` all still defaulted
+to `1.0` (the original, pre-fix value), so `stage_headline()`,
+`stage_alpha_sweep()`, `stage_multiseed()`, and `segment_alpha_explore.py`
+had all been silently running at the stale default since the fix was
+"adopted" — only scripts that passed it explicitly
+(`netting_discount_sweep.py`, `service_level_real_data.py`,
+`scenario_test.py`) were actually using it. Fixed by changing the defaults
+themselves, not just documenting the recommendation in prose.
 
-**Validated**: a fresh real-data check with both fixes together (cluster z
-+ netting_discount=0.0) reproduces the headline table above — better fill,
-better internal replen fill, *and* lower cost than netting_discount=0.0
-alone under the old segment-based z. **Not yet validated**: multi-seed
-confirmation of this specific *combined* configuration (the 5-seed netting
-confirmation was run before this change, under the old segment-z default).
+**Validated**: a fresh real-data check with the netting fix and the live
+v5 link together reproduces the headline table above — still beats the
+original (pre-fix, segment-z) configuration on every axis.
+**Not yet validated**: multi-seed confirmation of this exact combined
+configuration, or any dedicated test of v5's specific clusters/z-values the
+way v4's were tested (segment_alpha_real_data.py / service_level_real_data.py
+both still hardcode the v4 4-cluster list).
 
 ## Scenario testing (Feature 2, front-end agent — demand surge only so far)
 
@@ -365,43 +400,53 @@ impact if ignored) is −0.06pp fill, +$226K cost.
 
 ## Next steps, in priority order
 
-1. **Multi-seed confirmation of the combined configuration** (cluster-based
-   z + netting_discount=0.0 together). The single-seed check above is
-   promising but this exact combination has never been run 5 seeds deep —
-   every prior multi-seed confirmation (netting-discount at α=0.2 and
-   α=0.6, the per-segment alpha sweep, the service-level sweep) was run
-   under the *old* segment-based z default. Highest priority: the current
-   headline table rests on one seed.
-2. **Re-point or re-run the evidence that was computed elsewhere under the
+1. **Decide whether to validate v5 directly, or fall back to v4 until it
+   is.** `segment_alpha_real_data.py` and `service_level_real_data.py` both
+   still hardcode v4's 4-cluster list — none of this project's multi-seed
+   evidence says anything about v5's 6 clusters, and the new z=1.717 value
+   (Long-Tail Erratic 2) has no real-data evidence behind it at all. Either
+   re-run the sweeps against v5's archetypes (more work, but validates what's
+   actually live now), or treat v4 as the validated reference and keep
+   canonical segmentation's output reconciled to those 4 groupings until v5
+   earns its own evidence.
+2. **Multi-seed confirmation of the combined configuration** (live
+   segmentation z + netting_discount=0.0 together). The single-seed check
+   above is promising but this exact combination has never been run 5
+   seeds deep — every prior multi-seed confirmation (netting-discount at
+   α=0.2 and α=0.6, the per-segment alpha sweep, the service-level sweep)
+   was run under the *old* segment-based z default. The current headline
+   table rests on one seed.
+3. **Re-point or re-run the evidence that was computed elsewhere under the
    old z default.** Checking GitHub (2026-10-18) found that a teammate's
    branch (`multi_agent_orchastration`) already completed both sweeps this
    README previously listed as "partially run" — `segment_alpha_real_data_
-   summary.csv` (full 4-cluster x 6-alpha x 5-seed grid) and
-   `service_level_real_data_summary.csv` (full 4-cluster x 4-CSL x 5-seed
-   grid) both exist there, plus a 5-seed netting_discount confirmation at
-   alpha=0.6. None of that work has been merged into this branch, and all
-   of it predates adopting cluster-z as the default here — so even once
-   merged, it describes the old configuration, not the current one.
-3. **Find the rest of the internal-replenishment-fill gap.** The
-   netting-discount fix closed some of it (82.11% → 82.23% with cluster z
-   added) but 93.21% is still ~11pp away. Likely candidates: the PDC
-   real-variance formula fix (below, unresolved), or the RDC's
+   summary.csv` (full v4 4-cluster x 6-alpha x 5-seed grid) and
+   `service_level_real_data_summary.csv` (full v4 4-cluster x 4-CSL x
+   5-seed grid) both exist there, plus a 5-seed netting_discount
+   confirmation at alpha=0.6. None of that work has been merged into this
+   branch, and all of it predates both the cluster-z default and the v5
+   canonical link — so even once merged, it describes an older
+   configuration, not today's.
+4. **Find the rest of the internal-replenishment-fill gap.** The
+   netting-discount fix closed some of it (82.11% → 82.38% with the live
+   segmentation z added) but 93.21% is still ~11pp away. Likely candidates:
+   the PDC real-variance formula fix (below, unresolved), or the RDC's
    `order_up_to_level` sizing more generally.
-4. **Fresh-holdout confirmation** once more real weeks (2026 actuals) are
+5. **Fresh-holdout confirmation** once more real weeks (2026 actuals) are
    available — everything here is still one real year.
-5. **PDC real-variance formula fix.** `meio_weekly_lib.py::solve_pdc_policy`
+6. **PDC real-variance formula fix.** `meio_weekly_lib.py::solve_pdc_policy`
    sizes PDC safety stock as `z * sqrt(lt_mean_wk) * mu * SIGMA_UPLIFT["PDC"]
    * 0.5` — using throughput mean (`mu`) as a stand-in for variability
    instead of a real measured σ from RDC pull-order history. Not started.
-6. **Wire PDC policy into the scenario engine.** `scenario_test.py`'s test
+7. **Wire PDC policy into the scenario engine.** `scenario_test.py`'s test
    run confirmed PDCs don't respond to a scenario at all (`solve_pdc_policy`
    isn't touched) — a demand surge big/long enough to matter at the plant
    level would currently be invisible to PDC sizing.
-7. **Build the lead-time and capacity disruption scenario types.** Only
+8. **Build the lead-time and capacity disruption scenario types.** Only
    demand surge exists; `scenario_engine.py`'s docstring and
    `digital_twin.py`'s "Known limitations" section both say so. Same
    pattern as demand surge (scale an already-computed value, don't touch
    RNG draws) should apply to both.
-8. **Multi-seed / multi-scenario validation of the scenario-testing
-   feature** before the +0.09pp "value of preparing" number (or any future
-   scenario's number) is treated as more than a single working example.
+9. **Multi-seed / multi-scenario validation of the scenario-testing
+    feature** before the +0.09pp "value of preparing" number (or any future
+    scenario's number) is treated as more than a single working example.

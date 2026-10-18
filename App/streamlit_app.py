@@ -335,7 +335,7 @@ def steps_html(items: list[str]):
     st.markdown("<ol class='mod-steps'>" + "".join(f"<li>{i}</li>" for i in items) + "</ol>", unsafe_allow_html=True)
 
 
-def page_dashboard(slot: dict, run_all_clicked: bool):
+def page_dashboard(slot: dict):
     p = paths()
     sku = read_csv(str(p["clusters"]))
     k_meio, k_base = kpis(p["twin_dir"]), kpis(p["baseline_dir"])
@@ -438,8 +438,6 @@ def page_dashboard(slot: dict, run_all_clicked: bool):
         st.caption(f"{n_flag} cluster(s) flagged")
         jobs_panel(("alpha",))
 
-    st.divider()
-    run_all_panel(run_all_clicked)
     slot["df"] = pd.DataFrame([{"metric": "total_skus", "value": len(sku) if sku is not None else None},
                                *({"metric": k, "value": v} for k, v in (k_meio or {}).items())])
 
@@ -807,13 +805,73 @@ def page_alpha(slot: dict):
                      column_config={"own_fill_at_best": st.column_config.NumberColumn(format="percent"),
                                     "own_fill_at_adopted": st.column_config.NumberColumn(format="percent")})
         slot["df"] = flags
-    ev = read_csv(str(p["evidence"] / "segment_alpha_real_data_summary.csv"))
-    if ev is not None:
-        st.subheader("Own-cluster fill vs alpha (5 seeds, real replayed demand)")
-        st.line_chart(ev.pivot(index="alpha", columns="cluster", values="own_fill_mean"))
+    sw_fill = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
+    if sw_fill is not None:
+        import altair as alt
+        st.subheader("Portfolio totals vs alpha (51-week real-demand backtest)")
+        st.caption("Total customer and internal-replenishment fill rate at each tested alpha -- "
+                   "the portfolio-wide number a judgment call actually trades off, not a per-cluster view.")
+        tot = sw_fill[["alpha", "customer_fill_rate", "internal_replen_fill_rate"]].melt(
+            id_vars="alpha", var_name="metric", value_name="rate")
+        tot["metric"] = tot["metric"].map({"customer_fill_rate": "Customer fill rate",
+                                           "internal_replen_fill_rate": "Internal replen fill rate"})
+        bar = alt.Chart(tot).mark_bar().encode(
+            x=alt.X("metric:N", title=None, axis=None),
+            y=alt.Y("rate:Q", title="Fill rate", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("metric:N", title=None, scale=alt.Scale(range=["#2374CC", "#14956E"])),
+            column=alt.Column("alpha:O", title="Alpha (pooling factor)", header=alt.Header(labelOrient="bottom")),
+            tooltip=["alpha", "metric", alt.Tooltip("rate:Q", format=".1%")],
+        ).properties(width=70, height=280)
+        st.altair_chart(bar, width="content")
+
+    cb = read_csv(str(p["evidence"] / "alpha_cost_breakdown.csv"))
+    if cb is not None:
+        import altair as alt
+        st.subheader("Cost breakdown across alpha (51-week real-demand backtest)")
+        st.caption("Pooling (higher alpha) isn't free: it trades stockout cost for more transport cost. "
+                   "Holding stays essentially flat. A single net total hides this trade-off, so it's broken "
+                   "out below -- use the slider to read off any tested alpha's numbers for the judgment call.")
+        long = cb.melt(id_vars="alpha", value_vars=["holding_cost_usd", "stockout_cost_usd", "transport_cost_usd"],
+                       var_name="component", value_name="usd")
+        long["component"] = long["component"].str.replace("_cost_usd", "", regex=False).str.title()
+        # Three independent y-scales, not one shared axis: holding (~$2M), stockout (~$8M)
+        # and transport (~$79M) are different orders of magnitude, and a shared axis
+        # flattens exactly the trends (stockout falling, transport rising) this chart
+        # exists to show.
+        colors = {"Holding": "#2374CC", "Stockout": "#9B2828", "Transport": "#D68D15"}
+        charts = []
+        for comp in ["Holding", "Stockout", "Transport"]:
+            sub = long[long["component"] == comp]
+            charts.append(
+                alt.Chart(sub).mark_line(point=True, strokeWidth=2.5, color=colors[comp]).encode(
+                    x=alt.X("alpha:Q", title="Alpha (pooling factor)"),
+                    y=alt.Y("usd:Q", title=f"{comp} cost ($)", scale=alt.Scale(zero=False),
+                           axis=alt.Axis(format="$,.2s")),
+                    tooltip=["alpha", alt.Tooltip("usd:Q", format="$,.0f", title=f"{comp} cost")],
+                ).properties(height=180, title=comp)
+            )
+        st.altair_chart(alt.vconcat(*charts).resolve_scale(y="independent"), width="stretch")
+
+        st.markdown("**Explore a specific alpha**")
+        alphas_sorted = sorted(cb["alpha"].unique().tolist())
+        chosen = st.select_slider("Alpha (pooling factor)", options=alphas_sorted,
+                                  value=alphas_sorted[len(alphas_sorted) // 2], key="alpha_cost_slider")
+        row = cb[cb["alpha"] == chosen].iloc[0]
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Holding cost", f"${row['holding_cost_usd']:,.0f}")
+        m2.metric("Stockout cost", f"${row['stockout_cost_usd']:,.0f}")
+        m3.metric("Transport cost", f"${row['transport_cost_usd']:,.0f}")
+        m4.metric("Total landed cost", f"${row['total_landed_cost_usd']:,.0f}")
+        f1, f2 = st.columns(2)
+        f1.metric("Customer fill rate", f"{row['customer_fill_rate']:.1%}")
+        f2.metric("Internal replen fill rate", f"{row['internal_replen_fill_rate']:.1%}")
+    else:
+        st.info("No cost breakdown yet -- run the alpha sweep (`validate_real_data.py --stage alpha_sweep` in "
+                "final_submission_optimized/) to generate `alpha_cost_breakdown.csv`.")
+
     sw = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
     if sw is not None:
-        with st.expander("Portfolio alpha sweep"):
+        with st.expander("Portfolio alpha sweep (raw)"):
             st.dataframe(sw, hide_index=True, width="stretch")
 
 
@@ -900,12 +958,14 @@ with header:
     run_all_clicked, export_col = topbar()
 
 page = st.session_state["page"]
-body = {"dashboard": lambda: page_dashboard(slot, run_all_clicked), "segmentation": lambda: page_segmentation(slot),
+body = {"dashboard": lambda: page_dashboard(slot), "segmentation": lambda: page_segmentation(slot),
         "service-levels": lambda: page_service_levels(slot), "allocation": lambda: page_allocation(slot),
         "alpha": lambda: page_alpha(slot), "simulation": lambda: page_simulation(slot)}[page]
-if run_all_clicked and page != "dashboard":
-    st.session_state.update(page="dashboard", show_run_all=True)
-    st.rerun()
+# "Run all" shows its confirmation panel right here, on whichever page you're on --
+# it never navigates you away. page_dashboard() does NOT render its own copy of this
+# (see its definition): this is the only place it's rendered, so there's no duplicate
+# on the dashboard page itself.
+run_all_panel(run_all_clicked)
 body()
 with export_col:
     df = slot.get("df")

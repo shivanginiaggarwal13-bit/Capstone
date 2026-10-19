@@ -30,6 +30,7 @@ OUT = ROOT / "output datasets"
 SEG = OUT / "segmentation"
 CFG_PATH = ROOT / "scenario_config.json"
 PY = sys.executable
+AGENT_BRIDGE_DIR = ROOT / "Agents" / "workspace" / "bridge"
 
 st.set_page_config(page_title="Supply Brain - MEIO Optimiser", page_icon=":material/psychology:", layout="wide")
 
@@ -223,6 +224,67 @@ def jobs_panel(keys: tuple[str, ...] | None = None):
             tail = (log_file.read_text(encoding="utf-8", errors="replace").splitlines()[-25:]
                     if log_file.exists() else [])
             st.code("\n".join(tail) or "(no output yet)", language="text")
+
+
+def _read_json_live(path: Path) -> dict | None:
+    """Uncached read -- the bridge's current.json / approval_request.json / done.json are
+    rewritten in place as a run progresses, so the cached read_json() would keep serving
+    the first version it ever saw for that path."""
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+@st.fragment(run_every=3)
+def agent_bridge_panel():
+    """What a `--profile desktop` Agents.runtime session is blocked on right now: the
+    next model call to relay, or the human-approval gate -- the two things the README's
+    manual operator loop (`python -m Agents.runtime.bridge wait`, by hand, at a terminal)
+    exists to surface. Approval is answered here directly; a model call still needs an
+    actual Claude session (this one, if asked, or another) to read it and write the reply."""
+    current = _read_json_live(AGENT_BRIDGE_DIR / "current.json")
+    if not current:
+        return
+    session = Path(current["session"])
+    if not session.exists():
+        return
+    st.markdown("**Agent session status**")
+    pending_req = None
+    for req in sorted(session.glob("req_*.json")):
+        if not (session / req.name.replace("req_", "res_")).exists():
+            pending_req = req
+            break
+    approval_req_path = session / "approval_request.json"
+    approval_res_path = session / "approval_response.json"
+    done = _read_json_live(session / "done.json")
+
+    if pending_req is not None:
+        r = _read_json_live(pending_req)
+        st.info(f"Waiting on a model call: **{r['agent']}** (model alias `{r['model']}`, call #{r['seq']})")
+        with st.expander("Full request (what a Claude session needs to read and answer)"):
+            st.markdown(pending_req.with_suffix(".md").read_text(encoding="utf-8", errors="replace"))
+        st.caption("Ask Claude Code, in your terminal session, to \"drive the agent bridge\" and it will "
+                   "answer this (and each call after it) the same way a human operator would -- or write the "
+                   f"reply JSON to `{r['response_file']}` yourself: "
+                   '`{"text": "...", "tool_calls": [...], "model_id": "..."}`.')
+    elif approval_req_path.exists() and not approval_res_path.exists():
+        a = _read_json_live(approval_req_path)
+        st.warning(f"Waiting on your approval: **{a['scenario_folder']}**")
+        with st.expander("Scenario card", expanded=True):
+            st.markdown(a["card"])
+        name = st.text_input("Your name (recorded in approval.json)", key="agent_approver_name")
+        feedback = st.text_input("Feedback (only used if you reject)", key="agent_reject_feedback")
+        c1, c2 = st.columns(2)
+        if c1.button("Approve", type="primary", key="agent_approve_btn", disabled=not name.strip()):
+            Path(a["response_file"]).write_text(
+                json.dumps({"approved": True, "approved_by": name.strip()}), encoding="utf-8")
+            st.rerun()
+        if c2.button("Reject", key="agent_reject_btn"):
+            Path(a["response_file"]).write_text(
+                json.dumps({"approved": False, "feedback": feedback}), encoding="utf-8")
+            st.rerun()
+    elif done:
+        st.success(f"Session finished: {done.get('summary') or '(no summary recorded)'}")
+    else:
+        st.caption("Session starting...")
 
 
 # --------------------------------------------------------------------------- shared data
@@ -1012,6 +1074,26 @@ def page_simulation(slot: dict):
         if node is not None:
             with st.expander(f"Service by node - {names[0]}"):
                 st.dataframe(node, hide_index=True, width="stretch")
+    st.subheader("Scenario agents")
+    st.caption("Describe a what-if in plain English; the agents turn it into validated overrides, a scenario "
+               "card for you to approve, and (once approved) a re-planned MEIO + Twin comparison. No Anthropic "
+               "API key is configured here, so each model call is relayed through a Claude Desktop bridge "
+               "session instead of running unattended -- the panel below shows what the session is currently "
+               "blocked on, and lets you approve or reject directly from here.")
+    with st.form("agent_prompt"):
+        agent_prompt = st.text_area("Planner request", height=80,
+                                    placeholder="e.g. What if Southeast beverage demand rises 25% in July?")
+        go_agent = st.form_submit_button("Start agent session", icon=":material/play_arrow:", type="primary")
+    if go_agent:
+        if agent_prompt.strip():
+            launch("agents", "Scenario agents",
+                  [("Run scenario agents", [PY, "-m", "Agents.runtime", "--profile", "desktop",
+                                            agent_prompt.strip()])])
+        else:
+            st.warning("Enter a prompt first.")
+    jobs_panel(("agents",))
+    agent_bridge_panel()
+
     st.subheader("Scenarios from the Agents' override engine")
     sc = list_scenarios()
     if sc:

@@ -1,0 +1,53 @@
+# Which model each agent runs on.
+# Ported to NVIDIA NIM / Build API (https://integrate.api.nvidia.com/v1).
+# Choose a profile with `python -m Agents.runtime --profile <name>` or the
+# SUPPLY_BRAIN_AGENT_PROFILE environment variable. `workers` applies to every agent
+# except the orchestrator; an agent listed by name (e.g. validator_agent) overrides it.
+
+default_profile: nvidia
+
+profiles:
+  # Primary NVIDIA Build profile using GLM 5.3 Flash
+  nvidia:
+    provider: nvidia
+    orchestrator: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
+    workers: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
+
+  # Test profile pointing to NVIDIA build
+  test:
+    provider: nvidia
+    orchestrator: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
+    workers: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
+
+  # Fast profile on NVIDIA build using Google Gemma 4
+  nvidia-fast:
+    provider: nvidia
+    orchestrator: {model: google/gemma-4-31b-it, max_tokens: 1024, temperature: 0.5}
+    workers: {model: google/gemma-4-31b-it, max_tokens: 1024, temperature: 0.5}
+
+  # Production candidate on NVIDIA build
+  production:
+    provider: nvidia
+    orchestrator: {model: z-ai/glm-5.3-flash, max_tokens: 2048, temperature: 0.3}
+    validator_agent: {model: z-ai/glm-5.3-flash, max_tokens: 2048, temperature: 0.2}
+    workers: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
+
+  # Testing without an API key: a Claude/local Desktop session answers each model call
+  # through the file bridge (runtime/bridge.py). Models are Desktop aliases.
+  desktop:
+    provider: desktop
+    orchestrator: {model: sonnet}
+    workers: {model: haiku}
+
+  # Legacy Anthropic profiles (retained for backwards compatibility if langchain-anthropic is installed)
+  anthropic-test:
+    provider: anthropic
+    orchestrator: {model: claude-sonnet-4-6, effort: medium, thinking: adaptive}
+    workers: {model: claude-haiku-4-5}
+
+  anthropic-production:
+    provider: anthropic
+    orchestrator: {model: claude-opus-5-5, effort: high}
+    validator_agent: {model: claude-opus-5-5, effort: high}
+    workers: {model: claude-opus-5-5, effort: medium}
+    fallbacks: default

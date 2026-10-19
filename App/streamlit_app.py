@@ -179,7 +179,11 @@ def _run_chain(job: dict):
         with open(job["log"], "a", encoding="utf-8") as log:
             log.write(f"\n$ {' '.join(map(str, cmd))}\n")
             log.flush()
-            env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"}
+            # Secrets (e.g. an API key typed into the UI) go here, in the child's env, never
+            # appended to cmd -- the "$ ..." line above logs cmd verbatim, so anything in cmd
+            # would leak into App/runs/*.log.
+            env = {**os.environ, **(job.get("extra_env") or {}), "PYTHONIOENCODING": "utf-8",
+                  "PYTHONUNBUFFERED": "1"}
             proc = subprocess.Popen([str(c) for c in cmd], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
             job["proc"] = proc
             code = proc.wait()
@@ -189,14 +193,14 @@ def _run_chain(job: dict):
     job.update(state="succeeded", current="done", finished=time.time())
 
 
-def launch(key: str, title: str, steps: list[tuple[str, list]]) -> None:
+def launch(key: str, title: str, steps: list[tuple[str, list]], extra_env: dict | None = None) -> None:
     reg = job_registry()
     if reg.get(key, {}).get("state") == "running":
         st.warning(f"'{title}' is already running.")
         return
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     job = {"key": key, "title": title, "steps": steps, "state": "running", "current": steps[0][0],
-           "started": time.time(), "log": RUNS / f"{key}_{stamp}.log"}
+           "started": time.time(), "log": RUNS / f"{key}_{stamp}.log", "extra_env": extra_env or {}}
     reg[key] = job
     threading.Thread(target=_run_chain, args=(job,), daemon=True).start()
     st.toast(f"Started: {title}")
@@ -1078,11 +1082,22 @@ def page_simulation(slot: dict):
     st.subheader("Scenario agents")
     st.caption("Describe a what-if in plain English; the agents turn it into validated overrides, a scenario "
                "card for you to approve, and (once approved) a re-planned MEIO + Twin comparison.")
-    has_nvidia_key = bool(os.environ.get("NVIDIA_API_KEY"))
+    server_has_nvidia_key = bool(os.environ.get("NVIDIA_API_KEY"))
     profile_label = st.radio(
-        "Model profile", ["Desktop bridge (no API key)", "NVIDIA (GLM, needs NVIDIA_API_KEY)"],
-        index=1 if has_nvidia_key else 0, horizontal=True, key="agent_profile_choice")
+        "Model profile", ["Desktop bridge (no API key)", "NVIDIA (GLM, needs an API key)"],
+        index=1 if server_has_nvidia_key else 0, horizontal=True, key="agent_profile_choice")
     profile = "nvidia" if profile_label.startswith("NVIDIA") else "desktop"
+    typed_nvidia_key = ""
+    if profile == "nvidia":
+        typed_nvidia_key = st.text_input(
+            "NVIDIA API key", type="password", key="nvidia_api_key_input",
+            placeholder="Already set on the server" if server_has_nvidia_key else "nvapi-...",
+            help="Kept only in this browser tab's session state, never written to disk, never logged, and "
+                 "passed to the agent process through its environment, not as a command-line argument -- so "
+                 "it never appears in the job log below. Leave blank to use the server's own NVIDIA_API_KEY, "
+                 "if it has one.")
+    effective_nvidia_key = typed_nvidia_key.strip() or os.environ.get("NVIDIA_API_KEY", "")
+    has_nvidia_key = bool(effective_nvidia_key)
     with st.form("agent_prompt"):
         agent_prompt = st.text_area("Planner request", height=80,
                                     placeholder="e.g. What if Southeast beverage demand rises 25% in July?")
@@ -1092,19 +1107,23 @@ def page_simulation(slot: dict):
                    "the panel below shows what the session is blocked on, and lets you approve or reject the "
                    "scenario directly; a model call itself still needs an actual Claude session to answer it.")
     elif not has_nvidia_key:
-        st.warning("NVIDIA_API_KEY isn't set in this server's environment -- the run will fail immediately. "
-                   "Set it and restart the app, or use the Desktop bridge profile instead.")
+        st.warning("No NVIDIA API key available -- type one in above, or set NVIDIA_API_KEY on the server and "
+                   "restart it. The run will fail immediately without one.")
     else:
         st.caption("NVIDIA profile: runs unattended end-to-end, no relay needed -- progress and the final "
                    "report appear in the job log below. Started non-interactively, it won't pause to ask for "
                    "approval live; approve the generated scenario in the list below once it's ready.")
     if go_agent:
-        if agent_prompt.strip():
+        if not agent_prompt.strip():
+            st.warning("Enter a prompt first.")
+        elif profile == "nvidia" and not has_nvidia_key:
+            st.warning("Enter an NVIDIA API key first, or switch to the Desktop bridge profile.")
+        else:
+            extra_env = {"NVIDIA_API_KEY": effective_nvidia_key} if profile == "nvidia" else None
             launch("agents", "Scenario agents",
                   [("Run scenario agents", [PY, "-m", "Agents.runtime", "--profile", profile,
-                                            agent_prompt.strip()])])
-        else:
-            st.warning("Enter a prompt first.")
+                                            agent_prompt.strip()])],
+                  extra_env=extra_env)
     jobs_panel(("agents",))
     agent_bridge_panel()
 

@@ -29,7 +29,13 @@ ROOT_CONFIG = REPO_ROOT / "scenario_config.json"
 OPENING_STATE = OUTPUT_DIR / "history" / "opening_position.parquet"
 FORWARD_POLICY = OUTPUT_DIR / "history" / "forward_policy.parquet"
 SKU_CLUSTERS = OUTPUT_DIR / "segmentation" / "sku_clusters.csv"
-PROJECTIONS_DIR = OUTPUT_DIR / "projections"
+# NOT OUTPUT_DIR / "projections": that was models/twin/digital_twin.py's convention
+# (run_dir = out_root / "projections" / run_name, digital_twin.py:1744), but the optimized
+# engine this branch's scenario_config.json actually points at (digital_twin_fast.py) writes
+# straight to out_root / scenario_folder_name / run_name, no "projections" segment -- confirmed
+# against a real scenario run's output (SCENARIO_0003_Southeast_Beverage_Surge_July, 2026-10-19):
+# scenario_config.json, run_kpis.json etc. all sit directly under OUTPUT_DIR/<scenario>/<arm>/.
+PROJECTIONS_DIR = OUTPUT_DIR
 MEIO_OUTPUT_DIR = OUTPUT_DIR / "MEIO"
 MEIO_ARTIFACTS_DIR = OUTPUT_DIR / "MEIO artifacts"
 

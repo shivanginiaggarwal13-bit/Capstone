@@ -9,6 +9,7 @@ Segmentation and Simulation launches write to App/runs/ (a sandbox) by default.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -1076,18 +1077,31 @@ def page_simulation(slot: dict):
                 st.dataframe(node, hide_index=True, width="stretch")
     st.subheader("Scenario agents")
     st.caption("Describe a what-if in plain English; the agents turn it into validated overrides, a scenario "
-               "card for you to approve, and (once approved) a re-planned MEIO + Twin comparison. No Anthropic "
-               "API key is configured here, so each model call is relayed through a Claude Desktop bridge "
-               "session instead of running unattended -- the panel below shows what the session is currently "
-               "blocked on, and lets you approve or reject directly from here.")
+               "card for you to approve, and (once approved) a re-planned MEIO + Twin comparison.")
+    has_nvidia_key = bool(os.environ.get("NVIDIA_API_KEY"))
+    profile_label = st.radio(
+        "Model profile", ["Desktop bridge (no API key)", "NVIDIA (GLM, needs NVIDIA_API_KEY)"],
+        index=1 if has_nvidia_key else 0, horizontal=True, key="agent_profile_choice")
+    profile = "nvidia" if profile_label.startswith("NVIDIA") else "desktop"
     with st.form("agent_prompt"):
         agent_prompt = st.text_area("Planner request", height=80,
                                     placeholder="e.g. What if Southeast beverage demand rises 25% in July?")
         go_agent = st.form_submit_button("Start agent session", icon=":material/play_arrow:", type="primary")
+    if profile == "desktop":
+        st.caption("Desktop bridge: no API key needed, but each model call is relayed through a mailbox -- "
+                   "the panel below shows what the session is blocked on, and lets you approve or reject the "
+                   "scenario directly; a model call itself still needs an actual Claude session to answer it.")
+    elif not has_nvidia_key:
+        st.warning("NVIDIA_API_KEY isn't set in this server's environment -- the run will fail immediately. "
+                   "Set it and restart the app, or use the Desktop bridge profile instead.")
+    else:
+        st.caption("NVIDIA profile: runs unattended end-to-end, no relay needed -- progress and the final "
+                   "report appear in the job log below. Started non-interactively, it won't pause to ask for "
+                   "approval live; approve the generated scenario in the list below once it's ready.")
     if go_agent:
         if agent_prompt.strip():
             launch("agents", "Scenario agents",
-                  [("Run scenario agents", [PY, "-m", "Agents.runtime", "--profile", "desktop",
+                  [("Run scenario agents", [PY, "-m", "Agents.runtime", "--profile", profile,
                                             agent_prompt.strip()])])
         else:
             st.warning("Enter a prompt first.")
@@ -1098,15 +1112,37 @@ def page_simulation(slot: dict):
     sc = list_scenarios()
     if sc:
         pick = st.selectbox("Scenario", sc)
-        stt = read_json(str(OUT / "overrides" / pick / "status.json")) or {}
-        card = OUT / "overrides" / pick / "scenario_card.md"
-        st.caption(f"Status: {stt.get('state', 'unknown')}")
+        base = OUT / "overrides" / pick
+        stt = _read_json_live(base / "status.json") or {}
+        card = base / "scenario_card.md"
+        cfg_path = base / "scenario_config.json"
+        approval = _read_json_live(base / "approval.json")
+        if approval and cfg_path.exists():
+            current_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
+            approval_state = "approved" if approval.get("config_sha256") == current_sha else "stale"
+        else:
+            approval_state = "awaiting_approval"
+        st.caption(f"Run status: {stt.get('state', 'unknown')} | Approval: {approval_state}")
         if card.exists():
             with st.expander("Scenario card"):
                 st.markdown(card.read_text(encoding="utf-8", errors="replace"))
+        if approval_state == "approved":
+            st.success(f"Approved by {approval['approved_by']} at {approval['approved_at']}")
+        else:
+            if approval_state == "stale":
+                st.warning("Approved once, but the config changed since -- re-approval required.")
+            name = st.text_input("Your name (recorded in approval.json)", key="scenario_approver_name")
+            if st.button("Approve", type="primary", key="scenario_approve_btn", disabled=not name.strip()):
+                res = subprocess.run([PY, "-m", "Agents.tools", "approve", pick, "--by", name.strip(), "--yes"],
+                                     cwd=ROOT, capture_output=True, text=True)
+                if res.returncode == 0:
+                    st.success("Approved.")
+                    st.rerun()
+                else:
+                    st.error((res.stdout or "") + (res.stderr or ""))
         st.button("Launch approved scenario", disabled=True,
-                  help="Not wired: approval is human-only (python -m Agents.tools approve ...), "
-                       "then `run_scenario` launches it. Use the Agents CLI.")
+                  help="Not wired: run_scenario() queues a detached MEIO + Twin job once approved. Use the "
+                       "Agents CLI (python -m Agents.tools call orchestrator run_scenario ...).")
     else:
         st.info("No scenarios yet. Create them with the Agents (python -m Agents.runtime ...).")
 

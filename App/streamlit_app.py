@@ -360,7 +360,37 @@ def start_agent_chat(profile: str, nvidia_key: str = "") -> dict:
 def send_agent_message(chat: dict, text: str):
     chat["turns"].append({"role": "user", "text": text})
     chat["state"] = "thinking"
+    chat["turn_started"] = time.time()
     threading.Thread(target=_run_agent_turn, args=(chat, text), daemon=True).start()
+
+
+def _agent_progress_text(chat: dict) -> str | None:
+    """Peek at the orchestrator's checkpointed state WHILE a turn is still in flight in its
+    background thread -- LangGraph saves state after every superstep, so this is safe to read
+    concurrently and gives real mid-turn progress (which tool is running, which agent just
+    reported back) instead of a static "thinking..." for the whole multi-step orchestration
+    (create_draft -> delegate x N -> validate -> review -> build -> approval), which can
+    legitimately take minutes and otherwise looks identical to a hang the whole time."""
+    session = chat.get("session")
+    if session is None:
+        return None
+    try:
+        snap = session.team.orchestrator.get_state(session.config)
+        messages = (snap.values or {}).get("messages", [])
+    except Exception:
+        return None
+    if not messages:
+        return None
+    last = messages[-1]
+    kind = getattr(last, "type", None)
+    if kind == "ai":
+        calls = getattr(last, "tool_calls", None) or []
+        if calls:
+            return "Calling: " + ", ".join(c["name"] for c in calls)
+        return "Composing a reply..."
+    if kind == "tool":
+        return f"Got a result back from: {getattr(last, 'name', 'a tool')}"
+    return None
 
 
 @st.fragment(run_every=2)
@@ -374,7 +404,14 @@ def agent_chat_panel():
             st.markdown(turn["text"])
     if chat["state"] == "thinking" and not chat.get("pending_approval"):
         with st.chat_message("assistant"):
-            st.caption(":material/progress_activity: thinking...")
+            elapsed = time.time() - chat.get("turn_started", time.time())
+            progress = _agent_progress_text(chat) or "thinking..."
+            st.caption(f":material/progress_activity: {progress} ({elapsed:,.0f}s)")
+            if elapsed > 120:
+                st.caption("This is taking a while -- each model call now times out at 60s "
+                           "(1 retry), so a genuinely stuck call should resolve, one way or "
+                           "another, well under this. If it keeps climbing, something's wrong; "
+                           "a fresh \"New session\" is the fastest way out.")
     if chat.get("pending_approval"):
         a = chat["pending_approval"]
         st.warning(f"Waiting on your approval: **{a['scenario_folder']}**")

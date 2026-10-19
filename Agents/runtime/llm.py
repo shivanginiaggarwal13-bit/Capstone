@@ -70,7 +70,12 @@ def chat_model(agent: str, profile: str | None = None, streaming: bool = False):
             "temperature": s.get("temperature", 0.5),
             "api_key": api_key,
             "base_url": NVIDIA_API_URL,
-            "max_retries": 2,
+            # No explicit timeout previously -> the openai SDK's own default (10 minutes)
+            # applied per call, and max_retries=2 could multiply that up to ~30 minutes with
+            # no visible signal to the caller that anything was wrong. A live multi-turn chat
+            # needs a call to fail fast and visibly far sooner than that.
+            "request_timeout": 60,
+            "max_retries": 1,
             "top_p": s.get("top_p", 1),
             "frequency_penalty": s.get("frequency_penalty", 0),
             "presence_penalty": s.get("presence_penalty", 0),

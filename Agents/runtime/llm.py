@@ -74,8 +74,16 @@ def chat_model(agent: str, profile: str | None = None, streaming: bool = False):
             # applied per call, and max_retries=2 could multiply that up to ~30 minutes with
             # no visible signal to the caller that anything was wrong. A live multi-turn chat
             # needs a call to fail fast and visibly far sooner than that.
-            "request_timeout": 60,
-            "max_retries": 1,
+            #
+            # First cut was request_timeout=60/max_retries=1 -- too tight: a real multi-part
+            # planner request ("rains... beverage surge... dairy fall") timed out on the very
+            # first orchestrator call, before the GLM model (apparently reasoning-heavy, see
+            # the max_tokens comment in profiles.yaml) could finish. Raised to 180s. Retries
+            # dropped to 0 rather than widened further: a retry re-sends the identical request
+            # to what's very likely a genuinely-slow response, not a transient fault, so it
+            # would just double the wait without improving the odds of success.
+            "request_timeout": 180,
+            "max_retries": 0,
             "top_p": s.get("top_p", 1),
             "frequency_penalty": s.get("frequency_penalty", 0),
             "presence_penalty": s.get("presence_penalty", 0),

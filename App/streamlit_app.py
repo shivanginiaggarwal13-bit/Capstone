@@ -407,11 +407,15 @@ def agent_chat_panel():
             elapsed = time.time() - chat.get("turn_started", time.time())
             progress = _agent_progress_text(chat) or "thinking..."
             st.caption(f":material/progress_activity: {progress} ({elapsed:,.0f}s)")
-            if elapsed > 120:
-                st.caption("This is taking a while -- each model call now times out at 60s "
-                           "(1 retry), so a genuinely stuck call should resolve, one way or "
-                           "another, well under this. If it keeps climbing, something's wrong; "
-                           "a fresh \"New session\" is the fastest way out.")
+            if chat["profile"] == "nvidia" and elapsed > 150:
+                st.caption("This is taking a while -- each NVIDIA model call now times out at "
+                           "180s with no retry, so this should resolve, one way or another, "
+                           "well under that. If it keeps climbing past ~3 minutes, something's "
+                           "wrong; a fresh \"New session\" is the fastest way out.")
+            elif chat["profile"] == "desktop" and elapsed > 150:
+                st.caption("This is taking a while, but desktop-profile model calls have no "
+                           "timeout -- they're genuinely waiting on a Claude session to answer "
+                           "the bridge request below, not stuck on their own.")
     if chat.get("pending_approval"):
         a = chat["pending_approval"]
         st.warning(f"Waiting on your approval: **{a['scenario_folder']}**")

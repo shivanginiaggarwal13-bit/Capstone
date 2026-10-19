@@ -840,41 +840,40 @@ def page_alpha(slot: dict):
         st.altair_chart(line, width="stretch")
 
         st.markdown("**Explore by segment**")
-        st.caption("One slider per cluster: each varies ONLY that cluster's own alpha while every other "
-                   "cluster stays at the live reference (0.6) -- a one-at-a-time view, not a simultaneous "
-                   "what-if across all six at once (that would take 6^6 twin runs, which don't exist). Cost "
-                   "here is a single total-landed-cost delta vs. actual history -- not broken into "
-                   "holding/stockout/transport like the portfolio view below. Fill rates are the 51-week "
-                   "real-demand test window and don't scale with the time-period toggle below; cost delta does.")
+        st.caption("Pick a cluster and its alpha varies while every other cluster stays at the live reference "
+                   "(0.6) -- a one-at-a-time view, not a simultaneous what-if across all six at once (that "
+                   "would take 6^6 twin runs, which don't exist). Only \"Own fill rate\" below is actually "
+                   "specific to the chosen cluster; the other three are portfolio-wide and read the same "
+                   "no matter which cluster is picked, unless its alpha is moved off 0.6. Cost is a single "
+                   "total-landed-cost delta vs. actual history, not broken into holding/stockout/transport "
+                   "like the portfolio view below. Fill rates are the 51-week real-demand test window and "
+                   "don't scale with the time-period toggle; cost delta does.")
         SEG_WINDOW_WEEKS = 156   # same full-run cumulative convention as alpha_cost_breakdown.py's WINDOW_WEEKS
-        period5 = st.radio("Time period", ["Week", "Month", "Year", "All"], index=3, horizontal=True,
-                           key="alpha_explore_seg_period")
-        per_week5 = 1.0 / SEG_WINDOW_WEEKS
-        divisor5 = {"Week": per_week5, "Month": per_week5 * 52 / 12, "Year": per_week5 * 52, "All": 1.0}[period5]
-        suffix5 = {"Week": " / week", "Month": " / month", "Year": " / year", "All": " (3-yr total)"}[period5]
         alphas5 = sorted(ev5["alpha"].unique().tolist())
         clusters5 = ev5["cluster"].unique().tolist()
         default5 = 0.6 if 0.6 in alphas5 else alphas5[len(alphas5) // 2]
-        cols5 = st.columns(2)
-        for i, cluster in enumerate(clusters5):
-            with cols5[i % 2]:
-                with st.container(border=True):
-                    st.markdown(f"**{cluster}**")
-                    slug = re.sub(r"[^a-z0-9]+", "_", cluster.lower()).strip("_")
-                    chosen5 = st.select_slider("Alpha", options=alphas5, value=default5,
-                                               key=f"alpha_explore_seg_{slug}")
-                    row5 = ev5[(ev5["cluster"] == cluster) & (ev5["alpha"] == chosen5)].iloc[0]
-                    portfolio_help = ("Portfolio-wide, not per-segment -- identical across all 6 cards "
-                                      "whenever this slider sits at the 0.6 reference, since they all read "
-                                      "the same underlying twin run. Only diverges once THIS cluster's alpha "
-                                      "moves away from 0.6.")
-                    mm1, mm2 = st.columns(2)
-                    mm1.metric("Own fill rate", f"{row5['own_fill_mean']:.1%}")
-                    mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}", help=portfolio_help)
-                    mm3, mm4 = st.columns(2)
-                    mm3.metric("Internal replen fill", f"{row5['internal_replen_mean']:.1%}", help=portfolio_help)
-                    mm4.metric(f"Cost delta vs actual{suffix5}", f"${row5['cost_delta_mean'] * divisor5:,.0f}",
-                              help=portfolio_help)
+        c1, c2, c3 = st.columns([2, 2, 1])
+        with c1:
+            cluster5 = st.selectbox("Cluster", clusters5, key="alpha_explore_seg_cluster")
+        with c2:
+            chosen5 = st.select_slider("Alpha", options=alphas5, value=default5, key="alpha_explore_seg_alpha")
+        with c3:
+            period5 = st.radio("Time period", ["Week", "Month", "Year", "All"], index=3,
+                               key="alpha_explore_seg_period")
+        per_week5 = 1.0 / SEG_WINDOW_WEEKS
+        divisor5 = {"Week": per_week5, "Month": per_week5 * 52 / 12, "Year": per_week5 * 52, "All": 1.0}[period5]
+        suffix5 = {"Week": " / week", "Month": " / month", "Year": " / year", "All": " (3-yr total)"}[period5]
+        row5 = ev5[(ev5["cluster"] == cluster5) & (ev5["alpha"] == chosen5)].iloc[0]
+        portfolio_help = ("Portfolio-wide, not per-segment -- the same for every cluster whenever its alpha "
+                          "sits at the 0.6 reference, since they all read the same underlying twin run. Only "
+                          "diverges once THIS cluster's alpha moves away from 0.6.")
+        mm1, mm2 = st.columns(2)
+        mm1.metric("Own fill rate", f"{row5['own_fill_mean']:.1%}")
+        mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}", help=portfolio_help)
+        mm3, mm4 = st.columns(2)
+        mm3.metric("Internal replen fill", f"{row5['internal_replen_mean']:.1%}", help=portfolio_help)
+        mm4.metric(f"Cost delta vs actual{suffix5}", f"${row5['cost_delta_mean'] * divisor5:,.0f}",
+                  help=portfolio_help)
 
     sw_fill = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
     if sw_fill is not None:

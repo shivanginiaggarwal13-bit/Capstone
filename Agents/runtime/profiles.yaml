@@ -7,11 +7,16 @@
 default_profile: nvidia
 
 profiles:
-  # Primary NVIDIA Build profile using GLM 5.3 Flash
+  # Primary NVIDIA Build profile using GLM 5.3 Flash. max_tokens raised from the
+  # original 1024: GLM 5.3 appears to be a reasoning/thinking model, whose hidden
+  # reasoning tokens count against max_tokens on this endpoint -- at 1024 the
+  # orchestrator's first call came back with empty text AND no tool call (confirmed
+  # in a real run's transcript), consistent with the whole budget being spent on
+  # internal reasoning before any visible output or tool call could be emitted.
   nvidia:
     provider: nvidia
-    orchestrator: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
-    workers: {model: z-ai/glm-5.3-flash, max_tokens: 1024, temperature: 0.5}
+    orchestrator: {model: z-ai/glm-5.3-flash, max_tokens: 4096, temperature: 0.5}
+    workers: {model: z-ai/glm-5.3-flash, max_tokens: 4096, temperature: 0.5}
 
   # Test profile pointing to NVIDIA build
   test:

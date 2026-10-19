@@ -161,14 +161,14 @@ class ProfileTests(unittest.TestCase):
         model = llm.chat_model("orchestrator", "nvidia")
         self.assertIsInstance(model, ChatOpenAI)
         self.assertEqual(model.model_name, "z-ai/glm-5.3-flash")
-        self.assertEqual(model.max_tokens, 1024)
+        self.assertEqual(model.max_tokens, 4096)
         self.assertEqual(model.temperature, 0.5)
         self.assertEqual(model.openai_api_base, llm.NVIDIA_API_URL)
 
     def test_nvidia_profile_settings(self):
         settings = llm.agent_settings("orchestrator", "nvidia")
         self.assertEqual(settings["model"], "z-ai/glm-5.3-flash")
-        self.assertEqual(settings["max_tokens"], 1024)
+        self.assertEqual(settings["max_tokens"], 4096)
         self.assertEqual(settings["temperature"], 0.5)
 
     def test_production_profile_settings(self):

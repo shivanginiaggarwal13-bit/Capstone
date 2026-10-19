@@ -839,6 +839,32 @@ def page_alpha(slot: dict):
             line = line + rule
         st.altair_chart(line, width="stretch")
 
+        st.markdown("**Explore by segment**")
+        st.caption("One slider per cluster: each varies ONLY that cluster's own alpha while every other "
+                   "cluster stays at the live reference (0.6) -- a one-at-a-time view, not a simultaneous "
+                   "what-if across all six at once (that would take 6^6 twin runs, which don't exist). Cost "
+                   "here is a single total-landed-cost delta vs. actual history, 156-week cumulative -- not "
+                   "broken into holding/stockout/transport like the portfolio view below. Fill rates are the "
+                   "51-week real-demand test window.")
+        alphas5 = sorted(ev5["alpha"].unique().tolist())
+        clusters5 = ev5["cluster"].unique().tolist()
+        default5 = 0.6 if 0.6 in alphas5 else alphas5[len(alphas5) // 2]
+        cols5 = st.columns(2)
+        for i, cluster in enumerate(clusters5):
+            with cols5[i % 2]:
+                with st.container(border=True):
+                    st.markdown(f"**{cluster}**")
+                    slug = re.sub(r"[^a-z0-9]+", "_", cluster.lower()).strip("_")
+                    chosen5 = st.select_slider("Alpha", options=alphas5, value=default5,
+                                               key=f"alpha_explore_seg_{slug}")
+                    row5 = ev5[(ev5["cluster"] == cluster) & (ev5["alpha"] == chosen5)].iloc[0]
+                    mm1, mm2 = st.columns(2)
+                    mm1.metric("Own fill rate", f"{row5['own_fill_mean']:.1%}")
+                    mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}")
+                    mm3, mm4 = st.columns(2)
+                    mm3.metric("Internal replen fill", f"{row5['internal_replen_mean']:.1%}")
+                    mm4.metric("Cost delta vs actual (156-wk)", f"${row5['cost_delta_mean']:,.0f}")
+
     sw_fill = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
     if sw_fill is not None:
         import altair as alt
@@ -887,7 +913,9 @@ def page_alpha(slot: dict):
             )
         st.altair_chart(alt.vconcat(*charts).resolve_scale(y="independent"), width="stretch")
 
-        st.markdown("**Explore a specific alpha**")
+        st.markdown("**Explore a specific alpha (portfolio-wide)**")
+        st.caption("This slider applies ONE alpha to the whole portfolio -- for the per-cluster view, see "
+                   "\"Explore by segment\" above.")
         alphas_sorted = sorted(cb["alpha"].unique().tolist())
         c1, c2 = st.columns([3, 1])
         with c1:

@@ -843,9 +843,15 @@ def page_alpha(slot: dict):
         st.caption("One slider per cluster: each varies ONLY that cluster's own alpha while every other "
                    "cluster stays at the live reference (0.6) -- a one-at-a-time view, not a simultaneous "
                    "what-if across all six at once (that would take 6^6 twin runs, which don't exist). Cost "
-                   "here is a single total-landed-cost delta vs. actual history, 156-week cumulative -- not "
-                   "broken into holding/stockout/transport like the portfolio view below. Fill rates are the "
-                   "51-week real-demand test window.")
+                   "here is a single total-landed-cost delta vs. actual history -- not broken into "
+                   "holding/stockout/transport like the portfolio view below. Fill rates are the 51-week "
+                   "real-demand test window and don't scale with the time-period toggle below; cost delta does.")
+        SEG_WINDOW_WEEKS = 156   # same full-run cumulative convention as alpha_cost_breakdown.py's WINDOW_WEEKS
+        period5 = st.radio("Time period", ["Week", "Month", "Year", "All"], index=3, horizontal=True,
+                           key="alpha_explore_seg_period")
+        per_week5 = 1.0 / SEG_WINDOW_WEEKS
+        divisor5 = {"Week": per_week5, "Month": per_week5 * 52 / 12, "Year": per_week5 * 52, "All": 1.0}[period5]
+        suffix5 = {"Week": " / week", "Month": " / month", "Year": " / year", "All": " (3-yr total)"}[period5]
         alphas5 = sorted(ev5["alpha"].unique().tolist())
         clusters5 = ev5["cluster"].unique().tolist()
         default5 = 0.6 if 0.6 in alphas5 else alphas5[len(alphas5) // 2]
@@ -863,7 +869,7 @@ def page_alpha(slot: dict):
                     mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}")
                     mm3, mm4 = st.columns(2)
                     mm3.metric("Internal replen fill", f"{row5['internal_replen_mean']:.1%}")
-                    mm4.metric("Cost delta vs actual (156-wk)", f"${row5['cost_delta_mean']:,.0f}")
+                    mm4.metric(f"Cost delta vs actual{suffix5}", f"${row5['cost_delta_mean'] * divisor5:,.0f}")
 
     sw_fill = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
     if sw_fill is not None:

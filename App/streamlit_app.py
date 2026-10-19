@@ -173,6 +173,16 @@ def job_registry() -> dict:
     return {}
 
 
+@st.cache_resource
+def agent_chat_registry() -> dict:
+    """Separate from job_registry(): that dict's values are all launch()-built subprocess
+    job records with a uniform {"key", "title", "steps", ...} shape that other code (e.g.
+    page_simulation's `sims = [j for j in job_registry().values() if j["key"] == "sim"]`)
+    iterates assuming every entry has it. The agent chat object has a different shape
+    entirely, so it gets its own registry rather than violating that assumption."""
+    return {}
+
+
 def _run_chain(job: dict):
     for label, cmd in job["steps"]:
         job["current"] = label
@@ -289,7 +299,104 @@ def agent_bridge_panel():
     elif done:
         st.success(f"Session finished: {done.get('summary') or '(no summary recorded)'}")
     else:
-        st.caption("Session starting...")
+        st.caption("Idle -- nothing pending right now.")
+
+
+# ------------------------------------------------------------------ agent chat (in-process) --
+# One shared LangGraph Session kept alive across turns (agent_chat_registry()["chat"]), instead
+# of spawning a brand-new `Agents.runtime` subprocess per message. A subprocess has no way to
+# carry conversation state between invocations -- graph.Team compiles the orchestrator with a
+# fresh in-memory checkpointer every time, so a one-shot launch() per prompt is structurally a
+# dead end the moment the orchestrator asks a clarifying question back. graph.Session.ask() is
+# already built to be called repeatedly on one object (see the CLI's own `planner>` REPL loop
+# in runtime/__main__.py); this just drives that loop from Streamlit instead of a terminal.
+
+
+def _agent_decide(chat: dict):
+    """The approval interrupt, answered in the chat UI instead of a terminal prompt or the
+    file-based bridge: blocks the background turn thread until agent_chat_panel()'s Approve/
+    Reject button sets chat['approval_event']. Used for every profile -- unlike model calls,
+    approval is for a person regardless of which model is answering the rest of the graph."""
+    def decide(payload: dict) -> dict:
+        chat["pending_approval"] = payload
+        event = threading.Event()
+        chat["approval_event"] = event
+        event.wait()
+        return chat.pop("approval_decision", {"pending": True})
+    return decide
+
+
+def _run_agent_turn(chat: dict, text: str):
+    from Agents.runtime import graph
+    try:
+        if chat["session"] is None:
+            if chat["profile"] == "nvidia" and chat.get("nvidia_key"):
+                # This is a single-local-user tool (see CLAUDE.md), not a multi-tenant server,
+                # so setting the process env here is fine; llm.chat_model() re-reads it per call.
+                os.environ["NVIDIA_API_KEY"] = chat["nvidia_key"]
+            team = graph.Team(chat["profile"], streaming=False)
+            chat["session"] = graph.Session(team, decide=_agent_decide(chat))
+            if chat["profile"] == "desktop":
+                from Agents.runtime import bridge
+                bridge.start_session()
+        reply = chat["session"].ask(text)
+        chat["turns"].append({"role": "assistant",
+                              "text": reply or "_(no reply text back -- check the scenario list below; the "
+                                               "agents may have acted without saying anything)_"})
+    except Exception as e:
+        chat["turns"].append({"role": "assistant", "text": f"Error: {e}"})
+    finally:
+        chat["state"] = "idle"
+        chat["pending_approval"] = None
+
+
+def start_agent_chat(profile: str, nvidia_key: str = "") -> dict:
+    chat = {"profile": profile, "nvidia_key": nvidia_key, "turns": [], "state": "idle",
+           "session": None, "pending_approval": None}
+    agent_chat_registry()["chat"] = chat
+    return chat
+
+
+def send_agent_message(chat: dict, text: str):
+    chat["turns"].append({"role": "user", "text": text})
+    chat["state"] = "thinking"
+    threading.Thread(target=_run_agent_turn, args=(chat, text), daemon=True).start()
+
+
+@st.fragment(run_every=2)
+def agent_chat_panel():
+    chat = agent_chat_registry().get("chat")
+    if not chat:
+        st.caption('No active session yet -- click "New session" above to start one.')
+        return
+    for turn in chat["turns"]:
+        with st.chat_message(turn["role"]):
+            st.markdown(turn["text"])
+    if chat["state"] == "thinking" and not chat.get("pending_approval"):
+        with st.chat_message("assistant"):
+            st.caption(":material/progress_activity: thinking...")
+    if chat.get("pending_approval"):
+        a = chat["pending_approval"]
+        st.warning(f"Waiting on your approval: **{a['scenario_folder']}**")
+        with st.expander("Scenario card", expanded=True):
+            st.markdown(a["card"])
+        name = st.text_input("Your name (recorded in approval.json)", key="chat_approver_name")
+        feedback = st.text_input("Feedback (only used if you reject)", key="chat_reject_feedback")
+        c1, c2 = st.columns(2)
+        if c1.button("Approve", type="primary", key="chat_approve_btn", disabled=not name.strip()):
+            chat["approval_decision"] = {"approved": True, "approved_by": name.strip()}
+            chat["pending_approval"] = None
+            chat["approval_event"].set()
+            st.rerun()
+        if c2.button("Reject", key="chat_reject_btn"):
+            chat["approval_decision"] = {"approved": False, "feedback": feedback}
+            chat["pending_approval"] = None
+            chat["approval_event"].set()
+            st.rerun()
+    msg = st.chat_input(f"Message the {chat['profile']} agents...", disabled=chat["state"] != "idle")
+    if msg:
+        send_agent_message(chat, msg)
+        st.rerun()
 
 
 # --------------------------------------------------------------------------- shared data
@@ -1080,52 +1187,47 @@ def page_simulation(slot: dict):
             with st.expander(f"Service by node - {names[0]}"):
                 st.dataframe(node, hide_index=True, width="stretch")
     st.subheader("Scenario agents")
-    st.caption("Describe a what-if in plain English; the agents turn it into validated overrides, a scenario "
-               "card for you to approve, and (once approved) a re-planned MEIO + Twin comparison.")
+    st.caption("Describe a what-if in plain English. It's a real conversation: if the agents ask a clarifying "
+               "question, just answer it below and they'll continue with the same context, instead of having "
+               "to restate everything in a brand-new run.")
     server_has_nvidia_key = bool(os.environ.get("NVIDIA_API_KEY"))
-    profile_label = st.radio(
-        "Model profile", ["Desktop bridge (no API key)", "NVIDIA (GLM, needs an API key)"],
-        index=1 if server_has_nvidia_key else 0, horizontal=True, key="agent_profile_choice")
+    active_chat = agent_chat_registry().get("chat")
+    c1, c2, c3 = st.columns([2, 2, 1])
+    with c1:
+        profile_label = st.radio(
+            "Model profile", ["Desktop bridge (no API key)", "NVIDIA (GLM, needs an API key)"],
+            index=1 if server_has_nvidia_key else 0, horizontal=True, key="agent_profile_choice")
     profile = "nvidia" if profile_label.startswith("NVIDIA") else "desktop"
     typed_nvidia_key = ""
-    if profile == "nvidia":
-        typed_nvidia_key = st.text_input(
-            "NVIDIA API key", type="password", key="nvidia_api_key_input",
-            placeholder="Already set on the server" if server_has_nvidia_key else "nvapi-...",
-            help="Kept only in this browser tab's session state, never written to disk, never logged, and "
-                 "passed to the agent process through its environment, not as a command-line argument -- so "
-                 "it never appears in the job log below. Leave blank to use the server's own NVIDIA_API_KEY, "
-                 "if it has one.")
+    with c2:
+        if profile == "nvidia":
+            typed_nvidia_key = st.text_input(
+                "NVIDIA API key", type="password", key="nvidia_api_key_input",
+                placeholder="Already set on the server" if server_has_nvidia_key else "nvapi-...",
+                help="Kept only in this process's memory for this session, never written to disk or logged. "
+                     "Leave blank to use the server's own NVIDIA_API_KEY, if it has one.")
     effective_nvidia_key = typed_nvidia_key.strip() or os.environ.get("NVIDIA_API_KEY", "")
     has_nvidia_key = bool(effective_nvidia_key)
-    with st.form("agent_prompt"):
-        agent_prompt = st.text_area("Planner request", height=80,
-                                    placeholder="e.g. What if Southeast beverage demand rises 25% in July?")
-        go_agent = st.form_submit_button("Start agent session", icon=":material/play_arrow:", type="primary")
+    with c3:
+        st.markdown("<div style='height: 1.9rem'></div>", unsafe_allow_html=True)
+        new_session_disabled = profile == "nvidia" and not has_nvidia_key
+        if st.button("New session", key="agent_new_session", disabled=new_session_disabled,
+                     help="Starting a new session replaces the current conversation." if active_chat else None):
+            start_agent_chat(profile, effective_nvidia_key)
+            st.rerun()
     if profile == "desktop":
         st.caption("Desktop bridge: no API key needed, but each model call is relayed through a mailbox -- "
-                   "the panel below shows what the session is blocked on, and lets you approve or reject the "
-                   "scenario directly; a model call itself still needs an actual Claude session to answer it.")
+                   "the panel below the chat shows what the session is blocked on; a model call itself still "
+                   "needs an actual Claude session to answer it. Approval happens right in the chat.")
     elif not has_nvidia_key:
         st.warning("No NVIDIA API key available -- type one in above, or set NVIDIA_API_KEY on the server and "
-                   "restart it. The run will fail immediately without one.")
+                   "restart it.")
     else:
-        st.caption("NVIDIA profile: runs unattended end-to-end, no relay needed -- progress and the final "
-                   "report appear in the job log below. Started non-interactively, it won't pause to ask for "
-                   "approval live; approve the generated scenario in the list below once it's ready.")
-    if go_agent:
-        if not agent_prompt.strip():
-            st.warning("Enter a prompt first.")
-        elif profile == "nvidia" and not has_nvidia_key:
-            st.warning("Enter an NVIDIA API key first, or switch to the Desktop bridge profile.")
-        else:
-            extra_env = {"NVIDIA_API_KEY": effective_nvidia_key} if profile == "nvidia" else None
-            launch("agents", "Scenario agents",
-                  [("Run scenario agents", [PY, "-m", "Agents.runtime", "--profile", profile,
-                                            agent_prompt.strip()])],
-                  extra_env=extra_env)
-    jobs_panel(("agents",))
-    agent_bridge_panel()
+        st.caption("NVIDIA profile: runs live -- replies appear directly in the chat below, including "
+                   "clarifying questions, which you can just answer.")
+    agent_chat_panel()
+    if active_chat and active_chat.get("profile") == "desktop":
+        agent_bridge_panel()
 
     st.subheader("Scenarios from the Agents' override engine")
     sc = list_scenarios()

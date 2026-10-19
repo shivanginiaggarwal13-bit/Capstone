@@ -861,10 +861,11 @@ def page_alpha(slot: dict):
     cb = read_csv(str(p["evidence"] / "alpha_cost_breakdown.csv"))
     if cb is not None:
         import altair as alt
-        st.subheader("Cost breakdown across alpha (51-week real-demand backtest)")
+        st.subheader("Cost breakdown across alpha (156-week real-demand simulation)")
         st.caption("Pooling (higher alpha) isn't free: it trades stockout cost for more transport cost. "
                    "Holding stays essentially flat. A single net total hides this trade-off, so it's broken "
-                   "out below -- use the slider to read off any tested alpha's numbers for the judgment call.")
+                   "out below. These are cumulative totals over the full 156-week (3-year) simulation -- "
+                   "use the slider below to read off any tested alpha's numbers per week, month or year instead.")
         long = cb.melt(id_vars="alpha", value_vars=["holding_cost_usd", "stockout_cost_usd", "transport_cost_usd"],
                        var_name="component", value_name="usd")
         long["component"] = long["component"].str.replace("_cost_usd", "", regex=False).str.title()
@@ -888,14 +889,30 @@ def page_alpha(slot: dict):
 
         st.markdown("**Explore a specific alpha**")
         alphas_sorted = sorted(cb["alpha"].unique().tolist())
-        chosen = st.select_slider("Alpha (pooling factor)", options=alphas_sorted,
-                                  value=alphas_sorted[len(alphas_sorted) // 2], key="alpha_cost_slider")
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            chosen = st.select_slider("Alpha (pooling factor)", options=alphas_sorted,
+                                      value=alphas_sorted[len(alphas_sorted) // 2], key="alpha_cost_slider")
+        with c2:
+            period = st.radio("Time period", ["Week", "Month", "Year", "All"], index=3, horizontal=True,
+                              key="alpha_cost_period")
         row = cb[cb["alpha"] == chosen].iloc[0]
+        window_weeks = float(row["window_weeks"])
+        # Cumulative dollars over the full 156-week simulation aren't an intuitive unit for a
+        # planner -- divide down to a weekly rate, then scale to the chosen cadence. 52 weeks/
+        # year and 12 months/year (so 52/12 weeks/month) are the standard conventions; "All"
+        # shows the raw cumulative total, unscaled.
+        per_week = 1.0 / window_weeks
+        divisor = {"Week": per_week, "Month": per_week * 52 / 12, "Year": per_week * 52, "All": 1.0}[period]
+        suffix = {"Week": " / week", "Month": " / month", "Year": " / year", "All": " (3-yr total)"}[period]
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Holding cost", f"${row['holding_cost_usd']:,.0f}")
-        m2.metric("Stockout cost", f"${row['stockout_cost_usd']:,.0f}")
-        m3.metric("Transport cost", f"${row['transport_cost_usd']:,.0f}")
-        m4.metric("Total landed cost", f"${row['total_landed_cost_usd']:,.0f}")
+        m1.metric(f"Holding cost{suffix}", f"${row['holding_cost_usd'] * divisor:,.0f}")
+        m2.metric(f"Stockout cost{suffix}", f"${row['stockout_cost_usd'] * divisor:,.0f}")
+        m3.metric(f"Transport cost{suffix}", f"${row['transport_cost_usd'] * divisor:,.0f}")
+        m4.metric(f"Total landed cost{suffix}", f"${row['total_landed_cost_usd'] * divisor:,.0f}")
+        st.caption("Fill rates below are a rate, not a sum, so the time-period selector doesn't apply to them -- "
+                   "they're the 51-week real-demand test window specifically (2025-W02..2025-W52, where the "
+                   "swept alpha actually governs the policy), not blended with the 105-week warm-up.")
         f1, f2 = st.columns(2)
         f1.metric("Customer fill rate", f"{row['customer_fill_rate']:.1%}")
         f2.metric("Internal replen fill rate", f"{row['internal_replen_fill_rate']:.1%}")

@@ -864,12 +864,17 @@ def page_alpha(slot: dict):
                     chosen5 = st.select_slider("Alpha", options=alphas5, value=default5,
                                                key=f"alpha_explore_seg_{slug}")
                     row5 = ev5[(ev5["cluster"] == cluster) & (ev5["alpha"] == chosen5)].iloc[0]
+                    portfolio_help = ("Portfolio-wide, not per-segment -- identical across all 6 cards "
+                                      "whenever this slider sits at the 0.6 reference, since they all read "
+                                      "the same underlying twin run. Only diverges once THIS cluster's alpha "
+                                      "moves away from 0.6.")
                     mm1, mm2 = st.columns(2)
                     mm1.metric("Own fill rate", f"{row5['own_fill_mean']:.1%}")
-                    mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}")
+                    mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}", help=portfolio_help)
                     mm3, mm4 = st.columns(2)
-                    mm3.metric("Internal replen fill", f"{row5['internal_replen_mean']:.1%}")
-                    mm4.metric(f"Cost delta vs actual{suffix5}", f"${row5['cost_delta_mean'] * divisor5:,.0f}")
+                    mm3.metric("Internal replen fill", f"{row5['internal_replen_mean']:.1%}", help=portfolio_help)
+                    mm4.metric(f"Cost delta vs actual{suffix5}", f"${row5['cost_delta_mean'] * divisor5:,.0f}",
+                              help=portfolio_help)
 
     sw_fill = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
     if sw_fill is not None:

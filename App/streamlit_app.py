@@ -680,14 +680,15 @@ def run_all_panel(clicked: bool):
         st.session_state["show_run_all"] = True
     if st.session_state.get("show_run_all"):
         with st.container(border=True):
-            st.markdown("**Run all** - executes, in order: segmentation (sandbox) -> alpha check -> "
-                        "MEIO policy -> Digital Twin")
-            st.warning("The MEIO + Twin step runs `run_meio_then_twin.py --yes`, which CLEARS and rebuilds "
+            st.markdown("**Run all** - the routine weekly piece: MEIO policy, then Digital Twin. "
+                        "Segmentation and the alpha check are separate, standalone buttons on their own "
+                        "pages -- run those only when the business team asks for a refresh, not as part "
+                        "of this.")
+            st.warning("This runs `run_meio_then_twin.py --yes`, which CLEARS and rebuilds "
                        f"`output datasets/MEIO/{paths()['name']}` and its Twin run. This takes a long time.")
             ok = confirm_box("I understand; rebuild the configured scenario outputs", "ra_ok")
             if st.button("Start run all", type="primary", disabled=not ok):
-                steps = seg_steps(False) + alpha_steps() + meio_steps(True)
-                launch("runall", "Run all", steps)
+                launch("runall", "Run all", meio_steps(True))
     jobs_panel(("runall",))
 
 

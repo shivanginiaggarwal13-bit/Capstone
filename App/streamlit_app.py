@@ -158,8 +158,14 @@ def paths() -> dict:
         "cluster_sl": SEG / "cluster_service_levels.csv",
         "meio_dir": OUT / "MEIO" / name,
         "weekly_dir": OUT / "MEIO" / name / "2026-W01",
-        "twin_dir": OUT / "projections" / name / cfg["digital_twin"].get("run_name", "meio_policy"),
-        "baseline_dir": OUT / "projections" / "SCENARIO_0001_Baseline_Forward_Plan" / "baseline",
+        # NOT OUT / "projections" / ...: that was models/twin/digital_twin.py's (the
+        # original engine's) output convention. scenario_config.json's digital_twin.entrypoint
+        # points at the optimized port (digital_twin_fast.py), which writes straight to
+        # OUT / scenario_folder_name / run_name instead -- confirmed against real output
+        # (Agents/tools/paths.py's PROJECTIONS_DIR had the same stale assumption, fixed
+        # 2026-10-19; this call site was missed then and is fixed now).
+        "twin_dir": OUT / name / cfg["digital_twin"].get("run_name", "meio_policy"),
+        "baseline_dir": OUT / "SCENARIO_0001_Baseline_Forward_Plan" / "baseline",
         "evidence": OUT / "MEIO artifacts" / name / "results",
     }
 
@@ -1205,11 +1211,26 @@ def page_simulation(slot: dict):
     runs = {"Forward plan - MEIO policy": p["twin_dir"], "Forward plan - baseline policy": p["baseline_dir"]}
     for s in list_scenarios():
         for arm in ("prepared", "unprepared"):
-            runs[f"{s} / {arm}"] = OUT / "projections" / s / arm
+            runs[f"{s} / {arm}"] = OUT / s / arm
+    # No-scenario counterfactuals: today's policy, no overrides, same seed -- ad hoc runs
+    # (python digital_twin_fast.py --scenario-config scenario_config.json --policy <baseline>
+    # --run-name counterfactual_<label>), not launched from this UI, but worth surfacing here
+    # since they're the "what if we hadn't hit this scenario at all" comparison a scenario's
+    # own prepared/unprepared arms can't provide by themselves.
+    for d in sorted((OUT / p["name"]).glob("counterfactual_*")) if (OUT / p["name"]).exists() else []:
+        if (d / "run_kpis.json").exists():
+            runs[f"No scenario ({d.name})"] = d
     for d in sorted(RUNS.glob("twin_*")):
         for k in d.rglob("run_kpis.json"):
             runs[f"Sandbox {d.name}"] = k.parent
-    names = st.multiselect("Compare runs", list(runs), default=[n for n in list(runs)[:2]])
+    # Default to the most recently built scenario's own arms plus a no-scenario
+    # counterfactual, when either exists -- otherwise nothing useful shows up without the
+    # user first knowing to go find the right entries in a dropdown themselves.
+    scenario_names = [n for n in runs if " / " in n and n.split(" / ")[0] in list_scenarios()]
+    counterfactual_names = [n for n in runs if n.startswith("No scenario (")]
+    smart_default = (sorted(scenario_names)[-2:] if scenario_names else []) + counterfactual_names[:1]
+    names = st.multiselect("Compare runs", list(runs),
+                           default=smart_default or [n for n in list(runs)[:2]])
     rows = {}
     for n in names:
         k = kpis(runs[n])

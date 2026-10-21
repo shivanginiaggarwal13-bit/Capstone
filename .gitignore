@@ -7,3 +7,12 @@ __pycache__/
 # "output datasets/" at root, already tracked. This is a redundant local
 # snapshot (~400MB), not a deliverable.
 MEIO Weekly Data/
+
+# Regenerable research simulation dumps (multi-GB) -- the evidence the pipeline
+# reads lives in "MEIO artifacts/*/results/", which stays tracked.
+output datasets/MEIO artifacts/*/twin_runs/
+output datasets/MEIO artifacts/*/validation_output/
+# Scenarios cleared from the app's view; kept locally, not a deliverable.
+output datasets/_archive_*/
+# Zipped duplicate of the "Model Documentation/" folder.
+Model Documentation.zip

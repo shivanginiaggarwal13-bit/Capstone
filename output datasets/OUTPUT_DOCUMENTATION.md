@@ -1,6 +1,6 @@
 # Supply Brain — output datasets
 
-*Auto-generated 2026-09-25 13:59 by
+*Auto-generated 2026-10-21 10:37 by
 `models/twin/digital_twin.py`. Do not edit by hand.*
 
 ## Scope
@@ -131,11 +131,18 @@ machine-readable `changes` object. It may also contain `scenario_number`,
 or other relevant context. If `scenario_number` is omitted, the next available
 number is assigned automatically.
 
+If `changes` contains `demand_surge_pct`, it is actually APPLIED to the
+simulated demand (see `scenario_engine.py` and Part 5's known limitations) --
+scaled for `affected_region` (or an explicit `affected_nodes` list) over
+`duration_weeks` weeks starting `start_week_offset` weeks into the horizon
+(both optional; default to the whole horizon starting immediately). Any
+other `changes` key is saved for context but has no simulation effect yet.
+
 ```bash
 python models/twin/digital_twin.py --mode forward \
-  --scenario-config models/twin/scenario_config.example.json \
-  --policy "output datasets/history/forward_policy.csv" \
-  --state "output datasets/history/opening_position.csv"
+    --scenario-config models/twin/scenario_config.example.json \
+    --policy "output datasets/history/forward_policy.csv" \
+    --state "output datasets/history/opening_position.csv"
 ```
 
 The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
@@ -152,7 +159,14 @@ The policy table's full column-by-column dictionary is Part 5 of
 
 | Folder | Mode | Seed | Label | Size |
 |---|---|---|---|---|
-| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.18 MB |
+| `MEIO/` | ? | ? | ? | 23.74 MB |
+| `MEIO artifacts/` | ? | ? | ? | 7463.39 MB |
+| `SCENARIO_0001_Baseline_Forward_Plan/` | ? | ? | ? | 9.50 MB |
+| `SCENARIO_0002_MEIO_CLARK_SCARF_V2/` | ? | ? | ? | 28.22 MB |
+| `SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/` | ? | ? | ? | 28.21 MB |
+| `agent output/` | ? | ? | ? | 0.02 MB |
+| `history/` | history | 2026 | 2023-W01..2025-W52 history | 1.34 MB |
+| `overrides/` | ? | ? | ? | 0.02 MB |
 | `projections/` | ? | ? | ? | 84.46 MB |
 | `segmentation/` | ? | ? | ? | 0.69 MB |
 
@@ -305,8 +319,13 @@ what move.
   routed across them.
 - **Single-sourcing per (node, SKU).** Routing is one parent per pair, taken
   from `sku_sourcing_map.csv`.
-- **Disruption scenarios are not applied.** The library is generated but no run
-  currently overlays it.
+- **Only a demand-surge scenario type is applied.** `--scenario-config`'s
+  `changes` object is read and actually affects the simulation when it
+  contains `demand_surge_pct` (optionally `affected_region`/`affected_nodes`,
+  `duration_weeks`, `start_week_offset` -- see `scenario_engine.py`). Any
+  other key in `changes` is still saved to the self-describing scenario
+  folder for context but has no simulation effect -- lead-time and capacity
+  disruption types are not implemented yet.
 - **Demand is aggregated to (node, SKU, day).** Forward mode synthesises demand
   from the forecast, so there are no discrete order lines and no true
   order-level on-time-in-full; `pct_demand_weeks_in_full` is measured at

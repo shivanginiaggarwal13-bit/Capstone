@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.1",
+  "scenario_number": 3,
+  "scenario_name": "Veganism_Dairy_Decline_Protest_Shipping_Delays",
+  "description": "Structural 25% decline in fresh dairy demand (veganism trend) plus protest-driven shipping/lead-time delays",
+  "changes": {
+    "override_schema_version": "1.0",
+    "overrides": [
+      {
+        "id": "OVR-0001",
+        "measure": "demand.volume",
+        "scope": {
+          "category": [
+            "Dairy & Bakery"
+          ],
+          "subcategory": [
+            "Fresh Dairy",
+            "Powdered Milk"
+          ]
+        },
+        "operation": "scale",
+        "value": 0.75,
+        "unit": "multiplier",
+        "applies_to": [
+          "plan",
+          "actual"
+        ],
+        "rationale": "structural decline in Fresh Dairy / Powdered Milk demand (~25%) due to the rise of the veganism movement",
+        "provenance": {
+          "agent": "demand_agent",
+          "created_at": "2026-10-21T04:49:55Z"
+        }
+      },
+      {
+        "id": "OVR-0002",
+        "measure": "supply.lead_time_mean",
+        "scope": {
+          "all": true
+        },
+        "window": {
+          "start_period": "2026-W43",
+          "end_period": "2026-W48"
+        },
+        "operation": "scale",
+        "value": 1.1,
+        "unit": "multiplier",
+        "applies_to": [
+          "plan",
+          "actual"
+        ],
+        "rationale": "nationwide lane lead-time increase (+10%) from rising protests across the country, 2026-W43..W48, per planner request",
+        "provenance": {
+          "agent": "supply_agent",
+          "created_at": "2026-10-21T04:56:56Z"
+        }
+      },
+      {
+        "id": "OVR-0003",
+        "measure": "supply.lead_time_std",
+        "scope": {
+          "all": true
+        },
+        "window": {
+          "start_period": "2026-W43",
+          "end_period": "2026-W48"
+        },
+        "operation": "scale",
+        "value": 1.1,
+        "unit": "multiplier",
+        "applies_to": [
+          "plan",
+          "actual"
+        ],
+        "rationale": "nationwide lane lead-time variability increase (+10%) from rising protests across the country, 2026-W43..W48, per planner request",
+        "provenance": {
+          "agent": "supply_agent",
+          "created_at": "2026-10-21T04:56:56Z"
+        }
+      }
+    ]
+  },
+  "digital_twin": {
+    "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py",
+    "mode": "forward",
+    "run_name": "prepared",
+    "seed": 2026,
+    "data_dir": "input datasets",
+    "policy": "input datasets/baseline_policy.csv",
+    "state": "output datasets/history/opening_position.csv",
+    "output_root": "output datasets"
+  },
+  "meio": {
+    "runner_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_weekly_tools.py",
+    "weekly_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/meio_optimizer_weekly.py",
+    "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py",
+    "data_dir": "input datasets",
+    "as_of_week": "2025-W52",
+    "policy_filename": "meio_policy_rolling.parquet",
+    "output_root": "output datasets/MEIO",
+    "parameters": {
+      "model": "clark_scarf_v2",
+      "selection": "validated",
+      "min_seeds": 5,
+      "evidence": [
+        "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results",
+        "models/MEIO/MEIO_Weekly/final_submission/results"
+      ],
+      "clusters": "output datasets/segmentation/sku_clusters.csv",
+      "ddlt": "quadrature",
+      "n_sims": 4000,
+      "seed": 2026
+    }
+  },
+  "artifacts": {
+    "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_all.py",
+    "scenario": "output datasets/MEIO artifacts/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays",
+    "twin_output_root": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/twin_runs"
+  },
+  "overrides": {
+    "engine": "models/overrides",
+    "output_root": "output datasets/overrides"
+  },
+  "evaluation": {
+    "baseline_scenario": "SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+    "baseline_run": "meio_policy",
+    "arms": [
+      "prepared",
+      "unprepared"
+    ]
+  },
+  "details": {
+    "owner": "Supply Planning",
+    "hypothesis": "If dairy demand structurally falls ~25% (veganism) while protests lengthen transit lead times, how much does re-planning with MEIO (prepared) improve service and cost versus letting today's policy absorb both changes (unprepared), and is the dairy-only impact material enough to act on now?",
+    "request": "I foresee a decline in dairy demand by 25 percent due to the rise in the Veganism movement. I also expect there to be shipping delays due to rise in protests across the country.",
+    "created_by": "Agents draft D0005",
+    "created_at": "2026-10-21T05:04:02Z",
+    "notes": "Generated by the scenario agents; overrides apply only through models/overrides."
+  },
+  "execution": {
+    "mode": "forward",
+    "seed": 2026,
+    "horizon_weeks": null,
+    "policy": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+    "state": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/history/opening_position.csv",
+    "output_folder": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/unprepared"
+  }
+}

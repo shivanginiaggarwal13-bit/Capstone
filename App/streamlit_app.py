@@ -261,10 +261,10 @@ def agent_bridge_panel():
     manual operator loop (`python -m Agents.runtime.bridge wait`, by hand, at a terminal)
     exists to surface. Approval is answered here directly; a model call still needs an
     actual Claude session (this one, if asked, or another) to read it and write the reply."""
-    current = _read_json_live(AGENT_BRIDGE_DIR / "current.json")
-    if not current:
+    chat = agent_chat_registry().get("chat") or {}
+    if not chat.get("bridge_session"):
         return
-    session = Path(current["session"])
+    session = Path(chat["bridge_session"])
     if not session.exists():
         return
     st.markdown("**Agent session status**")
@@ -336,15 +336,15 @@ def _run_agent_turn(chat: dict, text: str):
     from Agents.runtime import graph
     try:
         if chat["session"] is None:
-            if chat["profile"] == "nvidia" and chat.get("nvidia_key"):
+            if chat["profile"] == "claude" and chat.get("api_key"):
                 # This is a single-local-user tool (see CLAUDE.md), not a multi-tenant server,
-                # so setting the process env here is fine; llm.chat_model() re-reads it per call.
-                os.environ["NVIDIA_API_KEY"] = chat["nvidia_key"]
+                # so setting the process env here is fine; the Anthropic client reads it per model.
+                os.environ["ANTHROPIC_API_KEY"] = chat["api_key"]
             team = graph.Team(chat["profile"], streaming=False)
             chat["session"] = graph.Session(team, decide=_agent_decide(chat))
             if chat["profile"] == "desktop":
                 from Agents.runtime import bridge
-                bridge.start_session()
+                chat["bridge_session"] = str(bridge.start_session())
         reply = chat["session"].ask(text)
         chat["turns"].append({"role": "assistant",
                               "text": reply or "_(no reply text back -- check the scenario list below; the "
@@ -356,8 +356,8 @@ def _run_agent_turn(chat: dict, text: str):
         chat["pending_approval"] = None
 
 
-def start_agent_chat(profile: str, nvidia_key: str = "") -> dict:
-    chat = {"profile": profile, "nvidia_key": nvidia_key, "turns": [], "state": "idle",
+def start_agent_chat(profile: str, api_key: str = "") -> dict:
+    chat = {"profile": profile, "api_key": api_key, "turns": [], "state": "idle",
            "session": None, "pending_approval": None}
     agent_chat_registry()["chat"] = chat
     return chat
@@ -399,6 +399,92 @@ def _agent_progress_text(chat: dict) -> str | None:
     return None
 
 
+AGENT_LABELS = {"orchestrator": ("Orchestrator", ":material/account_tree:"),
+                "demand_agent": ("Demand agent", ":material/trending_down:"),
+                "supply_agent": ("Supply agent", ":material/local_shipping:"),
+                "inventory_agent": ("Inventory agent", ":material/inventory_2:"),
+                "service_policy_agent": ("Service & policy agent", ":material/tune:"),
+                "economics_agent": ("Economics agent", ":material/payments:"),
+                "validator_agent": ("Validator agent", ":material/fact_check:"),
+                "analyst_agent": ("Analyst agent", ":material/analytics:")}
+
+
+@st.cache_data(show_spinner=False, max_entries=1024)
+def _bridge_call(req_path: str, req_mtime: float, res_mtime: float | None) -> dict | None:
+    """One model call as the feed shows it. The mtimes are in the signature so a newly written
+    reply (or rewritten request) invalidates the cached entry."""
+    try:
+        req = json.loads(Path(req_path).read_text(encoding="utf-8"))
+        res_p = Path(req["response_file"])
+        res = json.loads(res_p.read_text(encoding="utf-8")) if res_mtime is not None and res_p.exists() else None
+    except (OSError, json.JSONDecodeError, KeyError):
+        return None
+    last = req["messages"][-1] if req.get("messages") else {}
+    if last.get("role") == "tool":
+        incoming = f"Result of `{last.get('name', 'tool')}`"
+    elif last.get("role") == "user":
+        incoming = "Brief from the planner" if req["agent"] == "orchestrator" else "Brief from the orchestrator"
+    else:
+        incoming = "Continuing"
+    return {"seq": req["seq"], "agent": req["agent"], "model": req["model"],
+            "incoming": incoming, "incoming_body": str(last.get("content") or last.get("text") or ""),
+            "answered": res is not None, "model_id": (res or {}).get("model_id"),
+            "text": (res or {}).get("text") or "", "tool_calls": (res or {}).get("tool_calls") or [],
+            "seconds": (res_mtime - req_mtime) if res is not None else None}
+
+
+def _call_summary(c: dict) -> str:
+    calls = []
+    for t in c["tool_calls"]:
+        args = t.get("args") or {}
+        target = args.get("agent") or args.get("scenario_folder") or args.get("draft_id") or args.get("measure")
+        calls.append(f"`{t['name']}`" + (f" -> {target}" if target else ""))
+    return ", ".join(calls) if calls else "final reply (no tool calls)"
+
+
+def agent_activity_feed(chat: dict):
+    """Every model call of the current desktop-bridge session, live: which agent, which model, how
+    long it took, what came in, what it decided and which tools it called -- the same trail an
+    operator sees relaying the bridge, so a planner can watch the agents actually work."""
+    # This chat's own bridge session only -- current.json still points at the previous chat's
+    # session until this chat sends its first message, which would replay old history here.
+    if not chat.get("bridge_session"):
+        return
+    session = Path(chat["bridge_session"])
+    reqs = sorted(session.glob("req_*.json")) if session.exists() else []
+    if not reqs:
+        return
+    feed = []
+    for req in reqs:
+        res = session / req.name.replace("req_", "res_")
+        c = _bridge_call(str(req), req.stat().st_mtime, res.stat().st_mtime if res.exists() else None)
+        if c:
+            feed.append(c)
+    done = sum(c["answered"] for c in feed)
+    total_s = sum(c["seconds"] or 0 for c in feed)
+    st.markdown(f"**:material/monitoring: Agent activity** -- {done}/{len(feed)} model calls answered, "
+                f"{total_s / 60:,.1f} min of model time")
+    with st.container(height=460, border=True):
+        for c in feed:
+            label, icon = AGENT_LABELS.get(c["agent"], (c["agent"], ":material/smart_toy:"))
+            with st.chat_message(label, avatar=icon):
+                if c["answered"]:
+                    st.markdown(f"**#{c['seq']} {label}** · {c['model_id'] or c['model']} · "
+                                f"{c['seconds']:,.0f}s  \n:material/arrow_forward: {c['incoming']}  \n"
+                                f":material/check_circle: {_call_summary(c)}")
+                    with st.expander("What it said and did"):
+                        if c["text"]:
+                            st.markdown(c["text"])
+                        for t in c["tool_calls"]:
+                            st.code(f"{t['name']}({json.dumps(t.get('args') or {}, indent=1)[:1500]})", language="json")
+                        if c["incoming_body"]:
+                            st.caption("Input it was answering:")
+                            st.code(c["incoming_body"][:1500], language="json")
+                else:
+                    st.markdown(f"**#{c['seq']} {label}** · {c['model']}  \n:material/arrow_forward: {c['incoming']}  \n"
+                                ":material/hourglass_top: *working -- waiting on the model through the bridge...*")
+
+
 @st.fragment(run_every=2)
 def agent_chat_panel():
     chat = agent_chat_registry().get("chat")
@@ -408,16 +494,17 @@ def agent_chat_panel():
     for turn in chat["turns"]:
         with st.chat_message(turn["role"]):
             st.markdown(turn["text"])
+    if chat.get("profile") == "desktop":
+        agent_activity_feed(chat)
     if chat["state"] == "thinking" and not chat.get("pending_approval"):
         with st.chat_message("assistant"):
             elapsed = time.time() - chat.get("turn_started", time.time())
             progress = _agent_progress_text(chat) or "thinking..."
             st.caption(f":material/progress_activity: {progress} ({elapsed:,.0f}s)")
-            if chat["profile"] == "nvidia" and elapsed > 150:
-                st.caption("This is taking a while -- each NVIDIA model call now times out at "
-                           "180s with no retry, so this should resolve, one way or another, "
-                           "well under that. If it keeps climbing past ~3 minutes, something's "
-                           "wrong; a fresh \"New session\" is the fastest way out.")
+            if chat["profile"] == "claude" and elapsed > 300:
+                st.caption("This is taking a while -- each Claude model call times out at 300s "
+                           "(with up to 2 retries), so this should resolve, one way or another. If it "
+                           "keeps climbing, a fresh \"New session\" is the fastest way out.")
             elif chat["profile"] == "desktop" and elapsed > 150:
                 st.caption("This is taking a while, but desktop-profile model calls have no "
                            "timeout -- they're genuinely waiting on a Claude session to answer "
@@ -448,7 +535,9 @@ def agent_chat_panel():
 
 # --------------------------------------------------------------------------- shared data
 def kpis(path: Path) -> dict | None:
-    return read_json(str(path / "run_kpis.json"))
+    # Uncached on purpose: a scenario's arms write run_kpis.json minutes after the page first
+    # renders, and the cached read_json() would keep serving the "no file yet" None it saw then.
+    return _read_json_live(path / "run_kpis.json")
 
 
 def alpha_flags() -> pd.DataFrame:
@@ -1191,6 +1280,113 @@ def list_scenarios() -> list[str]:
     return sorted(d.name for d in root.iterdir() if (d / "scenario_config.json").exists()) if root.exists() else []
 
 
+IMPACT_METRICS = [("customer_fill_rate", "Customer fill (pp)", 100), ("customer_fill_rate_cdc", "CDC fill (pp)", 100),
+                  ("internal_replen_fill_rate", "Internal replen fill (pp)", 100),
+                  ("stockout_cost_usd", "Lost-sales cost ($)", 1), ("holding_cost_usd", "Holding cost ($)", 1),
+                  ("total_landed_cost_usd", "Total landed cost ($)", 1)]
+
+
+def _week_no(period: str) -> int:
+    return int(str(period).split("-W")[1])
+
+
+def scenario_windows(scenario: str) -> list[tuple[int, int, str]]:
+    """Distinct (start_week, end_week, label) windows of a scenario's windowed overrides, so a short
+    shock (e.g. 6 weeks of lead-time disruption) can be read on its own instead of averaged into 52."""
+    cfg = _read_json_live(OUT / "overrides" / scenario / "scenario_config.json") or {}
+    seen = {}
+    for o in (cfg.get("changes") or {}).get("overrides") or []:
+        w = o.get("window")
+        if w and w.get("start_period") and w.get("end_period"):
+            a, b = _week_no(w["start_period"]), _week_no(w["end_period"])
+            seen.setdefault((a, b), []).append(o.get("measure", o.get("id", "")))
+    return [(a, b, f"W{a:02d}-W{b:02d} ({', '.join(m)})") for (a, b), m in sorted(seen.items())]
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def _window_kpis(inv_path: str, mtime: float, weeks: tuple[int, int] | None, inside: bool) -> dict | None:
+    """Fill rates and costs recomputed from a run's weekly inventory table for a week window.
+    `mtime` is only in the signature so a rewritten run invalidates the cache."""
+    p = Path(inv_path)
+    if not p.exists():
+        return None
+    inv = pd.read_parquet(p, columns=["period", "dc_id", "demand_customer_qty", "unmet_customer_qty",
+                                       "demand_replen_qty", "unmet_replen_qty", "lost_margin_usd",
+                                       "holding_cost_usd"])
+    wk = inv["period"].map(_week_no)
+    if weeks:
+        m = wk.between(*weeks)
+        inv = inv[m if inside else ~m]
+    if inv.empty:
+        return None
+    cdc = inv[inv["dc_id"].str.startswith("CDC")]
+
+    def fill(d, dem, un):
+        tot = d[dem].sum()
+        return float(1 - d[un].sum() / tot) if tot else None
+
+    return {"customer_fill_rate": fill(inv, "demand_customer_qty", "unmet_customer_qty"),
+            "customer_fill_rate_cdc": fill(cdc, "demand_customer_qty", "unmet_customer_qty"),
+            "internal_replen_fill_rate": fill(inv, "demand_replen_qty", "unmet_replen_qty"),
+            "lost_margin_usd": float(inv["lost_margin_usd"].sum()),
+            "holding_cost_usd": float(inv["holding_cost_usd"].sum())}
+
+
+WINDOW_METRICS = [("customer_fill_rate", "Customer fill (pp)", 100), ("customer_fill_rate_cdc", "CDC fill (pp)", 100),
+                  ("internal_replen_fill_rate", "Internal replen fill (pp)", 100),
+                  ("lost_margin_usd", "Lost margin ($)", 1), ("holding_cost_usd", "Holding cost ($)", 1)]
+
+
+def scenario_impact_table(rows: dict, run_paths: dict):
+    """The three comparisons a scenario exists to answer, from whichever of its runs are selected:
+    what the scenario costs if ignored (unprepared vs no scenario), what re-planning buys (prepared vs
+    unprepared), and where preparing leaves you (prepared vs no scenario) -- for the full horizon or
+    for the weeks a windowed override is active."""
+    prep = next((n for n in rows if n.endswith(" / prepared")), None)
+    unprep = next((n for n in rows if n.endswith(" / unprepared")), None)
+    base = next((n for n in rows if n.startswith("No scenario (")), None)
+    pairs = [("Scenario impact if ignored (unprepared - no scenario)", unprep, base),
+             ("Value of re-planning (prepared - unprepared)", prep, unprep),
+             ("Net position after preparing (prepared - no scenario)", prep, base)]
+    if not any(a and b for _, a, b in pairs):
+        return
+    scenario = (prep or unprep).split(" / ")[0]
+    options = {"Full horizon": None}
+    for a, b, label in scenario_windows(scenario):
+        options[f"During {label}"] = ((a, b), True)
+        options[f"Outside W{a:02d}-W{b:02d}"] = ((a, b), False)
+    st.markdown("**Scenario impact** (differences between the selected runs)")
+    period = st.radio("Period", list(options), horizontal=True, key="impact_period",
+                      help="A short shock is diluted when averaged over the full year -- read it on its own window.")
+    choice = options[period]
+    if choice is None:
+        vals, metrics = rows, IMPACT_METRICS
+    else:
+        vals, metrics = {}, WINDOW_METRICS
+        for n in [x for x in (prep, unprep, base) if x]:
+            inv = Path(run_paths[n]) / "inventory.parquet"
+            k = _window_kpis(str(inv), inv.stat().st_mtime if inv.exists() else 0.0, choice[0], choice[1])
+            if k:
+                vals[n] = k
+    out = {}
+    for label, a, b in pairs:
+        if a in vals and b in vals:
+            out[label] = {name: round((float(vals[a][k]) - float(vals[b][k])) * scale, 2 if scale == 100 else 0)
+                          for k, name, scale in metrics
+                          if vals[a].get(k) is not None and vals[b].get(k) is not None}
+    if out:
+        st.dataframe(pd.DataFrame(out).T, width="stretch")
+        if choice is not None:
+            levels = {n.split(" / ")[-1] if " / " in n else "no scenario": vals[n] for n in vals}
+            st.dataframe(pd.DataFrame({n: {name: round(v[k] * 100, 2) if scale == 100 else round(v[k])
+                                           for k, name, scale in WINDOW_METRICS if v.get(k) is not None}
+                                       for n, v in levels.items()}).T.rename(
+                columns=lambda c: c.replace(" (pp)", " (%)")), width="stretch")
+    st.caption("Fill-rate differences are percentage points; costs are USD over the selected period "
+               "(windowed views recompute from each run's weekly inventory table; lost margin there "
+               "counts lost-sale accounts only). Single seeded run each: small differences can be noise.")
+
+
 def page_simulation(slot: dict):
     p = paths()
     sims = [j for j in job_registry().values() if j["key"] == "sim"]
@@ -1244,6 +1440,7 @@ def page_simulation(slot: dict):
                 "stockout_cost_usd", "transport_cost_usd", "total_landed_cost_usd", "horizon_weeks"]
         st.dataframe(df[[c for c in keep if c in df.columns]], width="stretch")
         slot["df"] = df.reset_index(names="run")
+        scenario_impact_table(rows, {n: runs[n] for n in rows})
         sv = runs[names[0]] / "service_by_node.csv"
         node = read_csv(str(sv))
         if node is not None:
@@ -1253,40 +1450,41 @@ def page_simulation(slot: dict):
     st.caption("Describe a what-if in plain English. It's a real conversation: if the agents ask a clarifying "
                "question, just answer it below and they'll continue with the same context, instead of having "
                "to restate everything in a brand-new run.")
-    server_has_nvidia_key = bool(os.environ.get("NVIDIA_API_KEY"))
+    server_has_claude_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     active_chat = agent_chat_registry().get("chat")
     c1, c2, c3 = st.columns([2, 2, 1])
     with c1:
         profile_label = st.radio(
-            "Model profile", ["Desktop bridge (no API key)", "NVIDIA (GLM, needs an API key)"],
-            index=1 if server_has_nvidia_key else 0, horizontal=True, key="agent_profile_choice")
-    profile = "nvidia" if profile_label.startswith("NVIDIA") else "desktop"
-    typed_nvidia_key = ""
+            "Model profile", ["Desktop bridge (no API key)", "Claude (needs an Anthropic API key)"],
+            index=1 if server_has_claude_key else 0, horizontal=True, key="agent_profile_choice")
+    profile = "claude" if profile_label.startswith("Claude") else "desktop"
+    typed_claude_key = ""
     with c2:
-        if profile == "nvidia":
-            typed_nvidia_key = st.text_input(
-                "NVIDIA API key", type="password", key="nvidia_api_key_input",
-                placeholder="Already set on the server" if server_has_nvidia_key else "nvapi-...",
+        if profile == "claude":
+            typed_claude_key = st.text_input(
+                "Anthropic API key", type="password", key="claude_api_key_input",
+                placeholder="Already set on the server" if server_has_claude_key else "sk-ant-...",
                 help="Kept only in this process's memory for this session, never written to disk or logged. "
-                     "Leave blank to use the server's own NVIDIA_API_KEY, if it has one.")
-    effective_nvidia_key = typed_nvidia_key.strip() or os.environ.get("NVIDIA_API_KEY", "")
-    has_nvidia_key = bool(effective_nvidia_key)
+                     "Leave blank to use the server's own ANTHROPIC_API_KEY, if it has one.")
+    effective_claude_key = typed_claude_key.strip() or os.environ.get("ANTHROPIC_API_KEY", "")
+    has_claude_key = bool(effective_claude_key)
     with c3:
         st.markdown("<div style='height: 1.9rem'></div>", unsafe_allow_html=True)
-        new_session_disabled = profile == "nvidia" and not has_nvidia_key
+        new_session_disabled = profile == "claude" and not has_claude_key
         if st.button("New session", key="agent_new_session", disabled=new_session_disabled,
                      help="Starting a new session replaces the current conversation." if active_chat else None):
-            start_agent_chat(profile, effective_nvidia_key)
+            start_agent_chat(profile, effective_claude_key)
             st.rerun()
     if profile == "desktop":
         st.caption("Desktop bridge: no API key needed, but each model call is relayed through a mailbox -- "
                    "the panel below the chat shows what the session is blocked on; a model call itself still "
                    "needs an actual Claude session to answer it. Approval happens right in the chat.")
-    elif not has_nvidia_key:
-        st.warning("No NVIDIA API key available -- type one in above, or set NVIDIA_API_KEY on the server and "
+    elif not has_claude_key:
+        st.warning("No Anthropic API key available -- type one in above, or set ANTHROPIC_API_KEY on the server and "
                    "restart it.")
     else:
-        st.caption("NVIDIA profile: runs live -- replies appear directly in the chat below, including "
+        st.caption("Claude profile (Opus 5 orchestrator, Haiku 4.5 specialists): runs live -- replies appear "
+                   "directly in the chat below, including "
                    "clarifying questions, which you can just answer.")
     agent_chat_panel()
     if active_chat and active_chat.get("profile") == "desktop":
@@ -1295,7 +1493,9 @@ def page_simulation(slot: dict):
     st.subheader("Scenarios from the Agents' override engine")
     sc = list_scenarios()
     if sc:
-        pick = st.selectbox("Scenario", sc)
+        # Newest first by default: folder names carry a zero-padded scenario number, so the last
+        # sorted entry is the one just built -- the one a planner almost always wants to look at.
+        pick = st.selectbox("Scenario", sc, index=len(sc) - 1)
         base = OUT / "overrides" / pick
         stt = _read_json_live(base / "status.json") or {}
         card = base / "scenario_card.md"
@@ -1324,9 +1524,6 @@ def page_simulation(slot: dict):
                     st.rerun()
                 else:
                     st.error((res.stdout or "") + (res.stderr or ""))
-        st.button("Launch approved scenario", disabled=True,
-                  help="Not wired: run_scenario() queues a detached MEIO + Twin job once approved. Use the "
-                       "Agents CLI (python -m Agents.tools call orchestrator run_scenario ...).")
     else:
         st.info("No scenarios yet. Create them with the Agents (python -m Agents.runtime ...).")
 

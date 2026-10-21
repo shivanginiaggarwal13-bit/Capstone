@@ -44,6 +44,15 @@ profiles:
     orchestrator: {model: sonnet}
     workers: {model: haiku}
 
+  # Claude API profile, used by the app's "Claude" option. Needs ANTHROPIC_API_KEY.
+  # Opus 5 thinks adaptively by default; effort is sent as output_config.effort. The
+  # orchestrator opts into server-side refusal fallbacks. Haiku 4.5 takes neither effort
+  # nor adaptive thinking, so the workers set neither.
+  claude:
+    provider: anthropic
+    orchestrator: {model: claude-opus-5, effort: high, fallbacks: default}
+    workers: {model: claude-haiku-4-5}
+
   # Legacy Anthropic profiles (retained for backwards compatibility if langchain-anthropic is installed)
   anthropic-test:
     provider: anthropic

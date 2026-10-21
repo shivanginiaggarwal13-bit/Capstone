@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "scenario_number": 1,
+  "scenario_name": "Baseline_Forward_Plan",
+  "description": "Shared scenario input for MEIO and Digital Twin runs. Ported in from Vishwajeet's final_submission_optimized port (multi_agent_orchastration branch) so its scripts can resolve paths; `meio.parameters.clusters` updated to the canonical, live v5 segmentation output (this branch's adopted default, see models/MEIO/MEIO_Weekly/meio_weekly_lib.py) instead of the frozen v4 path his original config pointed at.",
+  "changes": {},
+  "digital_twin": {
+    "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py",
+    "mode": "forward",
+    "run_name": "baseline",
+    "seed": 2026,
+    "data_dir": "input datasets",
+    "policy": "input datasets/baseline_policy.csv",
+    "state": "output datasets/history/opening_position.csv",
+    "output_root": "output datasets"
+  },
+  "meio": {
+    "runner_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_weekly_tools.py",
+    "weekly_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/meio_optimizer_weekly.py",
+    "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py",
+    "data_dir": "input datasets",
+    "as_of_week": "2025-W52",
+    "policy_filename": "meio_policy_rolling.parquet",
+    "output_root": "output datasets/MEIO",
+    "parameters": {
+      "model": "clark_scarf_v2",
+      "selection": "validated",
+      "min_seeds": 5,
+      "evidence": [
+        "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results",
+        "models/MEIO/MEIO_Weekly/final_submission/results"
+      ],
+      "clusters": "output datasets/segmentation/sku_clusters.csv",
+      "ddlt": "quadrature",
+      "n_sims": 4000,
+      "seed": 2026
+    }
+  },
+  "artifacts": {
+    "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_all.py",
+    "scenario": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+    "twin_output_root": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/twin_runs"
+  },
+  "overrides": {
+    "engine": "models/overrides",
+    "output_root": "output datasets/overrides"
+  },
+  "details": {
+    "owner": "Supply Planning",
+    "notes": "Copy this file into each scenario output folder as the audit input."
+  },
+  "execution": {
+    "mode": "forward",
+    "seed": 2026,
+    "horizon_weeks": null,
+    "policy": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/input datasets/baseline_policy.csv",
+    "state": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/history/opening_position.csv",
+    "output_folder": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/SCENARIO_0001_Baseline_Forward_Plan/baseline"
+  }
+}

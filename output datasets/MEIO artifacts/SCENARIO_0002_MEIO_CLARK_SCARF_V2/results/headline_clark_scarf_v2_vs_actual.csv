@@ -1,0 +1,3 @@
+arm,weeks,customer_demand_units,customer_fill_rate,customer_fill_rate_cdc,customer_fill_rate_rdc,pct_demand_weeks_in_full,internal_replen_fill_rate,pct_weeks_at_zero_stock,holding_cost_usd_window
+actual,51,11950269.0,0.9308,0.8021,0.9599,0.8717,0.9321,0.1108,696560.91
+clark_scarf_v2,51,11950269.0,0.9451,0.8693,0.9623,0.8644,0.8238,0.1062,933622.17

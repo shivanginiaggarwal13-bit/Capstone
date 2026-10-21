@@ -1,0 +1,5 @@
+metric,actual,clark_scarf_v2,delta_attributable_to_test_window
+holding_cost_usd,2064572.46,2301633.73,237061.27000000002
+stockout_cost_usd,8886484.29,8315856.75,-570627.5399999991
+transport_cost_usd,76815552.09,78822300.92,2006748.8299999982
+total_landed_cost_usd,87766608.84,89439791.4,1673182.5600000024

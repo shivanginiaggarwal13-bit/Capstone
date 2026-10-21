@@ -3,3 +3,4 @@ __pycache__/
 validation_output/
 run_logs/
 tests/_reference/
+alpha_cost_table_runs/

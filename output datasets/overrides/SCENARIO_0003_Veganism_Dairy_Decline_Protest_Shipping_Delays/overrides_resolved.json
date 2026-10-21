@@ -1,0 +1,102 @@
+{
+  "engine_version": "1.0",
+  "overrides": [
+    {
+      "id": "OVR-0001",
+      "measure": "demand.volume",
+      "scope": {
+        "category": [
+          "Dairy & Bakery"
+        ],
+        "subcategory": [
+          "Fresh Dairy",
+          "Powdered Milk"
+        ]
+      },
+      "operation": "scale",
+      "value": 0.75,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "structural decline in Fresh Dairy / Powdered Milk demand (~25%) due to the rise of the veganism movement",
+      "provenance": {
+        "agent": "demand_agent",
+        "created_at": "2026-10-21T04:49:55Z"
+      },
+      "options": {},
+      "matched_rows": 316,
+      "universe": "demand_lines",
+      "weeks": "all"
+    },
+    {
+      "id": "OVR-0002",
+      "measure": "supply.lead_time_mean",
+      "scope": {
+        "all": true
+      },
+      "window": {
+        "start_period": "2026-W43",
+        "end_period": "2026-W48"
+      },
+      "operation": "scale",
+      "value": 1.1,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "nationwide lane lead-time increase (+10%) from rising protests across the country, 2026-W43..W48, per planner request",
+      "provenance": {
+        "agent": "supply_agent",
+        "created_at": "2026-10-21T04:56:56Z"
+      },
+      "options": {},
+      "matched_rows": 76,
+      "universe": "lanes",
+      "weeks": [
+        "2026-W43",
+        "2026-W44",
+        "2026-W45",
+        "2026-W46",
+        "2026-W47",
+        "2026-W48"
+      ]
+    },
+    {
+      "id": "OVR-0003",
+      "measure": "supply.lead_time_std",
+      "scope": {
+        "all": true
+      },
+      "window": {
+        "start_period": "2026-W43",
+        "end_period": "2026-W48"
+      },
+      "operation": "scale",
+      "value": 1.1,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "nationwide lane lead-time variability increase (+10%) from rising protests across the country, 2026-W43..W48, per planner request",
+      "provenance": {
+        "agent": "supply_agent",
+        "created_at": "2026-10-21T04:56:56Z"
+      },
+      "options": {},
+      "matched_rows": 76,
+      "universe": "lanes",
+      "weeks": [
+        "2026-W43",
+        "2026-W44",
+        "2026-W45",
+        "2026-W46",
+        "2026-W47",
+        "2026-W48"
+      ]
+    }
+  ]
+}

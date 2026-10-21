@@ -1,0 +1,22 @@
+{
+  "scenario": "SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays",
+  "state": "succeeded",
+  "started_at": "2026-10-21T05:06:02Z",
+  "arms": {
+    "prepared": {
+      "state": "succeeded",
+      "started_at": "2026-10-21T05:06:02Z",
+      "returncode": 0,
+      "finished_at": "2026-10-21T05:07:44Z",
+      "output": "output datasets/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/prepared"
+    },
+    "unprepared": {
+      "state": "succeeded",
+      "started_at": "2026-10-21T05:07:44Z",
+      "returncode": 0,
+      "finished_at": "2026-10-21T05:07:48Z",
+      "output": "output datasets/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/unprepared"
+    }
+  },
+  "finished_at": "2026-10-21T05:07:48Z"
+}

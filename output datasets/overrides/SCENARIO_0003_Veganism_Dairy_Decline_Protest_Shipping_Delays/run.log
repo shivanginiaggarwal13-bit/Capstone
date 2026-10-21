@@ -1,0 +1,70 @@
+=== prepared: /private/tmp/claude-501/-Users-sunnel-Documents-Headquarters-AMPBA-Capstone-repo/6099c08a-5ae8-42a8-9f1b-473e4d3f021b/scratchpad/venv/bin/python3 /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/run_meio_then_twin.py --scenario-config /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/overrides/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/scenario_config.json
+=== 1/2 MEIO policy runner ===
+
+=== [1/2] /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/models/MEIO/MEIO_Weekly/final_submission_optimized/meio_optimizer_weekly.py --as-of-week 2025-W52 --scenario-config /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/overrides/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/scenario_config.json  --  log: /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/models/MEIO/MEIO_Weekly/final_submission_optimized/run_logs/01_meio_optimizer_weekly.log ===
+  OK in 5s
+
+=== [2/2] /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py --as-of-week 2025-W52 --scenario-config /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/overrides/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/scenario_config.json  --  log: /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/models/MEIO/MEIO_Weekly/final_submission_optimized/run_logs/02_roll_forward_policy.log ===
+  OK in 92s
+
+============================================================
+SUMMARY -- total wall time 97s
+============================================================
+  OK         5s  meio_optimizer_weekly.py
+  OK        92s  roll_forward_policy.py
+
+Both weekly tools completed. Output: output datasets/MEIO/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/
+MEIO policy: /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/MEIO/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/rolling_2026/meio_policy_rolling.parquet
+
+=== 2/2 Digital Twin ===
+Supply Brain digital twin (optimized) -- 'prepared' [forward]
+  margin basis: margin_usd
+  override engine 1.0: 3 actual-side override(s) of 3
+  2026-W01  on-hand   1,054,621 u
+  2026-W21  on-hand   1,627,964 u
+  2026-W41  on-hand   1,685,080 u
+  2026-W52  on-hand   1,877,755 u
+  override receipts: /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/overrides/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/receipts/twin_prepared.json
+  wrote OUTPUT_DOCUMENTATION.md (332 lines)
+
+==============================================================
+prepared
+==============================================================
+  Customer fill rate            94.89%
+    - CDC                       89.96%
+    - RDC direct                95.95%
+  Demand-weeks in full          91.82%
+  Internal replen fill          77.99%
+  Avg inventory value     $  7,312,632
+  Holding                 $    870,983
+  Stockout                $  2,600,327
+  Transport               $ 32,744,441
+  TOTAL LANDED COST       $ 36,215,751
+==============================================================
+Wrote /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/prepared  (2s)
+=== unprepared: /private/tmp/claude-501/-Users-sunnel-Documents-Headquarters-AMPBA-Capstone-repo/6099c08a-5ae8-42a8-9f1b-473e4d3f021b/scratchpad/venv/bin/python3 /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py --scenario-config /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/overrides/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/scenario_config.json --policy /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet --run-name unprepared --mode forward --seed 2026
+Supply Brain digital twin (optimized) -- 'unprepared' [forward]
+  margin basis: margin_usd
+  override engine 1.0: 3 actual-side override(s) of 3
+  2026-W01  on-hand   1,036,163 u
+  2026-W21  on-hand   1,647,405 u
+  2026-W41  on-hand   1,698,625 u
+  2026-W52  on-hand   1,893,862 u
+  override receipts: /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/overrides/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/receipts/twin_unprepared.json
+  wrote OUTPUT_DOCUMENTATION.md (332 lines)
+
+==============================================================
+unprepared
+==============================================================
+  Customer fill rate            95.04%
+    - CDC                       90.19%
+    - RDC direct                96.08%
+  Demand-weeks in full          92.15%
+  Internal replen fill          78.52%
+  Avg inventory value     $  7,338,622
+  Holding                 $    874,242
+  Stockout                $  2,569,832
+  Transport               $ 32,786,664
+  TOTAL LANDED COST       $ 36,230,738
+==============================================================
+Wrote /Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays/unprepared  (2s)

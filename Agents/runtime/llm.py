@@ -92,9 +92,11 @@ def chat_model(agent: str, profile: str | None = None, streaming: bool = False):
         return ChatOpenAI(**kwargs)
     if s["provider"] == "anthropic":
         from langchain_anthropic import ChatAnthropic
-        kwargs = {"model": s["model"], "max_tokens": s.get("max_tokens", MAX_TOKENS), "max_retries": 2}
+        kwargs = {"model": s["model"], "max_tokens": s.get("max_tokens", MAX_TOKENS), "max_retries": 2,
+                  "default_request_timeout": 300}
         if s.get("effort"):
-            kwargs["effort"] = s["effort"]
+            # effort lives in output_config on the Messages API; ChatAnthropic has no `effort` field
+            kwargs["output_config"] = {"effort": s["effort"]}
         if s.get("thinking") == "adaptive":
             kwargs["thinking"] = {"type": "adaptive"}
         if s.get("fallbacks"):

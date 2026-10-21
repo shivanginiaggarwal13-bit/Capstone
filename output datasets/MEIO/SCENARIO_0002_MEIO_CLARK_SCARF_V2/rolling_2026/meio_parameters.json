@@ -1,0 +1,431 @@
+{
+  "model": "clark_scarf_v2",
+  "selection": "validated",
+  "alpha": 0.6,
+  "netting_discount": 0.0,
+  "ddlt": "quadrature",
+  "n_sims": 4000,
+  "seed": 2026,
+  "alpha_by_sku": 367,
+  "z_by_sku": 0,
+  "decisions": [
+    {
+      "parameter": "netting_discount",
+      "value": 0.0,
+      "reason": "moved off the reference: better fill, cost not worse, on paired seeds",
+      "reference": 1.0,
+      "at_alpha": 0.2,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": 0.466,
+          "fill_gain_se": 0.0456,
+          "cost_delta_usd": -128022.0,
+          "cost_delta_se": 19048.0,
+          "passes": true
+        }
+      }
+    },
+    {
+      "parameter": "alpha",
+      "value": 0.6,
+      "reason": "moved off the reference: better fill, cost not worse, on paired seeds",
+      "reference": 0.2,
+      "at_netting_discount": 0.0,
+      "tests": {
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": 0.768,
+          "fill_gain_se": 0.0201,
+          "cost_delta_usd": -131091.0,
+          "cost_delta_se": 25947.0,
+          "passes": true
+        },
+        "0.6": {
+          "seeds": 5,
+          "fill_gain": 1.174,
+          "fill_gain_se": 0.0312,
+          "cost_delta_usd": -235678.0,
+          "cost_delta_se": 11526.0,
+          "passes": true
+        }
+      },
+      "not_counted": {}
+    },
+    {
+      "parameter": "service_level_by_cluster",
+      "value": null,
+      "reason": "not used; segment ladder kept: run at alpha [0.2], netting_discount [0.0]; selected alpha 0.6, netting_discount 0"
+    },
+    {
+      "parameter": "alpha[Flagship Core]",
+      "value": 1.0,
+      "reason": "paired test on own fill",
+      "reference": 0.6,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": -0.0266,
+          "fill_gain_se": 0.0001,
+          "cost_delta_usd": 460281.0,
+          "cost_delta_se": 18460.0,
+          "portfolio_fill_rate_delta": -0.008,
+          "passes": false
+        },
+        "0.2": {
+          "seeds": 5,
+          "fill_gain": -0.0157,
+          "fill_gain_se": 0.0005,
+          "cost_delta_usd": 286803.0,
+          "cost_delta_se": 19263.0,
+          "portfolio_fill_rate_delta": -0.0045,
+          "passes": false
+        },
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": -0.0067,
+          "fill_gain_se": 0.0004,
+          "cost_delta_usd": 114809.0,
+          "cost_delta_se": 19169.0,
+          "portfolio_fill_rate_delta": -0.0017,
+          "passes": false
+        },
+        "0.8": {
+          "seeds": 5,
+          "fill_gain": 0.0035,
+          "fill_gain_se": 0.0005,
+          "cost_delta_usd": -23223.0,
+          "cost_delta_se": 24296.0,
+          "portfolio_fill_rate_delta": 0.0016,
+          "passes": true
+        },
+        "1.0": {
+          "seeds": 5,
+          "fill_gain": 0.0056,
+          "fill_gain_se": 0.0002,
+          "cost_delta_usd": -41886.0,
+          "cost_delta_se": 18391.0,
+          "portfolio_fill_rate_delta": 0.0021,
+          "passes": true
+        }
+      }
+    },
+    {
+      "parameter": "alpha[Mid-Tier Core]",
+      "value": 0.6,
+      "reason": "paired test on own fill",
+      "reference": 0.6,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": -0.0083,
+          "fill_gain_se": 0.0006,
+          "cost_delta_usd": 109539.0,
+          "cost_delta_se": 13487.0,
+          "portfolio_fill_rate_delta": -0.0044,
+          "passes": false
+        },
+        "0.2": {
+          "seeds": 5,
+          "fill_gain": -0.0042,
+          "fill_gain_se": 0.0004,
+          "cost_delta_usd": 52715.0,
+          "cost_delta_se": 22178.0,
+          "portfolio_fill_rate_delta": -0.0021,
+          "passes": false
+        },
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": -0.0012,
+          "fill_gain_se": 0.0006,
+          "cost_delta_usd": -835.0,
+          "cost_delta_se": 18537.0,
+          "portfolio_fill_rate_delta": -0.0004,
+          "passes": false
+        },
+        "0.8": {
+          "seeds": 5,
+          "fill_gain": 0.001,
+          "fill_gain_se": 0.0006,
+          "cost_delta_usd": -23406.0,
+          "cost_delta_se": 19335.0,
+          "portfolio_fill_rate_delta": 0.0008,
+          "passes": false
+        },
+        "1.0": {
+          "seeds": 5,
+          "fill_gain": 0.0007,
+          "fill_gain_se": 0.0005,
+          "cost_delta_usd": -20270.0,
+          "cost_delta_se": 40086.0,
+          "portfolio_fill_rate_delta": 0.0005,
+          "passes": false
+        }
+      }
+    },
+    {
+      "parameter": "alpha[Long-Tail Erratic]",
+      "value": 1.0,
+      "reason": "paired test on own fill",
+      "reference": 0.6,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": -0.0121,
+          "fill_gain_se": 0.0008,
+          "cost_delta_usd": 5636.0,
+          "cost_delta_se": 22185.0,
+          "portfolio_fill_rate_delta": -0.0001,
+          "passes": false
+        },
+        "0.2": {
+          "seeds": 5,
+          "fill_gain": -0.007,
+          "fill_gain_se": 0.0003,
+          "cost_delta_usd": 19538.0,
+          "cost_delta_se": 20963.0,
+          "portfolio_fill_rate_delta": 0.0002,
+          "passes": false
+        },
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": -0.0025,
+          "fill_gain_se": 0.0004,
+          "cost_delta_usd": 2082.0,
+          "cost_delta_se": 24761.0,
+          "portfolio_fill_rate_delta": 0.0003,
+          "passes": false
+        },
+        "0.8": {
+          "seeds": 5,
+          "fill_gain": 0.0025,
+          "fill_gain_se": 0.0006,
+          "cost_delta_usd": 13812.0,
+          "cost_delta_se": 17877.0,
+          "portfolio_fill_rate_delta": 0.0005,
+          "passes": true
+        },
+        "1.0": {
+          "seeds": 5,
+          "fill_gain": 0.0035,
+          "fill_gain_se": 0.0009,
+          "cost_delta_usd": 24930.0,
+          "cost_delta_se": 14882.0,
+          "portfolio_fill_rate_delta": 0.0004,
+          "passes": true
+        }
+      }
+    },
+    {
+      "parameter": "alpha[Long-Tail Erratic 2]",
+      "value": 1.0,
+      "reason": "paired test on own fill",
+      "reference": 0.6,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": -0.1001,
+          "fill_gain_se": 0.0013,
+          "cost_delta_usd": -103706.0,
+          "cost_delta_se": 31935.0,
+          "portfolio_fill_rate_delta": -0.0063,
+          "passes": false
+        },
+        "0.2": {
+          "seeds": 5,
+          "fill_gain": -0.0586,
+          "fill_gain_se": 0.0013,
+          "cost_delta_usd": -35963.0,
+          "cost_delta_se": 29504.0,
+          "portfolio_fill_rate_delta": -0.0037,
+          "passes": false
+        },
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": -0.0211,
+          "fill_gain_se": 0.0019,
+          "cost_delta_usd": -23685.0,
+          "cost_delta_se": 14401.0,
+          "portfolio_fill_rate_delta": -0.0012,
+          "passes": false
+        },
+        "0.8": {
+          "seeds": 5,
+          "fill_gain": 0.0115,
+          "fill_gain_se": 0.0016,
+          "cost_delta_usd": 7550.0,
+          "cost_delta_se": 12912.0,
+          "portfolio_fill_rate_delta": 0.001,
+          "passes": true
+        },
+        "1.0": {
+          "seeds": 5,
+          "fill_gain": 0.016,
+          "fill_gain_se": 0.0023,
+          "cost_delta_usd": 11653.0,
+          "cost_delta_se": 21574.0,
+          "portfolio_fill_rate_delta": 0.0016,
+          "passes": true
+        }
+      }
+    },
+    {
+      "parameter": "alpha[Long-Tail Erratic 3]",
+      "value": 0.8,
+      "reason": "paired test on own fill",
+      "reference": 0.6,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": -0.0127,
+          "fill_gain_se": 0.0017,
+          "cost_delta_usd": 10398.0,
+          "cost_delta_se": 35129.0,
+          "portfolio_fill_rate_delta": 0.0007,
+          "passes": false
+        },
+        "0.2": {
+          "seeds": 5,
+          "fill_gain": -0.0086,
+          "fill_gain_se": 0.0018,
+          "cost_delta_usd": 44082.0,
+          "cost_delta_se": 16034.0,
+          "portfolio_fill_rate_delta": 0.0,
+          "passes": false
+        },
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": -0.0036,
+          "fill_gain_se": 0.0012,
+          "cost_delta_usd": 237.0,
+          "cost_delta_se": 34699.0,
+          "portfolio_fill_rate_delta": 0.0004,
+          "passes": false
+        },
+        "0.8": {
+          "seeds": 5,
+          "fill_gain": 0.0023,
+          "fill_gain_se": 0.0008,
+          "cost_delta_usd": 13490.0,
+          "cost_delta_se": 17539.0,
+          "portfolio_fill_rate_delta": 0.0003,
+          "passes": true
+        },
+        "1.0": {
+          "seeds": 5,
+          "fill_gain": -0.0001,
+          "fill_gain_se": 0.0016,
+          "cost_delta_usd": -2595.0,
+          "cost_delta_se": 43974.0,
+          "portfolio_fill_rate_delta": 0.0005,
+          "passes": false
+        }
+      }
+    },
+    {
+      "parameter": "alpha[Long-Tail Supply-Risk]",
+      "value": 1.0,
+      "reason": "paired test on own fill",
+      "reference": 0.6,
+      "tests": {
+        "0.0": {
+          "seeds": 5,
+          "fill_gain": -0.0186,
+          "fill_gain_se": 0.0009,
+          "cost_delta_usd": -537.0,
+          "cost_delta_se": 22973.0,
+          "portfolio_fill_rate_delta": 0.0003,
+          "passes": false
+        },
+        "0.2": {
+          "seeds": 5,
+          "fill_gain": -0.0138,
+          "fill_gain_se": 0.0006,
+          "cost_delta_usd": 21632.0,
+          "cost_delta_se": 28279.0,
+          "portfolio_fill_rate_delta": 0.0006,
+          "passes": false
+        },
+        "0.4": {
+          "seeds": 5,
+          "fill_gain": -0.0056,
+          "fill_gain_se": 0.0005,
+          "cost_delta_usd": 26148.0,
+          "cost_delta_se": 20890.0,
+          "portfolio_fill_rate_delta": 0.0003,
+          "passes": false
+        },
+        "0.8": {
+          "seeds": 5,
+          "fill_gain": 0.0035,
+          "fill_gain_se": 0.0007,
+          "cost_delta_usd": -12008.0,
+          "cost_delta_se": 28167.0,
+          "portfolio_fill_rate_delta": 0.0004,
+          "passes": true
+        },
+        "1.0": {
+          "seeds": 5,
+          "fill_gain": 0.0055,
+          "fill_gain_se": 0.0007,
+          "cost_delta_usd": 32193.0,
+          "cost_delta_se": 23385.0,
+          "portfolio_fill_rate_delta": 0.0004,
+          "passes": true
+        }
+      }
+    },
+    {
+      "parameter": "alpha_by_cluster",
+      "value": {
+        "Flagship Core": 1.0,
+        "Mid-Tier Core": 0.6,
+        "Long-Tail Erratic": 1.0,
+        "Long-Tail Erratic 2": 1.0,
+        "Long-Tail Erratic 3": 0.8,
+        "Long-Tail Supply-Risk": 1.0
+      },
+      "reason": "per-cluster alpha adopted (measured one cluster at a time, not jointly)"
+    }
+  ],
+  "sources": [
+    {
+      "kind": "netting_multiseed",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/netting_discount_multiseed.csv",
+      "sha256": "be0a4b81a281eb137fa7ca5ec4223e397a495da085e19a7281a05f18dc67c5f0",
+      "rows": 10,
+      "context_assumed": {}
+    },
+    {
+      "kind": "netting_multiseed",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/netting_discount_multiseed_alpha0_6.csv",
+      "sha256": "9ab955c490dae609008a9f5442834da46dc384216e349b318795761b5c71e567",
+      "rows": 10,
+      "context_assumed": {}
+    },
+    {
+      "kind": "alpha_multiseed",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/multiseed_alpha_04_06.csv",
+      "sha256": "66a3efdf84facf269be19de71e18b3e5ada220b6e0aa5fc48ec64fcaf6823c7d",
+      "rows": 10,
+      "context_assumed": {}
+    },
+    {
+      "kind": "cluster_alpha",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/segment_alpha_v5_real_data_multiseed.csv",
+      "sha256": "289a1ae72d3ebc4c626a60c2ac466c2ec95d1b8a514be58a5a13509ba81c487d",
+      "rows": 180,
+      "context_assumed": {}
+    },
+    {
+      "kind": "cluster_csl",
+      "file": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/service_level_v5_real_data_multiseed.csv",
+      "sha256": "6f7a51c1f33134cfa98781aac537955c0b21252eda3dc5ea3d6ad209ec0baefd",
+      "rows": 150,
+      "context_assumed": {
+        "alpha": 0.2,
+        "netting_discount": 0.0
+      }
+    }
+  ]
+}

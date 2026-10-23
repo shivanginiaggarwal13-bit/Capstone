@@ -1,3 +1,17 @@
+> **Note (2026-10-23).** This is the original, slower research folder. The pipeline
+> (`run_meio_then_twin.py` + root `scenario_config.json`) runs
+> `../final_submission_optimized/`. There, `meio_parameters.resolve()` currently selects
+> **alpha=0.6, netting_discount=0.0, `ddlt="quadrature"`, and per-cluster alpha on 367
+> SKUs** (Flagship Core 1.0, Mid-Tier Core 0.6, Long-Tail Erratic 1.0, Long-Tail Erratic
+> 2 1.0, Long-Tail Erratic 3 0.8, Long-Tail Supply-Risk 1.0). The cluster CSL ladder is
+> not adopted. Receipt: `output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/
+> rolling_2026/meio_parameters.json`. This README's alpha=0.2 recommendation and
+> headline describe the configuration validated here. That headline has not been re-run
+> at the live configuration. Newer re-runs of several results files, and the complete
+> real-data cluster sweeps, are in `output datasets/MEIO artifacts/
+> SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/`. `../final_submission_optimized/README.md`
+> compares the two vintages.
+
 # MEIO — Final Submission: Clark-Scarf v2
 
 Start here. This folder has everything behind the model-building recommendation;
@@ -40,7 +54,7 @@ fix" and "Cluster-based service level" below for each one's own validation:
   against. See "Cluster-based service level" below for the validation
   caveat this introduces.
 
-| | Actual (as happened) | MEIO Weekly | **Clark-Scarf v2 (chosen)** |
+| | Actual (twin, baseline policy) | MEIO Weekly | **Clark-Scarf v2 (chosen)** |
 |---|---|---|---|
 | Customer fill rate, real 2025 demand | 93.08% | 93.23% (+0.15pp) | **94.51% (+1.43pp)** |
 | Internal replenishment fill | 93.21% | −4.60pp | **82.38% (−10.83pp, still degraded, but the best achieved so far)** |
@@ -51,11 +65,18 @@ canonical (v5) segmentation link both applied together
 (`results/headline_clark_scarf_v2_vs_actual.csv`,
 `results/headline_cost_summary.csv` — regenerated 2026-10-18; not yet
 multi-seed confirmed as a *combined* configuration — see "Next steps").
+"Actual" is the twin replaying 2025 orders under the dataset's `baseline_policy`, not
+observed outcomes. (Note, 2026-10-23: a 5-seed check of this combined alpha=0.2
+configuration now exists in the artifacts results, `netting_discount_multiseed.csv`,
+written by the optimized folder. Its means are +1.52pp fill, 82.32% internal
+replenishment fill and +$1.67M cost.)
 MEIO Weekly's own real-data result (context for why it wasn't chosen) is in
 `results/meio_weekly_vs_actual_report.md` and `results/meio_weekly_vs_actual.csv`
 (its own cost breakdown, computed separately, is in
-`results/meio_weekly_vs_actual_cost.csv`) — not regenerated under the new
-cluster-z default, since MEIO Weekly wasn't the chosen model either way.
+`results/meio_weekly_vs_actual_cost.csv`) — not regenerated here under the new
+cluster-z default, since MEIO Weekly wasn't the chosen model either way. (Note,
+2026-10-23: the optimized folder's re-run, artifacts `meio_weekly_vs_actual.csv`, reads
+93.00% fill (−0.08pp vs actual) and 88.86% internal fill, single seed.)
 
 ## Where the win actually comes from
 
@@ -73,18 +94,27 @@ evenly across the year, and is still incomplete even where it shows up.
 
 ## What's validated vs. what's exploratory
 
-**Validated** (real demand, no lookahead, multi-seed where it matters):
+**Validated** (real replayed demand, multi-seed where it matters; "no lookahead"
+applies to the weekly refit, but the seasonal index is built from all of 2023–2025
+orders, the test year included):
 - The headline number above.
 - Alpha=0.2 is *not* the best setting on real data — it's second-worst.
   Fill peaks near alpha=0.6, cost is lowest near alpha=0.4
-  (`results/alpha_sweep_report.md`, `results/chart_alpha_sweep.png`).
+  (`results/alpha_sweep_report.md`, `results/chart_alpha_sweep.png`). This sweep is
+  from the netting 1.0 era. The netting 0.0 re-run in the artifacts results is
+  monotonic instead: fill rises to 96.04% at alpha 1.0, where cost is also lowest.
 - Alpha=0.4 and alpha=0.6 both hold up 5/5 seeds
   (`results/multiseed_report.md`) — but **both were chosen and tested on the
   same single real year (2025)**, so this is not yet a fresh-holdout
   confirmation. We are explicitly not adopting 0.6 over 0.2 on this basis
-  alone — see "Known limitations" below.
+  alone — see "Known limitations" below. (Note, 2026-10-23: the pipeline's
+  `meio_parameters.py` has since adopted 0.6, on a netting 0.0 re-run of this same 2025
+  check. See the note at the top.)
 
-**Exploratory / diagnostic only** — real signal, not yet production-grade validation:
+**Exploratory / diagnostic only** — real signal, not yet production-grade validation.
+(Note, 2026-10-23: complete real-data 5-seed versions of this sweep now exist in the
+artifacts results, for v4 at netting 0.0 and for v5. Neither reproduces "long-tail
+wants less pooling": every long-tail cluster's own fill rises with alpha.)
 - Per-segment alpha, using the Clustering & Segmentation deliverable's own
   4 clusters (Flagship Promo-Driven, Mid-Tier Core, Long-Tail Erratic,
   Long-Tail Supply-Risk — `segment_alpha_explore.py`). Finding: core
@@ -155,7 +185,12 @@ with two methodology passes:
   internal replenishment fill 82.11% (σ=0.0007) vs. 81.94% (σ=0.001); cost
   delta +$1.83M (σ=$51k) vs. +$1.95M (σ=$42k). No tradeoff found at this
   alpha — **`netting_discount=0.0` is adopted as part of the recommended
-  configuration.**
+  configuration.** (These figures predate the cluster-z default of 2026-10-18. The
+  optimized folder's re-run, artifacts `netting_discount_multiseed.csv`, which the
+  pipeline reads, still wins on every axis in 5/5 seeds: +1.52pp vs. +1.05pp, 82.32%
+  vs. 82.24%, +$1.67M vs. +$1.79M. At alpha=0.6,
+  `netting_discount_multiseed_alpha0_6.csv` gives +2.69pp vs. +1.54pp and +$1.43M vs.
+  +$1.85M.)
 
 Caveats this does *not* resolve: internal replenishment fill is improved
 (82.11% vs. 81.99%) but still badly degraded relative to actual (93.21%) —
@@ -223,24 +258,31 @@ exact, previously-untested recommendation). Full 5-seed run, every
 | Cluster | Recommended CSL | Own-fill at recommended CSL (5-seed mean) | Gap vs. target |
 |---|---|---|---|
 | Flagship Core | 97.0% | 94.3% | 2.7pp short |
-| Mid-Tier Core | 97.0% | 95.2% | 1.8pp short |
+| Mid-Tier Core | 97.0% | 95.7% | 1.3pp short |
 | Long-Tail Erratic | 90.0% | 93.6% | beats target |
 | **Long-Tail Erratic 2** | **95.7%** | **88.1%** | **7.6pp short** |
 | Long-Tail Erratic 3 | 90.0% | 90.9% | beats target |
 | Long-Tail Supply-Risk | 90.0% | 91.9% | beats target |
+
+(Mid-Tier Core corrected 2026-10-23. The summary file gives 95.68% at its recommended
+97% CSL. The 95.2% shown earlier is its value at the 95.7% candidate.)
 
 **Five of six clusters hold up** — within a few points of target or beating
 it, consistent with the mild general under-delivery this project has
 documented elsewhere (forecast bias, trailing-CV lag). **Long-Tail Erratic 2
 does not.** Its shortfall (7.6pp) is markedly larger than every other
 cluster's, and the gap is not a seed artifact: own-fill std across the 5
-seeds is ~0.0019 (tiny) at every CSL tested. Pushing it to the most
+seeds is 0.0008–0.0019 (tiny) at every CSL tested. Pushing it to the most
 aggressive candidate tried (CSL=99%) still only reaches 89.9% own-fill —
 never closing in on its own nominal target anywhere in the tested range.
 That points at the newsvendor z-formula itself being a poor fit for this
 archetype's demand profile, not just "the wrong CSL was picked." Raw results:
 `output datasets/agent output/service_level_v5_real_data_multiseed.csv`
-(150 rows); aggregated: `..._summary.csv`.
+(150 rows); aggregated: `..._summary.csv`. This sweep ran at alpha=0.2. (Note,
+2026-10-23: the later v5 per-cluster alpha sweep, artifacts
+`segment_alpha_v5_real_data_summary.csv`, measured Long-Tail Erratic 2's own fill at
+93.96% with every cluster at alpha 0.6, and 95.55% with its own alpha at 1.0, the live
+value. So much of this shortfall is a pooling effect, not only a z-formula one.)
 
 **Not yet decided**: whether to revise Long-Tail Erratic 2's z directly, fold
 it back into a neighboring cluster (it split out of Long-Tail Erratic/3 in
@@ -272,7 +314,11 @@ original (pre-fix, segment-z) configuration on every axis.
 **Not yet validated**: multi-seed confirmation of this exact combined
 configuration, or any dedicated test of v5's specific clusters/z-values the
 way v4's were tested (segment_alpha_real_data.py / service_level_real_data.py
-both still hardcode the v4 4-cluster list).
+both still hardcode the v4 4-cluster list). (Note, 2026-10-23: since then, a 5-seed run
+of the combined alpha=0.2 configuration exists in the artifacts
+`netting_discount_multiseed.csv`. A v5 alpha sweep, `segment_alpha_v5_real_data.py` in
+`../final_submission_optimized/`, has been run in full, and its results set the live
+per-cluster alpha.)
 
 ## Scenario testing (Feature 2, front-end agent — demand surge only so far)
 
@@ -318,7 +364,12 @@ in the Southeast (CDC03/04/05/06, RDC02/03) — no false positives or
 negatives among 23 total nodes — each getting +1.4–2.0% more safety stock,
 every other node within noise (±0.2%) of unchanged. B→C (the value of
 preparing) is +0.09pp fill at roughly flat cost; A→B (the scenario's raw
-impact if ignored) is −0.06pp fill, +$226K cost.
+impact if ignored) is −0.06pp fill, +$226K cost. (Source:
+`output datasets/agent output/scenario_DemandSurgeEast_{comparison,stocking_by_dc}.csv`.
+Note, 2026-10-23: the optimized folder's re-run, artifacts
+`scenario_DemandSurgeEast_comparison.csv`, reads 93.79% / 93.84% / 93.82%, i.e. no
+measurable value from preparing, with CDC06 at −0.15%. See
+`../final_submission_optimized/README.md`.)
 
 **Known gaps, stated directly:**
 - **Only CDC/RDC policy is scenario-aware — PDC sizing is not wired.**
@@ -375,7 +426,9 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   `--workers N`, `--cluster "<name>"` for one cluster, `--summarize-only`
   to just re-aggregate. ~1.5-2 hours for a full run at the default worker
   count; **partially run as of this commit (a handful of combos only) —
-  not yet a complete sweep.**
+  not yet a complete sweep.** (Its output, `output datasets/agent output/
+  segment_alpha_real_data_summary.csv`, still has 6 rows at 1 seed. A complete 5-seed
+  run by the optimized folder, at netting 0.0, is in the artifacts results.)
 - `service_level_real_data.py` — Feature 1 (front-end service-planning
   agent): a twin-validated, real-data, multi-seed answer to "what service
   level should each cluster target?" A per-cluster recommendation already
@@ -391,7 +444,9 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   `--summarize-only`. ~1.5-2 hours for a full run. **Just started as of
   this commit (one correctness-check combo only) — not yet a complete
   sweep; see `output datasets/agent output/service_level_real_data_
-  summary.csv`.**
+  summary.csv`.** (Still 4 rows at 1 seed there. A complete 5-seed run by the
+  optimized folder is in the artifacts results. The v5 counterpart,
+  `service_level_v5_real_data.py` in this folder, is complete; see above.)
 - `scenario_test.py` — Feature 2 (front-end scenario-testing agent): given
   a scenario (`models/twin/scenario_config.example.json`'s schema -- so
   far only `demand_surge_pct` + `affected_region`/`affected_nodes` +
@@ -414,7 +469,7 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   its own file under `run_logs/`, continues past a failed step instead of
   aborting, prints a final pass/fail summary. `--from N` to skip ahead
   (e.g. `--from 6` to just finish the two real-data sweeps). ~9-10 hours
-  end to end.
+  end to end. Its 8 steps do not include `service_level_v5_real_data.py`.
 - `results/` — every CSV, chart, and report cited above. Already computed;
   you don't need to re-run anything to read the evidence. The CSVs and the
   `own_fill`/`sweep` numbers are the direct output of `validate_real_data.py`
@@ -422,8 +477,13 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   runs — both were executed end to end with zero errors, and every number
   reproduced the project's previously-validated results exactly. The
   narrative `*_report.md` files and charts predate the consolidation into
-  this folder and are carried over unchanged (the underlying data didn't
-  change, so they're still accurate).
+  this folder and are carried over unchanged. They were written by the earlier
+  `backtest_rolling_real*.py` scripts named in their headers, and
+  `validate_real_data.py` writes only the CSVs. (Note, 2026-10-23: they are no longer
+  all in step with the CSVs beside them. `headline_report.md` shows the netting 1.0 run
+  (94.27% / 81.99% / +$2.01M), while
+  `headline_clark_scarf_v2_vs_actual.csv` was regenerated on 2026-10-18 at netting 0.0
+  with cluster z (94.51% / 82.38% / +$1.67M). Each report now carries a dated note.)
 - `validation_output/` — gitignored. Full twin run detail (inventory.csv,
   receipts, etc.) per run; regenerate by re-running the scripts above.
 - `../../../../output datasets/agent output/` (i.e. the repo's
@@ -437,6 +497,15 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   `scenario_test.py` all write here directly.
 
 ## Next steps, in priority order
+
+(Status note, 2026-10-23, from the artifacts results and the optimized folder:
+#1's v5 alpha equivalent now exists, `segment_alpha_v5_real_data.py`, and has been run
+in full. #2 has a 5-seed run at alpha=0.2, `netting_discount_multiseed.csv`. #3's
+complete v4 sweeps and the alpha=0.6 netting confirmation are in the artifacts results.
+#7 and #8 are covered for the pipeline by the override engine (`models/overrides`, 19
+measures, including PDC sizing, lead time and capacity), though `scenario_test.py`
+still uses the legacy path. The live configuration — alpha 0.6 plus per-cluster
+alpha — has not itself been simulated end to end.)
 
 1. **Decide what to do about Long-Tail Erratic 2's miscalibrated z.**
    v5's CSL/z is now validated against real demand (see

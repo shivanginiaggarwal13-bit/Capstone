@@ -1,8 +1,8 @@
 # Supply Brain — Synthetic CPG Supply-Chain Dataset
 
-*Auto-generated 2026-09-25 13:59 by `supply_brain_generator_v5.py`.
+*Auto-generated 2026-10-23 21:21 by `supply_brain_generator_v5.py`.
 This document and the data are produced in the same run, so the figures below always describe the
-current instance. It supersedes the separate EDA report, whose content is folded in as Part 6.*
+current instance. It supersedes the separate EDA report, whose content is folded in as Part 7.*
 
 ---
 
@@ -26,12 +26,13 @@ explains how the two folders divide.
 | **2** | **Business assumptions, in plain language** | Understand what world this data describes, and what it deliberately does not |
 | **3** | Time horizons | Know which years hold what |
 | **4** | Table reference and key map | Join the tables correctly |
-| **5** | How each layer is generated | Trust, challenge or re-derive a number |
-| **6** | Data profile | See the actual shape of this instance |
-| **7** | Known limitations | Avoid drawing a conclusion the data cannot support |
-| **8** | Reproducing and modifying | Change an assumption and re-run |
+| **5** | The policy table, in plain words | Understand the (s, S) policy that ran the history |
+| **6** | How each layer is generated | Trust, challenge or re-derive a number |
+| **7** | Data profile | See the actual shape of this instance |
+| **8** | Known limitations | Avoid drawing a conclusion the data cannot support |
+| **9** | Reproducing and modifying | Change an assumption and re-run |
 
-**Start with Part 2.** Every number in Parts 5 and 6 is a consequence of an assumption stated there.
+**Start with Part 2.** Every number in Parts 5 to 7 is a consequence of an assumption stated there.
 
 ---
 
@@ -49,7 +50,7 @@ place, and promotions that move volume at the expense of margin.
 |---|---|
 | Portfolio | 500 SKUs across 5 categories and 25 subcategories |
 | Network | 4 plants → 4 plant DCs → 8 regional DCs → 15 customer DCs, 27 storage facilities in 20 US metros |
-| Customers | 10 B2B retail banners across 3 channel types |
+| Customers | 10 B2B retail banners across 3 channel types (`RT`, `Brick-and-Mortar`, `Foodservice`), covering the grocery, mass, club, convenience and foodservice banners of §2.1 |
 | History | 156 weeks of actual demand (2023-W01 to 2025-W52) |
 | Forward plan | 52 weeks |
 | Annual revenue | $97M gross (run-rate) |
@@ -99,34 +100,43 @@ Three commercial postures are modelled:
   promotional funding.
 - **High-low accounts** (conventional grocery) take a higher everyday price with deep, frequent
   temporary reductions.
-- **Contract accounts** (foodservice) take a flat negotiated annual price and run no promotions.
+- **Contract accounts** (foodservice) take a flat negotiated price and are never targeted by
+  account-specific promotions. Promotions aimed at every banner still reach them, though, so about
+  28% of their volume moved on a discount in the history.
+
+In the shipped data the postures differ mainly in everyday terms (off-invoice allowance and
+trade-fund rates), not in promotional exposure. Half of all promotion events target every banner
+at once, so 30% of everyday-low-cost volume, 31% of high-low volume and 28% of contract volume
+moved on a discount, at a similar average depth of 16–17%.
 
 Convenience-store accounts take the smallest deductions of any channel, so we realise the highest
 pocket price from them — that is the direct-store-delivery service premium.
 
 **Gross margin is set wide enough to absorb trade spend.** List prices are struck at roughly
-40-47% gross margin so that promotional depth and trade allowances fit inside it. A small share of
+40-49% gross margin so that promotional depth and trade allowances fit inside it. A small share of
 volume still sells below cost on the deepest deals; that is a real loss-leader effect, not an error.
 
 ### 2.3 Where the products physically are
 
 Four plants produce, each feeding its own on-site plant distribution centre. Product then moves to
 eight regional distribution centres, and from there to fifteen customer-facing distribution
-centres. Regional DCs are also cross-connected to each other for rebalancing.
+centres. Regional DCs are also cross-connected to each other by lateral lanes, but no rebalancing
+flow is simulated across them (§2.13).
 
 A regional DC does **not** simply buy from its nearest plant DC. Because only some plants are
 qualified to make a given item (§2.4), each regional DC buys **each SKU from the nearest plant DC
-whose plant can actually make it** — so a Chicago regional DC stocking an Atlanta-only item pays
+whose plant can actually make it** (nearest by lane lead time) — so a Chicago regional DC stocking an Atlanta-only item pays
 the Atlanta lane. Every plant DC therefore has a lane to every regional DC, and a plant DC only
 ever holds SKUs its own plant produces.
 
 Warehouse-delivered accounts (mass, club, large grocery) are served from regional DCs. Direct-store
--delivery accounts (convenience, smaller grocery, foodservice) are served from customer DCs.
+-delivery accounts (convenience, smaller grocery, foodservice) are served from customer DCs. Each
+customer DC is replenished from a single regional DC, the one on its shortest-lead-time lane.
 
 **Every distribution centre can store every subcategory.** We assume one uniform warehouse type — a
 plain ambient building. No product is assumed to need a freezer, a chiller, humidity control or a
 bonded store. This is a simplifying assumption, and it is the biggest single departure from a real
-food and beverage network (see Part 7).
+food and beverage network (see Part 8).
 
 ### 2.4 How production is sourced
 
@@ -139,8 +149,8 @@ its demand, so freight is minimised. High-volume SKUs are **dual-sourced** acros
 resilience, with the secondary plant costing slightly more per unit. Roughly a third of the
 portfolio is dual-sourced.
 
-Production plans are set from recent demand plus whatever it takes to restore about a week and a
-half of finished-goods cover, and they are **constrained by capacity** — first by the individual
+Production plans are set from recent demand plus whatever it takes to restore about two and a
+half weeks of finished-goods cover, and they are **constrained by capacity** — first by the individual
 production line for that family, then by the plant as a whole. Around 3% of
 SKU-weeks get clipped, at a mean plant utilisation of about 54% and peaks near
 99%.
@@ -164,8 +174,10 @@ Demand at a given customer and DC in a given week is the product of several forc
   Northeast, baking staples in the Midwest, wine on both coasts, and cassava and manioc flour in
   Florida and Texas. Regions are genuinely different markets, not scaled copies of each other.
 - **Price response.** Everyday shelf prices drift and step, and demand responds with a
-  subcategory-specific elasticity. Promotional discounts get a stronger response than everyday
-  price moves, as CPG research consistently finds.
+  subcategory-specific elasticity. Promotional discounts are given a stronger response than
+  everyday price moves (1.75 times the base elasticity), as CPG research finds. The exception is
+  the most price-sensitive subcategories: there a cap on promotional elasticity makes the
+  promotional response the weaker of the two (§6.1).
 - **A promotional trade calendar** (below).
 - **Structural events.** Some SKUs gain or lose distribution mid-history, some take a permanent
   step price change, and a few launch part-way through. These are what make forecasting genuinely
@@ -195,7 +207,7 @@ period, so nothing can ever expire.
 
 This is intentional. It lets inventory, safety-stock and multi-echelon optimisation work be
 developed and debugged without perishability confounding the results. The consequence is that
-write-offs are exactly zero and waste is not a measurable outcome in this dataset.
+the write-off table is written empty and waste is not a measurable outcome in this dataset.
 
 **One knock-on to be aware of:** with no obsolescence cost, holding cost becomes the only cost of
 over-stocking. In a newsvendor calculation the economically optimal service level then pins near
@@ -212,8 +224,9 @@ Holding cost has two parts, and we model them separately:
 
 The first part is built up from what a warehouse actually costs to own: construction cost per
 square foot in that metro, the local property cap rate, building depreciation, electricity price,
-and local labour, maintenance, insurance and property tax. Around two-thirds of a warehouse's
-annual cost is the amortised cost of having built it, not the cost of running it.
+and local labour, maintenance, insurance and property tax. On average 64% of a warehouse's
+annual cost (57–70% by site, §6.3) is the amortised cost of having built it, not the cost of
+running it.
 
 That means holding cost varies by **location** — a pallet in Boston costs materially more to keep
 than the same pallet at the Dallas plant DC — and by **product density**, because a bag of flour
@@ -224,13 +237,15 @@ occupies far more space per unit than a sachet of yeast.
 Each stocking location runs a reorder-point policy. Safety stock is sized from **both** sources of
 uncertainty — how variable the demand is and how variable the replenishment lead time is — with a
 service factor that differs by SKU segment: fast-moving items get the highest protection, seasonal
-items less, intermediate items least.
+items less, intermediate items least. (Plant DCs are the exception: they use a simpler rule
+proportional to throughput, Part 5.)
 
 Replenishment lead times are real network lead times. Each location buffers **its own inbound
 lane** — the leg from its immediate supplier — and we also publish the cumulative plant-to-node
-lead time for echelon work. Lanes range from about half a day at a co-located plant DC to nearly
-eight days at a distant customer DC. **Each individual receipt arrives at its own realised lead
-time**, not the average.
+lead time for echelon work. Inbound lanes in use range from about half a day (a co-located plant DC, a regional DC in the same metro as its plant DC, or a customer DC in the same metro as its regional DC)
+to nearly thirteen days on the longest plant-DC-to-regional-DC rail lane. Customer DCs' inbound lanes run
+0.5–3.2 days. **Each individual receipt arrives at its own realised lead time**,
+not the average.
 
 Suppliers quote a committed lead time above their average — the 90th percentile — so on-time
 delivery runs around 90% with a genuine late tail rather than a coin flip.
@@ -240,7 +255,8 @@ hand. When a regional DC cannot cover both its bulk customers and its customer D
 are served first and the remaining stock is split pro-rata across the customer DCs; the unfilled
 balance of the internal order is cancelled, and the customer DC simply orders again the following
 week. So an upstream stockout becomes a downstream delay: a short inbound receipt makes a
-customer-facing stockout at that same location roughly **nine times more likely the week after**.
+customer-facing stockout at that same location **more likely the week after**. In this instance it
+is about 2.7 times as likely as after a complete receipt.
 This is why the dataset distinguishes four demand and shortfall columns — customer versus internal
 replenishment — on every inventory row.
 
@@ -249,9 +265,15 @@ accounts backorder; direct-store-delivery accounts lose the sale. The customer-f
 rate is about 92.7%, and internal replenishment between echelons fills about
 89.6%.
 
+**That headline hides a large split by echelon.** Regional DCs fill 95.7% of their bulk
+customers' demand. Customer DCs fill only 79.7% of direct-store-delivery demand, and because those
+accounts lose the sale, about one DSD unit in five goes unserved. Internally, plant DCs fill 92.2%
+of regional DC orders, while regional DCs fill only 75.4% of customer DC orders.
+
 Plant DCs are supplied out of **finished goods that the plant actually produced**, and only for
-SKUs that plant is qualified to make. Plants build to a rolling plan — last week's demand signal
-plus whatever it takes to restore about a week and a half of finished-goods cover — and that plan is
+SKUs that plant is qualified to make. Plants build to a rolling plan — a smoothed recent demand
+signal (an exponentially weighted average of the replenishment orders placed on the plant DC)
+plus whatever it takes to restore about two and a half weeks of finished-goods cover — and that plan is
 clipped by production-line and plant-wide capacity. Capacity therefore binds in peak weeks
 (roughly 3% of SKU-weeks are clipped, at a mean plant utilisation of about
 54%), instead of being a number nobody consumes.
@@ -265,10 +287,18 @@ We publish **two** forecasts, not one:
 2. **A promotion-inclusive forecast** — the baseline plus the expected uplift from the *planned*
    promotional calendar. This is the number to replenish against.
 
-Both are produced **ex ante**: at any week, the forecast uses only information available before
-that week. Nothing looks ahead. The forecaster sees the *planned* promotional calendar but not the
-depth that actually ran, and its assumed uplift is imperfect — so promotional weeks remain harder
-to forecast than normal weeks, which is exactly the real-world condition.
+The baseline is produced **ex ante**: at any week it is built from earlier weeks only (apart from
+the interpolation that fills in de-promoted weeks). Two parts are not strictly ex ante. First, the
+per-series promotional uplift is estimated from every promotional week in the 2023–25 history,
+including the 2025 weeks being scored. Second, the split from DC to customer uses each customer's
+share of the whole 2023–25 history. Both leak a little information from the evaluated year. The
+forecaster sees the *planned* promotional calendar but not the depth that actually ran, and its
+assumed uplift is deliberately imperfect. So promotional weeks remain harder to forecast than
+normal weeks, which is exactly the real-world condition.
+
+**The published forecast is biased low.** Over the evaluated year it totals 7.8% below actual
+demand (−9.7% on weeks with non-zero demand), and the bias is negative in every segment and every
+category (§7.9).
 
 Publishing both separates two different failure modes: a poor baseline means the seasonal model is
 wrong, while a poor uplift means the promotional plan is wrong. They need different fixes, and no
@@ -297,7 +327,8 @@ Being explicit about the gaps matters more than the inclusions:
   and transport are sized generously; nothing runs out of physical room or truck space.
 - **No lateral transshipment and no failover.** `network_lanes` declares 10 regional-DC-to-regional
   -DC lateral lanes and a second, longer inbound lane for every customer DC, but **no flow is
-  simulated across either** — 16 of the 76 lanes carry nothing. They are there so a resilience or
+  simulated across either** — 25 of the 76 lanes (the 15 failover lanes and the 10 laterals)
+  carry nothing. They are there so a resilience or
   transshipment model has somewhere to route to; they are not exercised in the history.
 - **No lot or batch traceability**, and therefore no true first-expiry-first-out testing.
 - **No returns, damages or reverse logistics.**
@@ -315,7 +346,7 @@ begins in late December of the prior calendar year, as ISO-style week numbering 
 |---|---|---|
 | Burn-in (104 weeks) | 2023–2024 | Actual demand only. Exists so the forecaster has at least two prior seasonal cycles to learn from. |
 | Evaluated year (52 weeks) | 2025 | Actual demand **and** both forecasts, so accuracy is measurable. |
-| Forward plan (52 weeks) | 2026 | Both forecasts, a promotional calendar, a price plan and an opening inventory position. No actuals. |
+| Forward plan (52 weeks) | 2026 | Both forecasts, a promotional calendar and a price plan. No actuals. (The opening inventory position is a run artefact in `output datasets/`.) |
 
 `orders`, `production` and `inventory` cover all 156 actual weeks. `demand_forecast`
 covers the evaluated year and the forward plan.
@@ -360,7 +391,7 @@ All foreign keys are validated at generation time.
 | b2b_customer_master | banner | Channel type, delivery mode, pricing strategy |
 | b2b_customer_terms | banner | Off-invoice, trade fund, volume rebate, logistics allowance, promo frequency and depth multipliers |
 | customer_serving_dc | banner × DC | Which DC serves each banner, and its demand share |
-| cost_parameters | **DC × subcategory** (full cross product) | Storage cost per unit-year, inventory carrying %, stockout multiplier. Derivation in Part 5. |
+| cost_parameters | **DC × subcategory** (full cross product) | Storage cost per unit-year, inventory carrying %, stockout multiplier. Derivation in Part 6 (§6.3). |
 | seasonality_master | subcategory × month | Occasion-driven seasonal index plus the shared macro calendar |
 | regional_demand_index | region × subcategory | Regional consumption multiplier |
 | orders | SKU × DC × customer × **day** | Order lines grouped into baskets by `order_id`. Full price waterfall: list → base → invoice → net (pocket), plus `net_margin_usd`. |
@@ -370,10 +401,10 @@ All foreign keys are validated at generation time.
 | production | SKU × plant × week | The uncapped ask (`plan_uncapped_qty`), the capacity-clipped plan, actual output, schedule attainment and a `capacity_limited_flag`, by production family |
 | inventory | SKU × DC × week | Opening, receipts, demand, shipments, unmet, lost margin, closing, safety stock, reorder point, order-up-to, and lead time. Demand and shortfall are **split into customer versus internal replenishment** — `demand_customer_qty` sums exactly to `orders`, while `demand_qty` is an echelon total and counts a unit once per tier it passes through. Lead time appears twice: `lead_time_mean_days` is the node's own inbound lane (what its safety stock covers) and `cum_lead_time_mean_days` is the plant-to-node total (for echelon work). |
 | replenishment_receipts | receipt | Promised versus actual lead time, an on-time flag, and `qty_ordered` versus `qty_received` with the `short_qty` balance — every line is a real shipment from a real parent, so internal fill rate is measurable |
-| write_offs | SKU × DC × period | Empty by design (§2.7) |
+| write_offs | SKU × DC × period | Empty by design (§2.7): written as a header-only table, not computed from the simulation |
 | sku_sourcing_map | DC × SKU | The routing the twin executes: which parent serves each node for each SKU, and the `rule` that assigned it. Network structure, so it is an input — never recovered from simulated receipts |
 | baseline_policy | DC × SKU | Safety stock, reorder point and order-up-to level that ran the historical simulation, with the segment and service factor behind them. Full dictionary in Part 5 |
-| scenarios | scenario | 30 labelled disruptions in the forward year |
+| scenarios | scenario | 30 labelled disruptions in the forward year. `end_date` falls one week after the event's last week (the span is `duration_weeks` + 1 weeks), so take the event window as `start_date` plus `duration_weeks` weeks |
 
 ### Currency
 
@@ -479,20 +510,49 @@ shortfall arriving from upstream or the timing of demand inside a week.
 protection window   P  = 1 week (the review) + lead time of the lane this SKU travels
 safety_stock           = z x sqrt( P x sigma_demand^2 + mu_demand^2 x sigma_leadtime^2 )
 reorder_point    s     = mu_demand x P + safety_stock
-order_up_to_level S    = s + mu_demand x 1.5 weeks
+order_up_to_level S    = max( s + mu_demand x 1.5 weeks , 1.2 x s )
 ```
 
-`mu` and `sigma` are that location's weekly demand mean and standard deviation
-for that SKU. The lane lead time comes from `sku_sourcing_map.csv` — the route
-the SKU actually travels, which matters a great deal: one plant-DC-to-regional-DC
-lane runs half a day and another nearly thirteen.
+The `1.2 x s` floor binds in about 8% of regional and customer DC rows.
 
-Sigma is also uplifted upstream (PDC x1.45, RDC x1.25, CDC x1.0),
-because a parent absorbs its children's order lumpiness on top of its own demand.
+`mu` and `sigma` come from that location's weekly orders for that SKU over the
+**full 2023–25 order history**, not the 2025 year alone. They are on different
+bases. `mu` is total units divided by all 156 weeks, zero weeks included.
+`sigma` is the standard deviation over only the weeks in which the location
+actually ordered the SKU. Both include seasonality and trend. Because `mu`
+averages in the lower 2023–24 volumes, in aggregate it sits about 6% below the
+2025 weekly level.
+
+Demand here means orders placed **at that location only**. A regional DC's
+`mu` and `sigma` are its own bulk customers' orders. They do not include the
+replenishment flow it passes on to its customer DCs.
+
+The lane lead time comes from `sku_sourcing_map.csv` — the route the SKU
+actually travels, which matters a great deal: one plant-DC-to-regional-DC lane
+runs half a day and another nearly thirteen days. A pair without a sourcing entry
+would fall back to the shortest lane into the node, and failing that to a
+3.0-day mean and 1.0-day standard deviation. No row in this instance needs
+either fallback.
+
+Sigma is uplifted at regional DCs (x1.25; customer DCs x1.0) as an allowance
+for the order lumpiness a parent absorbs from its children, even though, as
+noted above, the children's flow itself is not in the regional DC's `mu`. The
+plant-DC factor (x1.45) multiplies throughput rather than a sigma (below).
 
 **Plant DCs are the exception.** They are not *pulled* by a reorder point —
-production *pushes* finished goods into them. Their `S` is therefore a holding
-ceiling sized on throughput (about 4.5 weeks of it), not a trigger,
+production *pushes* finished goods into them. Their throughput `mu` is the sum
+of the `mu` of every regional DC that sources the SKU from them. That again
+counts regional DCs' own customer demand only, not the customer-DC flow behind
+them. The three numbers are heuristics proportional to throughput, not to its
+variability:
+
+```
+safety_stock       = z x sqrt(L / 7) x mu x 1.45 x 0.5     L = plant-to-plant-DC lead time, days (0.5)
+reorder_point  s   = safety_stock + mu x L / 7
+order_up_to    S   = mu x 4.5 weeks + safety_stock
+```
+
+`S` is a holding ceiling sized on throughput (about 4.5 weeks of it), not a trigger,
 which is what the 10.5x `S / s` ratio above is showing.
 
 ### Worked example — `SKU0167`, fast-moving, CONFECTIONERY
@@ -529,8 +589,9 @@ One product, 25 locations, 25 different policies:
 
 `z` is identical everywhere, because it is a property of the product. Everything
 else varies with **local demand** and **lane length**. The largest regional DC
-carries orders of magnitude more than the smallest customer DC, because it serves
-big customers directly *and* restocks the customer DCs beneath it. A row of
+carries orders of magnitude more than the smallest customer DC because its own
+bulk customers order far more. Its policy does not include the customer DCs it
+restocks. A row of
 zeros, if one appears above, is a location that barely sells this product at all
 — it is stocked on paper but the arithmetic says hold nothing and never reorder.
 
@@ -549,42 +610,53 @@ DCs" is simply higher CDC `S` and lower RDC `S` in this same table.
 
 ## Part 6 — How each layer is generated
 
-### 5.1 Price elasticity — how to estimate it from `orders`
+### 6.1 Price elasticity — how to estimate it from `orders`
 
 The data carries TWO distinct price responses, and no elasticity column is shipped -- you estimate both
 from `orders`, exactly as you would on a real client extract:
 * **base (regular) elasticity** -- response of demand to the everyday **shelf** price
-    (`base_price_usd`, which drifts with mild inflation and steps at 1-3 revisions/yr).
+    (`base_price_usd`, which drifts with ~4%/yr inflation plus a small random walk and steps at
+    3-6 revisions/yr).
 * **promotional (deal) elasticity** -- response to a temporary **discount** (`discount_pct`,
     ~30% of VOLUME; v3's documentation claimed ~30% of SKU-weeks but the shipped data reached
-    only 11.6% of volume); larger in magnitude than base (grounded at ~1.75x; CPG research
-    puts promo ~1.5-2x regular). Promotions are followed by a **forward-buy dip** in the next
+    only 11.6% of volume). It is generated as 1.75x the base elasticity (CPG research puts promo
+    ~1.5-2x regular), clipped to [-4.5, +3.0]. The clip inverts the ordering for very elastic
+    groups (base below about -2.6), where the promotional response ends up *weaker* than the
+    base. Recovered from the data (§7.8), promo/base runs 0.85-1.28x by category, larger than
+    base in 3 of 5. Promotions are followed by a **forward-buy dip** in the next
     1-2 weeks for storable categories (pantry-loading payback), which is the signature that
     separates a deal response from a base response.
-* Estimate at **`subcategory`** level (22-25 groups), not `category` (5). The subcategory IS
+* Estimate at **`subcategory`** level (25 groups), not `category` (5). The subcategory IS
     the real product group each SKU's elasticity was drawn from; pooling to category mixes
-    genuinely different responses together.
+    genuinely different responses together. (The snippet below and §7.8 pool to category
+    for stable numbers, and inherit that mixing.)
 * `off_invoice_pct` and the other trade-term columns give **cross-sectional** price variation
     on top of the time-series variation in `base_price_usd`; both are needed to separate base
     from promotional response.
 
-### 5.2 The two forecasts — how `demand_forecast` is built
+### 6.2 The two forecasts — how `demand_forecast` is built
 
 v3 set `forecast_qty = actual_qty * (1 + noise)`, which made the forecast a relabelled copy of
 the actual: `corr(forecast, actual) = 0.981`, and 97.6% of the WMAPE variance was explained by
 the `segment` column alone. It also meant promo weeks were **no harder** than normal weeks,
 directly contradicting v3's own documentation.
 
-v4 forecasts **ex ante** in three layers:
-* **Layer 0 -- de-batch.** Forecast at SKU x DC x week, then disaggregate to customer by
-  historical share. 62% of the apparent volatility at customer grain is order batching, not
-  demand.
-* **Layer 1 -- baseline.** De-promote the history, then seasonal-naive from t-52 rescaled by
-  the trailing 13-week level ratio. Only weeks strictly before t are ever used. This is why
-  2023-24 exist: a seasonal model needs at least two prior cycles.
-* **Layer 2 -- lift.** Uplift per series estimated from PRIOR promo weeks, applied to the
-  PLANNED promo calendar with ~35% planner misestimation. Applying the true lift would rebuild
-  the leak.
+v4 forecasts in three layers. The baseline is ex ante; the lift and the customer split are not
+strictly so:
+* **Layer 0 -- de-batch.** Forecast at SKU x DC x week, then disaggregate to customer by each
+  customer's share of the full 2023-25 history (which includes the evaluated year). At customer
+  grain about 36% of in-sample weekly cells have no order at all, because slower items are
+  ordered every two or three weeks. Much of the apparent volatility there is the order
+  calendar, not demand.
+* **Layer 1 -- baseline.** De-promote the history (promo weeks masked and interpolated), then
+  seasonal-naive from t-52 rescaled by the trailing 13-week level ratio. Apart from that
+  interpolation, only weeks before t are used. The forward year applies one year-over-year
+  ratio, fixed at the cut-over, to the de-promoted 2025 shape. This is why 2023-24 exist: a
+  seasonal model needs at least two prior cycles.
+* **Layer 2 -- lift.** Uplift per series is the median observed uplift over the promo weeks of
+  the whole 156-week history, including the 2025 weeks it is then scored on. It is applied to
+  the PLANNED promo calendar with ~35% planner misestimation. Applying the true lift would
+  rebuild the leak.
 #### The two published series
 
 `demand_forecast` publishes **two usable forecasts** on the same rows, plus the bridge between
@@ -610,13 +682,14 @@ evaluated year:
 | **actual demand** | **~0.19** |
 
 The promo-inclusive forecast tracks the lumpiness of actual demand; the baseline does not,
-because promotional weeks have been stripped out of it. On promotional weeks specifically,
-applying the promo calendar cuts WMAPE by roughly a third (about 0.57 baseline-only versus
-0.39 with promotions).
+because promotional weeks have been stripped out of it. On promotional weeks specifically
+(rows with a planned promotion, `forecast_promo_lift_qty > 0`), applying the promo calendar cuts
+WMAPE by roughly a third (about 0.55 baseline-only versus 0.36 with promotions).
 
 **If the two look nearly identical in your own test, check what you aggregated.** Promotional
-lift is only about 15% of total volume (roughly 30% of volume on deal at about 2x lift), so it
-cannot move a portfolio-level CV by a large multiple. It shows up clearly in three places: the
+lift is only about 13% of forecast volume in the evaluated year (roughly 30% of volume moves on
+deal, and only the incremental part of it is lift), so it cannot move a portfolio-level CV by a
+large multiple. It shows up clearly in three places: the
 week-of-year promo profile (promo volume share swings from about 15% in the January trough to
 about 45% in the Thanksgiving/Christmas window), promo-week accuracy, and any single SKU-DC
 series. It will look muted if you aggregate across the whole portfolio and the whole year at
@@ -626,6 +699,8 @@ Both panels are **complete**: every (SKU, DC, customer, week) cell exists, with 
 zero-demand rows. v3's in-sample panel was 66% filled with no zero-demand rows at all, while
 its forward panel was 100% dense.
 
+#### Estimating the two elasticities (method for §6.1)
+
 Recommended method -- one regression with BOTH price terms and SKU + week fixed effects:
 
     ln(order_qty)_{i,t} = alpha_i + gamma_t
@@ -634,9 +709,12 @@ Recommended method -- one regression with BOTH price terms and SKU + week fixed 
 
 * `alpha_i` (SKU FE) absorbs baseline volume/price; `gamma_t` (week FE) absorbs common seasonality.
 * `beta_base` is identified from shelf-price drift/revisions; `beta_promo` from discount depth.
-* Expect |beta_promo| > |beta_base|. Estimate per category (pool SKUs) for stable numbers.
+* Do not assume |beta_promo| > |beta_base| everywhere: the clip described in §6.1 reverses it for
+  very elastic groups, and in this instance it holds in 3 of 5 categories (§7.8). Estimate per
+  category (pool SKUs) for stable numbers.
 
-Minimal snippet (statsmodels):
+Minimal snippet (statsmodels; if `orders.csv` in your checkout is a Git LFS pointer, read
+`orders.parquet` instead):
 
     import pandas as pd, numpy as np, statsmodels.formula.api as smf
     o = pd.read_csv("orders.csv").merge(pd.read_csv("sku_master.csv")[["sku_id","category"]], on="sku_id")
@@ -653,10 +731,7 @@ Caveats: (1) to isolate the forward-buy effect, add lagged-promo controls or exp
 (2) always include the week FE; (3) both elasticities are negative for most groups, a few real groups
 are near-zero/positive and kept verbatim, so a pooled category value can be pulled toward zero.
 
-"""
-doc += _facility_cost_doc_section()
-
-### 5.3 Holding cost — how `cost_parameters.csv` is derived
+### 6.3 Holding cost — how `cost_parameters.csv` is derived
 
 `cost_parameters.csv` has **675 rows** on a **dc_id x subcategory** key (27 storage facilities x 25 subcategories) and ships 5 columns:
 
@@ -755,8 +830,8 @@ Facilities sit in **20 metros across 5 regions**. Population is the MSA resident
 | Minneapolis, MN | Midwest | 1 | 3.7 | 1.03 | 6.4% | 0.115 | Upper-Midwest reach; long inbound lanes |
 | Tampa, FL | Southeast | 1 | 3.4 | 0.97 | 5.9% | 0.122 | Florida west-coast distribution; hurricane hardening premium |
 | Denver, CO | West | 2 | 3.0 | 1.04 | 6.0% | 0.108 | Mountain-West hub; long thin lanes, high inbound freight |
-| Orlando, FL | Southeast | 1 | 2.8 | 0.97 | 6.0% | 0.120 | Central Florida; foodservice and tourism demand skew |
 | Charlotte, NC | Southeast | 1 | 2.8 | 0.94 | 5.9% | 0.090 | Cheapest power in the network; Carolinas growth corridor |
+| Orlando, FL | Southeast | 1 | 2.8 | 0.97 | 6.0% | 0.120 | Central Florida; foodservice and tourism demand skew |
 | St. Louis, MO | Midwest | 1 | 2.8 | 0.94 | 6.8% | 0.092 | Low-cost Midwest node; barge and rail access |
 | Sacramento, CA | West | 1 | 2.4 | 1.15 | 5.7% | 0.212 | Northern California inland alternative to the LA basin |
 | Nashville, TN | Southeast | 1 | 2.1 | 0.95 | 6.1% | 0.112 | Fast-growing Southeast secondary; strong road reach |
@@ -859,7 +934,7 @@ multi-temperature network, where refrigerated space costs roughly 2-3x ambient t
 
 
 
-### 6.0 Data snapshot
+### 7.0 Data snapshot
 
 | Field | Value |
 | --- | --- |
@@ -878,16 +953,16 @@ multi-temperature network, where refrigerated space costs roughly 2-3x ambient t
 
 ---
 
-# Part 1 - Parameters and Assumptions
+### Parameters and assumptions (profile summary)
 
-Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real F&B sales dataset (per-unit prices, per-group elasticity, 2020-shape seasonality, ~80/20 concentration; 2020 COVID spike excluded). 5 categories x 100 SKUs, segmented ~50/30/20 Fast-Moving/Seasonal/Intermediate. Two price elasticities per SKU (base shelf-price and promotional). Demand is day-level orders on a dual-sourced US network (Plant -> Plant DC -> Regional DC -> Customer DC) with lateral RDC-to-RDC rebalancing lanes. Supply-side parameters (cost/margin, holding, lead time, capacities) are modelled assumptions; demand-side is grounded.
+Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real F&B sales dataset (per-unit prices, per-group elasticity, 2020-shape seasonality, ~80/20 concentration; 2020 COVID spike excluded). 5 categories x 100 SKUs, segmented ~50/30/20 Fast-Moving/Seasonal/Intermediate. Two price elasticities per SKU (base shelf-price and promotional). Demand is day-level orders on a US network (Plant -> Plant DC -> Regional DC -> Customer DC); about a third of SKUs are dual-sourced across plants, and failover RDC-to-CDC and lateral RDC-to-RDC lanes are declared but carry no simulated flow. Supply-side parameters (cost/margin, holding, lead time, capacities) are modelled assumptions; demand-side is grounded.
 
 
 ---
 
-# Part 2 - Exploratory Data Analysis
+### Exploratory data analysis
 
-### 6.1 Dataset overview and data quality
+### 7.1 Dataset overview and data quality
 
 | table | rows | cols | null_cells |
 | --- | --- | --- | --- |
@@ -911,7 +986,7 @@ Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real 
 
 **Data-quality checks:** orders order_qty > 0 = PASS; orders unit_price_usd > 0 = PASS; sku margins positive = PASS; inventory closing_stock >= 0 = PASS; delivery_date >= order_date = PASS; sku_id unique = PASS.
 
-### 6.2 Referential integrity
+### 7.2 Referential integrity
 
 | check | result |
 | --- | --- |
@@ -926,7 +1001,7 @@ Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real 
 | serving map dc in stocking DCs | PASS |
 | forward forecast has no actuals | PASS |
 
-### 6.3 Product catalog and economics (USD, per-unit)
+### 7.3 Product catalog and economics (USD, per-unit)
 
 | category | skus | median_price | min_price | max_price | avg_margin_pct | median_shelf_life_d |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -942,7 +1017,7 @@ Price tiers: Premium 170, Mainstream 165, Value 165. Seasonal segment SKUs: 150/
 
 ![price_by_category.png](report_assets/price_by_category.png)
 
-### 6.4 SKU segmentation and ABC classification
+### 7.4 SKU segmentation and ABC classification
 
 | segment | sku_count | sku_pct | revenue_pct |
 | --- | --- | --- | --- |
@@ -964,7 +1039,7 @@ Concentration: top 20 pct of SKUs = 84.2 pct of revenue (steep, ~80/20).
 
 ![abc_pareto.png](report_assets/abc_pareto.png)
 
-### 6.5 Demand analysis
+### 7.5 Demand analysis
 
 **By category:**
 | category | units | revenue | rev_pct |
@@ -1003,7 +1078,7 @@ Concentration: top 20 pct of SKUs = 84.2 pct of revenue (steep, ~80/20).
 
 ![seasonality_by_category.png](report_assets/seasonality_by_category.png)
 
-### 6.6 Demand variability and intermittency
+### 7.6 Demand variability and intermittency
 
 Weekly demand coefficient of variation (CV) and intermittency by segment - the inputs safety-stock sizing keys off:
 
@@ -1016,7 +1091,7 @@ Weekly demand coefficient of variation (CV) and intermittency by segment - the i
 
 ![demand_cv_hist.png](report_assets/demand_cv_hist.png)
 
-### 6.7 Promotions and daily-order structure
+### 7.7 Promotions and daily-order structure
 
 | Field | Value |
 | --- | --- |
@@ -1040,7 +1115,7 @@ Weekly demand coefficient of variation (CV) and intermittency by segment - the i
 
 ![discount_depth.png](report_assets/discount_depth.png)
 
-### 6.8 Price variation and elasticity (base vs promotional)
+### 7.8 Price variation and elasticity (base vs promotional)
 
 Two-elasticity recovery from orders (no elasticity shipped): regress ln(order_qty) on ln(base_price_usd) and ln(1-discount) with SKU and week fixed effects. Base = shelf-price response; promo = deal response.
 
@@ -1052,7 +1127,7 @@ Two-elasticity recovery from orders (no elasticity shipped): regress ln(order_qt
 | Grocery | -1.99 | -2.56 | 1.28 | 161,666 |
 | Snacks & Confectionery | -3.56 | -3.32 | 0.93 | 152,081 |
 
-### 6.9 Forecast accuracy and forward horizon
+### 7.9 Forecast accuracy and forward horizon
 
 **By segment:**
 | segment | MAPE_pct | WAPE_pct | bias_pct |
@@ -1072,7 +1147,9 @@ Two-elasticity recovery from orders (no elasticity shipped): regress ln(order_qt
 | Snacks & Confectionery | 55.00 | 41.30 | -11.10 |
 
 
-Forward 2026 total forecast units 13,242,327 vs 2025 actual 34,122,245, YoY -61.2 pct.
+Forward 2026 total forecast units 13,242,327 vs 2025 actual 12,148,919, YoY +9.0 pct.
+
+Bias is negative in every segment and category above: the forecast under-calls demand throughout the evaluated year (-9.7 pct on these non-zero-actual rows; -7.8 pct over the full panel, zero weeks included).
 
 
 ![forecast_error_hist.png](report_assets/forecast_error_hist.png)
@@ -1080,7 +1157,7 @@ Forward 2026 total forecast units 13,242,327 vs 2025 actual 34,122,245, YoY -61.
 
 ![hist_vs_forward.png](report_assets/hist_vs_forward.png)
 
-### 6.10 Production (planned vs actual)
+### 7.10 Production (planned vs actual)
 
 | Field | Value |
 | --- | --- |
@@ -1100,7 +1177,7 @@ Forward 2026 total forecast units 13,242,327 vs 2025 actual 34,122,245, YoY -61.
 
 ![adherence_hist.png](report_assets/adherence_hist.png)
 
-### 6.11 Inventory, service and working capital
+### 7.11 Inventory, service and working capital
 
 | ech | avg_closing | avg_safety | days_of_supply | stockout_wk_pct | avg_inv_value_usd |
 | --- | --- | --- | --- | --- | --- |
@@ -1119,7 +1196,7 @@ Availability: **92.7 pct** customer-facing unit fill rate. On a raw DC-SKU-week 
 
 ![inventory_value.png](report_assets/inventory_value.png)
 
-### 6.12 Network structure and cardinality
+### 7.12 Network structure and cardinality
 
 | Field | Value |
 | --- | --- |
@@ -1140,7 +1217,7 @@ Availability: **92.7 pct** customer-facing unit fill rate. On a raw DC-SKU-week 
 | REGIONAL_DC -> REGIONAL_DC | 10 | 1-2 | 1-2 |
 
 
-Dual-sourcing: 15/15 Customer DCs have >=2 inbound Regional DCs (failover); lateral RDC-to-RDC lanes: 10.
+Dual-sourcing: 15/15 Customer DCs have >=2 inbound Regional DCs (failover) on paper; lateral RDC-to-RDC lanes: 10. In the simulated history every Customer DC is replenished from a single Regional DC, so the 15 failover lanes and the 10 lateral lanes carry no flow (25 of 76 lanes unused).
 
 
 **Lanes by tier and mode:**
@@ -1153,7 +1230,7 @@ Dual-sourcing: 15/15 Customer DCs have >=2 inbound Regional DCs (failover); late
 | REGIONAL_DC | CUSTOMER_DC | Truck | 27 | 3.02 | 375.94 | 1.44 |
 | REGIONAL_DC | REGIONAL_DC | Truck | 10 | 5.19 | 752.13 | 2.09 |
 
-### 6.13 Capacity utilization
+### 7.13 Capacity utilization
 
 DC storage utilization (whole-site on-hand / capacity, averaged over weeks): mean 9.1 pct, max 32.3 pct. Storage is not a binding constraint in this dataset.
 
@@ -1172,7 +1249,7 @@ Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): me
 
 ![dc_utilization.png](report_assets/dc_utilization.png)
 
-### 6.14 Financial summary (full 2023-2025 actuals span)
+### 7.14 Financial summary (full 2023-2025 actuals span)
 
 | Field | Value |
 | --- | --- |
@@ -1183,7 +1260,7 @@ Last-mile lane utilization (CDC weekly flow / primary inbound lane capacity): me
 | Inventory turns (annualized) | 8.8x |
 | Est. last-mile logistics cost (approx/yr) | $1,980,940 |
 
-### 6.15 Disruption scenario library (digital-twin / bandit input)
+### 7.15 Disruption scenario library (digital-twin / bandit input)
 
 A labeled library of demand-side and supply-side disruptions with Time-to-Recover (TTR) and Time-to-Survive (TTS) estimates - the what-if inputs the digital twin, bandit reward, and agentic layer consume. Each row names the affected node/SKU/region and window.
 
@@ -1197,15 +1274,15 @@ A labeled library of demand-side and supply-side disruptions with Time-to-Recove
 | plant_shortfall | 4 | 10.50 | 0.00 |
 
 
-Total scenarios: 30 across 6 classes (supplier, geographic, systemic, market-driven).
+Total scenarios: 30 across 6 classes (demand surge, forecast miss, geographic disruption, lane outage, lead-time spike, plant shortfall). `end_date` runs one week past each event's last week; use `start_date` plus `duration_weeks` for the window.
 
-### 6.16 Key findings
+### 7.16 Key findings
 
 - Revenue is led by Beverages (51.1 pct of sales); demand is steeply concentrated (top 20 pct SKUs ~ 84 pct of revenue).
 - Most price-elastic category (base): Frozen Foods (-3.77); least: Beverages (-1.12). Promo elasticity exceeds base in 3/5 categories.
-- Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~-61 pct YoY.
-- Network is fully dual-sourced (15/15 Customer DCs with failover) with 10 lateral lanes, but failover and lateral lanes carry no simulated flow; whole-site storage utilization averages 9 pct.
-- Customer-facing unit fill rate ~ 92.7 pct at $5,960,329 avg working capital and 8.8x annual turns; 12 pct of DC-SKU-weeks close at zero.
+- Forecast accuracy is best for Fast-Moving SKUs (WAPE 34.5 pct); Seasonal SKUs are worst on WAPE (40.8 pct) and Intermediate on MAPE (54.0 pct), and bias is negative everywhere (see 7.9); the forward year grows ~+9 pct over 2025 actuals.
+- Every Customer DC has a declared failover lane (15/15) and there are 10 lateral lanes, but in the simulated history each Customer DC is single-sourced and failover and lateral lanes carry no flow; whole-site storage utilization averages 9 pct.
+- Customer-facing unit fill rate ~ 92.7 pct (Regional DCs 95.7 pct, Customer DCs 79.7 pct) at $5,960,329 avg working capital and 8.8x annual turns; 12 pct of DC-SKU-weeks close at zero.
 - No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a 30-scenario disruption library covers demand- and supply-side stresses.
 
 
@@ -1221,15 +1298,19 @@ Read these before drawing a conclusion the data cannot support.
 | **Synthetic data.** No real company's figures are in here. | The pipeline and the structure transfer; the specific numbers do not. Re-derive on live sell-through before committing to targets. |
 | **Shelf life cannot bind** (§2.7). | Zero write-offs. Waste is not measurable, and newsvendor service levels pin near 100%. |
 | **No special storage** (§2.3). | Holding-cost spread understates a real multi-temperature network, where refrigerated space costs roughly 2–3x ambient to build. |
-| **Production capacity binds, but only lightly.** It clips about 5.1% of the volume plants ask for, and the plan recovers most of it the following week. | Capacity is a real constraint you can model, but it is not yet the dominant driver of lost sales. Tighten `plant_master.production_capacity_units_per_week` if you want it to dominate. |
+| **Production capacity binds, but only lightly.** It clips about 5.1% of the volume plants ask for, and the unmet finished-goods cover feeds back into the following week's plan. | Capacity is a real constraint you can model, but it is not yet the dominant driver of lost sales. Tighten `plant_master.production_capacity_units_per_week` if you want it to dominate. |
 | **Warehouse and lane capacity never bind.** | Storage and transport impose no physical trade-off; add those limits before claiming a network plan is feasible. |
 | **Replenishment policy is static.** One safety stock, reorder point and order-up-to level per SKU-DC for all 156 weeks, fitted on the whole span. | The 2023 position already reflects 2025 demand. Refit on a rolling window before backtesting a policy. |
-| **Week 1 starts every location at its order-up-to level.** | The first weeks of 2023 are a warm-up artefact. The 104-week burn-in absorbs it; evaluate on 2025. |
+| **Regional and plant DC policies ignore the customer-DC flow they pass on.** A regional DC's `mu` and `sigma` are its own bulk customers' orders only, and a plant DC's throughput is the sum of those regional `mu` values (Part 5). | Regional DC buffers are sized for bulk demand alone, and regional DCs fill only 75.4% of customer DC orders. Do not read them as echelon-sized buffers. |
+| **Week 1 starts every location with zero stock** (a cold start). | Customer fill is 22% in the first week of 2023 and first passes 90% in week 5. The 104-week burn-in absorbs this warm-up; evaluate on 2025. |
 | **On-time delivery is roughly constant** across SKUs, because every node's promised lead time is set to its own 90th percentile. | Do not use OTD as a discriminating feature. A fixed contractual promise by transport mode would fix this. |
 | **Order batching inflates apparent demand variability** at customer grain. | Measure variability and intermittency on aggregated DC-week or national-week series, not on the customer order calendar. |
+| **Customer-DC service is much weaker than the headline.** The 92.7% customer fill blends 95.7% at regional DCs with 79.7% at customer DCs (§2.9). | Report service by echelon; a network average mostly reflects the bulk channel. |
+| **The published forecast is biased low** (−7.8% in total over the evaluated year, negative in every segment and category, §7.9), and its promotional lift and customer split use information from the evaluated year (§2.10). | Check and correct bias before using it as a demand signal, and treat its 2025 accuracy as slightly optimistic. |
+| **Failover and lateral lanes are never used** (§2.13). | Resilience or transshipment results that rely on those lanes cannot be validated against history. |
 | **Ten B2B customers.** | Too few for meaningful customer segmentation. |
 | **Elasticities are subcategory-level**, drawn from a small number of source groups. | Fine for portfolio work; do not read a single SKU's elasticity as an estimate. |
-| **One actuals path.** Fixed seeds mean one realisation of history. | For distributional questions, re-run with a different seed rather than treating this path as the mean. |
+| **One actuals path.** The world's random seeds are fixed in code, so there is one realisation of history. The `--seed` option changes only the digital twin's lead-time and production draws, not demand. | For distributional questions about demand, change the world seeds in the generator and regenerate rather than treating this path as the mean. |
 
 ---
 
@@ -1239,8 +1320,9 @@ Read these before drawing a conclusion the data cannot support.
 python supply_brain_generator_v5.py        # writes every table plus this document
 ```
 
-Seeds are fixed, so output is byte-identical run to run. Set `SUPPLY_BRAIN_OUTPUT` to write
-elsewhere.
+Seeds are fixed in code, so a re-run is designed to regenerate the same realisation of the data. The generated
+documents are not byte-identical between runs, because they embed the generation timestamp. Set
+`SUPPLY_BRAIN_OUTPUT` to write elsewhere.
 
 The assumptions in Part 2 map to named constants at the top of the generator, so any one of them
 can be changed and the effect traced through:
@@ -1252,7 +1334,8 @@ can be changed and the effect traced through:
 | Brand price positions | `CATEGORY_BRANDS` |
 | Seasonality by subcategory | `SUBCATEGORY_SEASONALITY_MONTHLY`, `MACRO_CALENDAR_MONTHLY` |
 | Regional consumption | `REGION_DEMAND_INDEX` |
-| Promotional intensity and depth | promo event count, `PROMO_MULT` |
+| Promotional intensity and depth | promo event count and depth draws in the order-generation step (not top-level constants) |
+| Promotional vs base price response | `PROMO_MULT` |
 | Promotional timing | `PROMO_CALENDAR_WEIGHT` |
 | Customer trade terms | `CUSTOMER_TERMS` |
 | Plant process lines and sourcing | `PRODUCTION_FAMILY`, `PLANT_CAPABILITY` |
@@ -1260,10 +1343,12 @@ can be changed and the effect traced through:
 | Product storage density | `UNITS_PER_SQFT` |
 | Service-level tiers | `Z_BY_SEGMENT` and the segment target table |
 | Forecast horizon and burn-in | `BURN_WEEKS`, `HIST_WEEKS`, `FWD_WEEKS` |
-| Forecast uplift misestimation | `LIFT_MISEST` |
+| Forecast uplift misestimation | `LIFT_MISEST` (local to the forecast step) |
 
 Every generated table is checked at build time — referential integrity, no-gap coverage, and a set
-of behavioural assertions that fail loudly if an assumption in Part 2 stops holding.
+of behavioural checks that flag when an assumption in Part 2 stops holding. A failed check is
+printed and reported in the run's closing summary, but it does not stop the run or prevent the
+tables and this document from being written. Read the validation output after every regeneration.
 
 ---
 

@@ -28,15 +28,32 @@ top-down greedy pass comparing the local holding cost of stocking against the co
 pushing that same protection downstream. A real, if heuristic, GSM — not the exact
 optimal DP.
 
-Walked per SKU, in network order Plant → PDC → RDC → CDC (a tree, single path per node,
-verified against `sku_sourcing_map.csv`):
+Walked per (SKU, RDC) pair, in network order Plant → PDC → RDC → CDC. The tree is a
+single path per node. The source docstring says this was verified against
+`sku_sourcing_map.csv`, but the code itself uses the fastest-lane primary-RDC map from
+`meio_weekly_lib.build_leadtime_graph()`:
 - **PDC always stocks** (*S=0*) — it's the network's only source of supply, with no
-  upstream guarantee to lean on.
+  upstream guarantee to lean on. In code this means PDC rows come unchanged from MEIO
+  Weekly's `solve_pdc_policy()`.
 - **RDC**: incoming service time from PDC is 0. If the RDC stocks, its protection
-  interval is the PDC→RDC lead time and it guarantees *S=0* downstream. If it passes
-  through, its local protection interval is 0 (no stock) but it pushes *S = lead time*
-  onto its CDCs. Chosen by whichever option has the lower total holding-cost-weighted
-  safety stock.
+  interval is its lead time `L_RDC` and it guarantees *S=0* downstream. If it passes
+  through, it holds no *safety* stock but pushes *S = L_RDC* onto its CDCs. `L_RDC` is
+  the cumulative Plant → PDC → RDC lead time from `build_leadtime_graph()`. The option
+  chosen is whichever has the lower total safety-stock **value**, i.e.
+  `SS × unit_cost_usd` summed over the RDC and its served CDCs. This is a $ value of
+  stock, not a holding-cost rate. A pass-through RDC still gets a cycle-stock reorder
+  point (`mu × L_RDC`) and an order-up-to level.
+- **CDC**: always guarantees *S=0* to the customer. Its protection interval is its own
+  lead time, plus `L_RDC` when its RDC passes through. The CDC's lead time is also
+  cumulative from the Plant.
+
+Sizing uses the closed form `SS = z·sqrt(P·σ_uplifted² + μ²·σ_LT²)` with z taken directly
+from `Z_BY_SEGMENT` (segment z) and the usual `SIGMA_UPLIFT`. Unlike MEIO Weekly, the
+protection interval `P` here has **no review period** added. The order-up-to is
+`max(ROP + 1.5·μ, 1.2·ROP)`.
+
+Recorded policy (`alt_output/gsm_recommendations.csv`): the RDC chose to stock in only
+**65 of 2,315** RDC lines.
 
 ## Features
 
@@ -44,7 +61,9 @@ verified against `sku_sourcing_map.csv`):
   stock sit," not "how much stock at each point."
 - Binary per-node stock/no-stock decision, made by a single greedy top-down pass —
   computationally trivial compared to Monte Carlo or search-based alternatives.
-- Explicit network-tree verification against real sourcing data before the walk.
+- A single-path tree per SKU (each CDC's fastest-lane primary RDC), which keeps the
+  walk trivial. The docstring's "verified via `sku_sourcing_map.csv`" is not
+  re-checked in code.
 
 ## Advantages
 
@@ -62,10 +81,21 @@ verified against `sku_sourcing_map.csv`):
   customer fill rate collapsed to 48.43% (a 42.5pp drop from baseline), and total landed
   cost came in at $56.0M against baseline's $36.2M — more than $19.8M worse, roughly 10x
   every other model's cost gap.
-- The all-or-nothing simplification is the likely direct cause: a node that "passes
+- The all-or-nothing simplification is one plausible cause: a node that "passes
   through" holds **zero** local safety stock, with no partial middle ground — unlike
   Clark-Scarf v2's continuous alpha, there's no way for this implementation to express
   "hold some, but not all, of the buffer here."
+- Two implementation details are at least as plausible a cause. Neither was ever
+  separated out.
+  1. **Missing policy rows.** `solve()` skips any (SKU, RDC) pair with no served CDC
+     (`if served.empty: continue`), so those RDC lines get no policy row, and the twin
+     treats a pair with no policy row as inactive (it never orders). The recorded
+     `gsm_policy.csv` has 2,315 RDC and 3,153 CDC rows. By comparison, MEIO Weekly's
+     2026-W01 policy (`output datasets/MEIO/2026-W01/meio_policy_weekly.csv`) has 3,452
+     RDC and 3,658 CDC rows. This is consistent with GSM's RDC-direct customer fill rate
+     of 42.70%, against 82.6–93.6% for every other model.
+  2. **No review period.** Sizing on lead time alone, with no review period, is the
+     undersizing `meio_weekly_lib.py` point 5 documents.
 - The greedy top-down pass optimizes each node's local decision given its parent's
   choice, with no backtracking — a genuinely suboptimal network-wide placement is
   possible, and likely, given the result.

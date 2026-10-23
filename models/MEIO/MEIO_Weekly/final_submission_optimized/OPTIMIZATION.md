@@ -6,13 +6,22 @@ the parameters, the CLI of every script and every results file are unchanged. Th
 original folder is untouched.
 
 ```bash
-python run_all.py                     # all nine steps, concurrently
+python run_all.py                     # the nine research steps concurrently, then step 10 (cleanup)
 python run_all.py --steps 5,6,7       # same --from / --steps as before
 python run_all.py --workers 8         # pool size (default: logical CPUs - 2)
 python run_all.py --lean-twin-outputs # skip most runs' detail tables (see Disk)
+python run_all.py --skip-cleanup      # omit step 10 (cleanup_research_artifacts.py)
 python run_weekly_tools.py            # the two production tools
-python -m pytest tests -q             # equivalence + the original's own tests
+python -m pytest tests -q             # equivalence + the original's own tests (see Exactness for current status)
 ```
+
+Step 10 (`cleanup_research_artifacts.py`, not in the original) writes a digest of the
+research outputs and then, after confirmation, deletes bulk twin outputs that the weekly
+tools don't read. `run_all.py` reproduces the original's nine steps. It does **not** run
+`segment_alpha_v5_real_data.py`, or `service_level_v5_real_data.py` (which exists only in
+`../final_submission/`). Those two produce the v5 evidence that `meio_parameters.py`
+now reads for the per-cluster decisions, so `run_all` alone cannot regenerate the
+evidence behind the live per-cluster alpha.
 
 ## Disk
 
@@ -71,7 +80,9 @@ published `segment_alpha_sweep_*.csv`.
   pip-installed NVRTC. However:
   - The Monte Carlo draws must come from numpy's own sequential stream to
     reproduce published results, so they can't move to the GPU.
-  - For the deterministic quadrature DDLT (the production tools) the GPU bisection took
+  - For the deterministic quadrature DDLT (the production tools; a different estimate
+    from Monte Carlo, checked against a 400,000-draw Monte Carlo to a median relative
+    error below 0.5% for safety stock in `test_meio_parameters.QuadratureTests`) the GPU bisection took
     0.42 s per call against 0.27 s for 8 CPU threads. This laptop GPU is weak at
     64-bit floating point, which the gamma functions need.
   - The twin's per-day arrays (27 × 500) are too small for GPU launches to pay off.
@@ -87,21 +98,43 @@ Published results come out of pandas groupby (Kahan-compensated sums, Welford's
 one-pass std), numpy's pairwise `add.reduce`, and pandas' quicksort tie order. A
 different summation order changes the last bit of a demand estimate. That changes the
 gamma parameters, then the reorder point, then a replenishment decision in the twin.
-`runtime.py` reproduces each of those orders exactly. The tests check:
+`runtime.py` reproduces each of those orders exactly. The tests check the following.
+The "Result" column records what was observed when each check was written. The status
+re-checked on 2026-10-23 is given below the table.
 
 | Test | What is compared | Result |
 |---|---|---|
-| `tests/test_equivalence.py` | Originals run in a separate process on small slices. Covered: seasonal index, lead-time graph, `target_week_demand` at 6 (as-of, target) pairs, PDC smoothing and sizing, Monte Carlo `solve` (including the generator state after two consecutive solves), alpha/z maps, quadrature `solve`, MEIO Weekly closed form, a 3-week walk-forward built as one of three variants on a shared stream (1 and 4 threads), and `meio_parameters` receipts on the committed evidence and two synthetic complete sweeps | bit-identical |
-| `tests/test_twin_equivalence.py` | Original and optimized twin side by side: forward with static policy, forward with time-varying policy (with forward-fill gaps), history with time-varying policy. Covers inventory, receipts, production, notes, `run_kpis`, cost summary | identical. The two service tables match to 1e-12 (see below). |
-| `tests/test_meio_parameters.py` | The original's own test suite, ported to the polars API | 11/11 pass |
-| `tests/verify_headline_full.py` | The full 156-week headline policy (105 warm-up + 51 refit weeks), built by original and optimized code, then simulated by both twins | **policy identical (1,199,384 rows); KPIs and test-window fill identical.** Original build 614 s vs optimized 380 s for this single variant on a busy machine (the draws dominate a single build; the saving comes from sharing them across variants). Twin: 70 s vs 14 s. |
-| `tests/smoke_run_all.py --lean-twin-outputs` | The whole `run_all` on a shrunken config (3 test weeks, 4-week rolling builds) in a temp folder | 9/9 steps OK, 18/18 results files, 4.5 GB, 22.6 min |
-| `roll_forward_policy.run(out_path=tmp)` | The production rolling policy against the original's last run log | 422,552 rows, mean order-up-to 287.0, the same as the log; 96 s |
+| `tests/test_equivalence.py` | Originals run in a separate process on small slices. Covered: seasonal index, lead-time graph, `target_week_demand` at 6 (as-of, target) pairs, PDC smoothing and sizing, Monte Carlo `solve` (including the generator state after two consecutive solves), alpha/z maps, quadrature `solve`, MEIO Weekly closed form, a 3-week walk-forward built as one of three variants on a shared stream (1 and 4 threads), and `meio_parameters` receipts on the committed evidence and two synthetic complete sweeps | bit-identical (optimized vs original; "quadrature `solve`" compares the two quadrature implementations, not quadrature against Monte Carlo) |
+| `tests/test_twin_equivalence.py` | Original and optimized twin side by side: forward with static policy, forward with time-varying policy (with forward-fill gaps), history with time-varying policy. Covers inventory, receipts, production, notes, `run_kpis`, cost summary | identical when written. The two service tables match to 1e-12 (see below). **Fails 3/3 on 2026-10-23** (see below). |
+| `tests/test_meio_parameters.py` | The original's own test suite, ported to the polars API | 11/11 passed when written. **8 pass, 3 fail on 2026-10-23** (see below). |
+| `tests/verify_headline_full.py` | The full 156-week Clark-Scarf v2 alpha=0.2 policy (105 warm-up + 51 refit weeks), built by original and optimized code, then simulated by both twins. The script uses **netting_discount=1.0 and `output datasets/history/forward_policy.parquet` as the warm-up policy**. The published headline uses netting 0.0 and the config's `baseline_policy`, so this checks the code path, not the published headline run. | **policy identical (1,199,384 rows); KPIs and test-window fill identical.** Original build 614 s vs optimized 380 s for this single variant on a busy machine (the draws dominate a single build; the saving comes from sharing them across variants). Twin: 70 s vs 14 s. |
+| `tests/smoke_run_all.py --lean-twin-outputs` | The whole `run_all` on a shrunken config (3 test weeks, 4-week rolling builds) in a temp folder | 9/9 steps OK, 18/18 results files, 4.5 GB, 22.6 min. The 18 expected files do not include the v5 sweeps. `shrink()` does not redirect step 10 (`cleanup_research_artifacts.py`), which resolves the *real* `scenario_config.json` paths, so use `--skip-cleanup` with the smoke run. |
+| `roll_forward_policy.run(out_path=tmp)` | The production rolling policy against the original's last run log | 422,552 rows, mean order-up-to 287.0, the same as the log; 96 s. The committed policy built with today's resolved parameters (`output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet`, alpha 0.6 + per-cluster alpha) also has 422,552 rows, with mean order-up-to 281.6. |
+
+**Status on 2026-10-23** (run read-only from this folder):
+- `python -m pytest tests/test_meio_parameters.py -q`: **8 passed, 3 failed**. The
+  failures are `test_committed_evidence_gives_the_validated_config`,
+  `test_complete_service_level_sweep_builds_the_cluster_ladder` and
+  `test_grids_match_the_sweep_scripts`. The tests still assume v4: they use the 4 v4
+  cluster names and file names, and compare `meio_parameters.CLUSTERS` (now v5's 6
+  archetypes) with `segment_alpha_explore.CLUSTERS` (v4's 4). `QuadratureTests` passes.
+- `python -m pytest tests/test_twin_equivalence.py -q`: **3 failed** (all three cases).
+  The original `models/twin/digital_twin.py` reads the policy with `pd.read_csv`, but the
+  test hands it a `.parquet` policy, so it raises `UnicodeDecodeError` before any
+  comparison. The repo's `input datasets/*.csv` files are also Git LFS pointer files,
+  not data.
+- `tests/test_equivalence.py` was not re-run. On first use it writes a reference cache
+  to `tests/_reference/` by running the originals. Until it is re-run, the
+  "bit-identical" claims above rest on the earlier runs.
 
 The full-length check also showed something about the original: today's original code
-(digital_twin.py as it stands) gives headline fill 0.9431 / internal 0.8183, not the
-0.9427 / 0.8199 in the committed `results/headline_clark_scarf_v2_vs_actual.csv`. The
-committed results predate later code changes. The optimized folder matches today's code.
+(digital_twin.py as it stands) gives fill 0.9431 / internal 0.8183 for this netting 1.0
+/ `forward_policy` warm-up configuration, not the 0.9427 / 0.8199 recorded for the
+netting 1.0 headline in `../final_submission/results/headline_report.md` (and the
+`nd=1.00` row of `../final_submission/results/netting_discount_sweep_alpha0_2.csv`).
+Those committed results predate later code changes. The committed
+`headline_clark_scarf_v2_vs_actual.csv` itself has since been regenerated at netting 0.0
+(0.9451 / 0.8238). The optimized folder matches today's code.
 
 ## Expected run time
 
@@ -148,6 +181,8 @@ Two known non-differences:
 | `policy_builds.py` | walk-forward and rolling builds, many variants per RNG stream; pool tasks |
 | `digital_twin_fast.py` | the optimized twin (CLI-compatible with `models/twin/digital_twin.py`) |
 | `validate_real_data.py`, `netting_discount_sweep.py`, `segment_alpha_explore.py`, `segment_alpha_real_data.py`, `service_level_real_data.py`, `scenario_test.py` | the research steps: same stages, flags and output files |
+| `segment_alpha_v5_real_data.py` | the v5 (6-cluster) per-cluster alpha sweep `meio_parameters.py` reads; new here, not in the original, and not run by `run_all.py` |
+| `cleanup_research_artifacts.py` | `run_all.py` step 10: digest, then (with confirmation) delete bulk research outputs |
 | `run_all.py`, `run_weekly_tools.py` | orchestration |
 | `meio_parameters.py`, `meio_optimizer_weekly.py`, `roll_forward_policy.py` | production tools on the port |
 
@@ -176,7 +211,10 @@ with `pd.read_parquet`), but polars encodes them with ZSTD and without pandas' s
 metadata, so they aren't byte-identical. The service tables can also differ in the last
 digit (see Exactness).
 
-So running this folder's `run_all.py` refreshes the evidence `meio_parameters.py` reads,
-exactly as the original would. Cached baselines in `twin_runs/` from a previous run of
+So running this folder's `run_all.py` refreshes the portfolio-level evidence
+`meio_parameters.py` reads (`netting_discount_multiseed*.csv`, `multiseed_alpha_*.csv`),
+exactly as the original would. It does not refresh the two v5 cluster files
+(`segment_alpha_v5_real_data_multiseed.csv`, `service_level_v5_real_data_multiseed.csv`),
+which have to be produced by their own scripts (see the top of this file). Cached baselines in `twin_runs/` from a previous run of
 either version are reused. Runs in `output datasets/projections/SCENARIO_0002_…/`, where
 both versions wrote before the switch to `artifacts.twin_output_root`, are not read.

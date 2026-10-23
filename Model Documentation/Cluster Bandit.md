@@ -19,6 +19,33 @@ Long-Tail Supply-Risk — segmentation_v4's scheme), via
 begins, and a named "current" arm per cluster so the bandit can confirm the
 segmentation's own recommendation rather than being forced away from it.
 
+**Mechanics (from the code).**
+- **Arms**: `{90, 95, 97, 99}%` plus "current", which is the cluster's v4
+  `safety_factor_z` (1.881 for the two core clusters, 1.282 for the two long-tail
+  clusters), read from the frozen file
+  `Clustering & Segmentation/segmentation_v4/sku_clusters.csv`.
+- **Reward**: the baseline `forward_policy.csv`'s total landed cost minus the candidate's,
+  for the **whole portfolio**, both twin-scored at the same per-round seed
+  (`2026 + round count`), with no penalty term.
+- **Loop**: one bandit per cluster, run sequentially, each holding the others at their
+  latest choice. Each cluster keeps the arm with the highest posterior mean.
+- **Budgets**: frozen `cluster_bandit.py` runs 8 rounds/cluster (5 forced + 3 Thompson)
+  with seed 7. Rolling `cluster_bandit_rolling.py` runs 5 rounds/cluster with seed 13,
+  i.e. forced exploration only, with a full 52-week policy per round.
+
+Because the z override covers every SKU, both scripts still vary z as intended under the
+current `assign_z()`.
+
+**Recorded choices** (highest posterior mean per cluster, from
+`alt_output/cluster_bandit_belief_history.csv` / `cluster_bandit_rolling_belief_history.csv`):
+
+| cluster | frozen run | rolling run |
+|---|---|---|
+| Flagship Promo-Driven | 99% | current (97%) |
+| Mid-Tier Core | 97% (≈ current) | 99% |
+| Long-Tail Erratic | 99% | current (90%) |
+| Long-Tail Supply-Risk | 97% | current (90%) |
+
 **Why this was built**: a companion script (`cluster_csl_segment_breakdown.py`) found
 that adopting the Clustering & Segmentation deliverable's prescribed CSL ladder
 (`cluster_service_levels.csv`) *as-is* drops fill rate meaningfully for the two
@@ -54,23 +81,34 @@ question this script exists to answer.
 
 - **Directly answers an open question another team deliverable raised about itself**,
   with the twin as an independent, non-partisan arbiter — not just a vibe check.
-- Found a real, material result: the twin-optimized bandit beats the segmentation
-  ladder "as-is" on long-tail cluster fill rate, confirming the concern that prompted
-  this model was legitimate (see table below).
+- Found a measurable result on the rolling basis: the twin-optimized bandit beats the
+  segmentation ladder "as-is" overall (93.03% vs. 92.68%). The gain comes from Mid-Tier
+  Core (93.14% vs. 92.27%), the only cluster the rolling bandit moved (to 99%). It did
+  **not** improve the long-tail clusters (see table below).
 - Reuses validated machinery (the v2 bandit fixes) rather than introducing new,
   unvalidated search logic — the only genuinely new ingredient is the cluster
   definitions themselves.
 
 ## Disadvantages
 
-- **Still loses to the original 3-way segment ladder overall** — see table below. The
-  twin-optimized cluster bandit reaches 93.03% overall fill, close to but still below
-  the original segment-based approach's 92.75%... actually *above* it on the overall
-  column, but **below it on both long-tail clusters specifically** (83.34% vs. 85.37%
-  for Long-Tail Erratic; 75.54% vs. 81.93% for Long-Tail Supply-Risk) — the twin-optimized
-  search could not fully recover what the coarser 3-way segmentation achieved for the
-  hardest-to-serve SKUs, even though it improved on the segmentation ladder's own
-  as-is prescription for those same clusters.
+- **Loses to the original 3-way segment ladder on both long-tail clusters**, though
+  not overall. Overall it reaches 93.03% fill, *above* the original segment-based
+  approach's 92.75%. On the long-tail clusters, though, it is below both the segment
+  ladder and the cluster ladder (see table below):
+  - Long-Tail Erratic: 83.34%, vs. 85.37% (segment) and 83.89% (cluster ladder).
+  - Long-Tail Supply-Risk: 75.54%, vs. 81.93% (segment) and 76.27% (cluster ladder).
+
+  The rolling bandit kept both long-tail clusters at the ladder's own 90% ("current"
+  arm). The search therefore never actually gave them more protection, and it did not
+  recover what the coarser 3-way segmentation achieved for the hardest-to-serve SKUs.
+- **The reward is blind to the long-tail clusters.** The reward is portfolio-wide
+  landed cost, and the clusters are small: Long-Tail Supply-Risk is 16 SKUs with 830
+  units of customer demand over the 2026 horizon, out of ~14.16M
+  (`cluster_csl_segment_breakdown.csv`), so its arm choice barely moves the reward. Seed
+  noise is also visible. Each round runs at a different twin seed, and the rolling
+  run's two near-identical Long-Tail Erratic arms ("90%", z=1.2816, and
+  "current (90.0%)", z=1.282) scored rewards $24,795 apart. With one observation per arm,
+  the long-tail picks are noise-dominated.
 - Built against **segmentation_v4's 4-cluster scheme specifically** (hardcoded
   `CLUSTER_CSV` path) — by the time segmentation moved to v5's 6-cluster scheme (see
   `Clark Scarf v2.md`'s "Cluster-based service level" section), this script's cluster
@@ -78,8 +116,9 @@ question this script exists to answer.
   `segment_alpha_real_data.py`/`service_level_real_data.py` (the scripts that *did* get
   a v5 counterpart) are the ones that matter most for the live pipeline; this bandit
   exploration was not carried forward the same way.
-- Single frozen-week basis only (same scope as `bandit_model.py`'s own comparison run),
-  not validated against real demand or multiple seeds.
+- Run on synthetic 2026 demand only, on both the frozen single-week and the 52-week
+  rolling basis. Each run uses one sequence of seeds (the rolling run is forced
+  exploration only). It was not validated against real demand or across seeds.
 - No tier-order penalty means nothing structurally prevents a cluster ordering that
   would look implausible to a planner, even if the twin says it's cheaper — a deliberate
   tradeoff (see "Definition" above), but a real one.
@@ -93,27 +132,37 @@ question this script exists to answer.
 | meio_segment (original 3-way) | **93.16%** | 92.29% | **85.37%** | **81.93%** | 92.75% |
 
 Reading this table honestly: the twin-optimized cluster bandit **beats the segmentation
-ladder's own as-is prescription** on the two core clusters and the overall number,
-confirming the concern that motivated this model. But it does **not** close the gap to
-the original, coarser 3-way segment ladder on the two long-tail clusters — Long-Tail
-Supply-Risk in particular is still 6.4pp behind the original segment approach
-(75.54% vs. 81.93%), even after twin-driven optimization specifically targeting it.
+ladder's own as-is prescription** on Mid-Tier Core (+0.87pp) and the overall number
+(+0.35pp). Flagship is a tie (+0.02pp). It is slightly *below* the ladder on both
+long-tail clusters. It does **not** close the gap to the original, coarser 3-way segment
+ladder there either. Long-Tail Supply-Risk is still 6.4pp behind the original segment
+approach (75.54% vs. 81.93%). The bandit was not optimizing for that cluster: its reward
+is portfolio cost, and it left the cluster at the ladder's 90%.
+
+Source caveat: `cluster_bandit_rolling_vs_ladder_breakdown.csv` has no generating
+script in the repo. Its `meio_segment` and `meio_cluster` rows match the `meio_weekly`
+rows of `cluster_csl_segment_breakdown.csv`, and its `ALL` column matches
+`cluster_csl_report.md`. The twin seed used for the `cluster_bandit_rolling` row is not
+recorded.
 
 ## Why it was not adopted
 
 Two separate findings kept this from becoming a production recommendation:
-1. It improves on the segmentation ladder it was built to critique, but still
-   underperforms the simpler original 3-way segment on the exact clusters (long-tail,
-   high lead-time variability) that matter most for this question.
+1. It improves on the segmentation ladder it was built to critique overall, through
+   Mid-Tier Core. It still underperforms the simpler original 3-way segment on the
+   exact clusters (long-tail, high lead-time variability) that matter most for this
+   question, and its cost-only, portfolio-wide reward was not able to target them.
 2. It was built against segmentation_v4's 4-cluster scheme and never updated for v5's
    6-cluster scheme once that became canonical — by the time service-level validation
    moved to v5 (see `Clark Scarf v2.md`), this model's cluster definitions were already
    stale, and the project's effort went into `service_level_v5_real_data.py`'s direct
    real-data CSL validation instead of rebuilding this bandit against v5.
 
-The finding itself was not wasted, though: it's a documented, twin-confirmed signal that
-the segmentation deliverable's CSL ladder underserves its own long-tail clusters, now
-carried forward as a flagged, open question in the v5 real-data validation (see
+The finding itself was not wasted, though. The twin-measured signal that the
+segmentation deliverable's CSL ladder underserves its own long-tail clusters comes
+from the ladder-vs-segment comparison in `cluster_csl_segment_breakdown.csv`; the bandit
+did not overturn it. That signal is now carried forward as a flagged, open question in
+the v5 real-data validation (see
 `Clark Scarf v2.md`'s Long-Tail Erratic 2 finding, a related but distinct result found
 later via a different method).
 
@@ -121,6 +170,10 @@ later via a different method).
 
 - `models/MEIO/MEIO_Weekly/alt_models/cluster_bandit.py`, `cluster_bandit_rolling.py`
 - `models/MEIO/MEIO_Weekly/alt_models/cluster_bandit_rolling_vs_ladder_breakdown.csv`
-  (source of the comparison table above)
+  (source of the comparison table above; no generating script in the repo)
+- `models/MEIO/MEIO_Weekly/cluster_csl_segment_breakdown.csv`, `cluster_csl_report.md`
+  (the ladder-vs-segment rerun that motivated this model)
+- `models/MEIO/MEIO_Weekly/alt_models/alt_output/cluster_bandit_belief_history.csv`,
+  `cluster_bandit_rolling_belief_history.csv`
 - `Clustering & Segmentation/segmentation_v4/cluster_service_levels.csv`,
   `segmentation_v4_report.md` (the ladder this model tests)

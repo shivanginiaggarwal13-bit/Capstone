@@ -1184,24 +1184,38 @@ def kpis(inv, twin, inp, costs) -> dict:
     }
 
 
+# Plain-language assumption set, written into every run_manifest.json and
+# into OUTPUT_DOCUMENTATION.md (Part 1). Figures that have a constant above
+# are interpolated from it so the text cannot drift from the code; the other
+# figures quoted here are literals in the code paths they describe
+# (SupplyBrainTwin._lead_times and SupplyBrainTwin._ship).
 ASSUMPTIONS = [
-    "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of "
-    "finished-goods cover), clipped by production-family line capacity then "
-    "plant-wide capacity; executed quantity = plan x schedule adherence "
-    "drawn uniformly in [0.90, 1.00].",
+    "Plants build to a rolling plan (demand signal + restore "
+    f"{FG_COVER_WEEKS:g} weeks of finished-goods cover, "
+    f"`FG_COVER_WEEKS = {FG_COVER_WEEKS:g}`), clipped by production-family "
+    "line capacity then plant-wide capacity; executed quantity = plan x "
+    "schedule adherence drawn uniformly in "
+    f"[{ADHERENCE_RANGE[0]:.2f}, {ADHERENCE_RANGE[1]:.2f}]. The demand signal "
+    f"is an EMA (alpha {DEMAND_EMA_ALPHA:g}, starting at 0) of the internal "
+    "orders placed on the plant's DC. Both the signal and the position are "
+    "multiplied by the plant's `allocation_share` (see Part 5).",
     "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a "
     "weekly (R,s,S) review with R = 1 week.",
     "Lead times are drawn per order line from each lane's own mean and std "
-    "in network_lanes.csv, so every receipt arrives on its own realised "
-    "transit rather than the average. The committed lead time quoted to the "
-    "child is that lane's ~90th percentile.",
+    "in network_lanes, as max(0.5, Normal(mean, max(std, 0.05))), so every "
+    "receipt arrives on its own realised transit rather than the average. "
+    "Arrival day = ship day + max(1, ceil(draw)). The committed lead time "
+    "quoted to the child is that lane's ~90th percentile "
+    f"(mean + {PROMISE_Z:g} x std).",
     "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following "
     "the fulfilment_type split in the dataset, which is clean by node type.",
     "An internal replenishment order the parent cannot cover is cancelled, "
     "not backlogged; the child re-orders at the next weekly review.",
-    "A parent holds back its own expected demand for the remainder of the "
-    "review period before releasing stock downstream, implementing "
-    "'customer orders served first'.",
+    "A parent holds back its own policy safety_stock for the current week "
+    "before releasing stock downstream, implementing 'customer orders served "
+    "first' (`reserve_own_demand=True`). Its realised customer demand is "
+    "already served earlier in the day. Plant DCs have no customers, so "
+    "their safety stock is never released.",
     "Routing comes from sku_sourcing_map.csv, an input table derived from "
     "network structure: each RDC draws a SKU from the nearest plant DC whose "
     "plant is qualified to make it, and each CDC from its min-lead-time "
@@ -1210,8 +1224,11 @@ ASSUMPTIONS = [
     "/ 52, keyed on (dc_id, subcategory).",
     "No shelf life, obsolescence or write-offs; no warehouse or lane "
     "capacity limits. Production capacity DOES bind.",
-    "Demand, lead-time and production RNG streams are independent, so two "
-    "runs at the same seed differ only by the policy under test.",
+    "Demand, lead-time and production RNG streams are independent. Two runs "
+    "at the same seed therefore face identical demand. The lead-time stream "
+    "is consumed once per shipped SKU line, so it stays in step only while "
+    "both runs ship the same lines. The production stream (one adherence "
+    "draw per producing plant per week) stays aligned.",
 ]
 
 
@@ -1274,6 +1291,32 @@ def _jsonable(o):
 # Documentation
 # ---------------------------------------------------------------------------
 
+def _doc_join(items) -> str:
+    """'a', 'a and b', 'a, b and c' -- for prose lists in the output doc."""
+    items = list(items)
+    if len(items) <= 1:
+        return "".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _doc_read_json(path: Path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _doc_pct(x: float) -> str:
+    return f"{100.0 * float(x):.1f}%"
+
+
+def _doc_fill(text: str, width: int = 88) -> str:
+    """Wrap a run-dependent paragraph without splitting words or hyphens."""
+    import textwrap
+    return textwrap.fill(" ".join(text.split()), width,
+                         break_long_words=False, break_on_hyphens=False)
+
+
 def write_output_documentation(out_root: Path) -> int:
     """Emit output datasets/OUTPUT_DOCUMENTATION.md.
 
@@ -1282,9 +1325,17 @@ def write_output_documentation(out_root: Path) -> int:
     `input datasets/DATASET_DOCUMENTATION.md`; this is the other half.
 
     Rewritten on every run so it cannot drift from the code, and so the list of
-    run folders below is always current.
+    run folders below is always current. The optimized twin
+    (`final_submission_optimized/digital_twin_fast.py`) imports and calls this
+    same function, so the text describes both implementations. Run-dependent
+    figures (runs table, nested runs, fill-vs-in-full gap, stale manifests) are
+    read from the run folders under `out_root` at writing time.
     """
     runs = []
+    nested = []          # (folder, [run_name, ...]) -- runs one level down
+    no_manifest = []     # folders with no run_manifest.json at either level
+    kpi_rows = []        # (display path, customer_fill_rate, in_full)
+    manifests = []       # every manifest dict found (top level + one down)
     if out_root.is_dir():
         for d in sorted(x for x in out_root.iterdir() if x.is_dir()
                         and not x.name.startswith("_")):
@@ -1295,20 +1346,106 @@ def write_output_documentation(out_root: Path) -> int:
                     m = json.loads(man.read_text())
                     label, mode = m.get("label") or d.name, m.get("mode", "?")
                     seed = m.get("seed", "?")
+                    manifests.append(m)
                 except Exception:
                     pass
             size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
             runs.append((d.name, mode, seed, label, size / 1e6))
+
+            subs = sorted(p.parent.name for p in d.glob("*/run_manifest.json"))
+            if subs:
+                nested.append((d.name, subs))
+                for s in subs:
+                    sm = _doc_read_json(d / s / "run_manifest.json")
+                    if isinstance(sm, dict):
+                        manifests.append(sm)
+            elif not man.exists():
+                no_manifest.append(d.name)
+
+            kpi_files = [(f"{d.name}/", d / "run_kpis.json")] + [
+                (f"{d.name}/{p.parent.name}", p)
+                for p in sorted(d.glob("*/run_kpis.json"))]
+            for disp, kp in kpi_files:
+                if not kp.exists():
+                    continue
+                kk = _doc_read_json(kp)
+                if not isinstance(kk, dict):
+                    continue
+                fr, inf = kk.get("customer_fill_rate"), kk.get(
+                    "pct_demand_weeks_in_full")
+                if isinstance(fr, (int, float)) and isinstance(inf, (int, float)):
+                    kpi_rows.append((disp, float(fr), float(inf)))
     run_rows = "\n".join(
         f"| `{n}/` | {mo} | {sd} | {lb} | {sz:.2f} MB |" for n, mo, sd, lb, sz in runs
     ) or "| _(no runs yet)_ | | | | |"
 
+    # -- why some rows of the runs table show `?` ----------------------------
+    runs_notes = [
+        "The table reads only a `run_manifest.json` sitting directly in each "
+        "top-level folder. A `SCENARIO_####_Name/` folder written by the "
+        "optimized twin keeps its runs one level down, in `<run_name>/`, so "
+        "it shows `?`. The original twin likewise writes a run named "
+        "`baseline` to `projections/baseline/`."]
+    if nested:
+        sub_names = sorted({s for _, subs in nested for s in subs})
+        runs_notes.append(
+            "Folders holding runs one level down here: "
+            + _doc_join(f"`{n}/`" for n, _ in nested) + " (run folders "
+            + _doc_join(f"`{s}/`" for s in sub_names) + ").")
+    if no_manifest:
+        runs_notes.append(
+            "Not every folder here is a twin run: "
+            + _doc_join(f"`{n}/`" for n in no_manifest)
+            + (" come" if len(no_manifest) > 1 else " comes")
+            + " from other tools (no `run_manifest.json` at either level).")
+    runs_note = _doc_fill(" ".join(runs_notes))
+
+    # -- fill rate vs in-full gap, from the runs actually present ------------
+    if len(kpi_rows) >= 2:
+        by_gap = sorted(kpi_rows, key=lambda r: abs(r[1] - r[2]))
+        lo, hi = by_gap[0], by_gap[-1]
+        gap_text = (
+            f"The gap varies by run: {_doc_pct(hi[1])} vs {_doc_pct(hi[2])} on "
+            f"`{hi[0]}`, but {_doc_pct(lo[1])} vs {_doc_pct(lo[2])} on "
+            f"`{lo[0]}` (the largest and smallest gaps among the "
+            f"{len(kpi_rows)} runs with a `run_kpis.json` present).")
+    elif kpi_rows:
+        r = kpi_rows[0]
+        gap_text = (f"The gap varies by run: {_doc_pct(r[1])} vs "
+                    f"{_doc_pct(r[2])} on `{r[0]}`.")
+    else:
+        gap_text = "The gap varies by run and policy."
+    in_full_note = _doc_fill(
+        "**Read `pct_demand_weeks_in_full` alongside the fill rate.** It is "
+        "the share of node-SKU-weeks with customer demand and zero unmet "
+        "units. Unit fill rate counts a week served 90% as 0.9 of a unit "
+        "fill; in-full counts it as a failed order line. " + gap_text
+        + " If the objective is on-time-in-full, in-full is the honest number.")
+
+    # -- manifests written before the current assumption wording -------------
+    stale = sum(1 for m in manifests
+                if isinstance(m.get("assumptions"), list)
+                and m["assumptions"] != ASSUMPTIONS)
+    stale_note = ""
+    if stale:
+        stale_note = (
+            (f"All {stale}" if stale == len(manifests)
+             else f"{stale} of the {len(manifests)}")
+            + " run manifests present (top level and one level down) were "
+            "written with an earlier wording of this list, so their "
+            "`assumptions` differ from the text below.")
+    assum_intro = _doc_fill(
+        "Every run records this list (the `ASSUMPTIONS` constant in "
+        "`models/twin/digital_twin.py`, which the optimized twin imports) in "
+        "its own `run_manifest.json`. " + stale_note)
+
     assum = "\n".join(f"{i}. {a}" for i, a in enumerate(ASSUMPTIONS, 1))
+    first_fwd = period_label(HISTORY_WEEKS + 1)
 
     doc = f"""# Supply Brain — output datasets
 
-*Auto-generated {time.strftime('%Y-%m-%d %H:%M')} by
-`models/twin/digital_twin.py`. Do not edit by hand.*
+*Auto-generated {time.strftime('%Y-%m-%d %H:%M')} by `write_output_documentation()` in
+`models/twin/digital_twin.py`, which both twins call. Do not edit by hand.*
 
 ## Scope
 
@@ -1341,6 +1478,12 @@ pulled by a reorder point. Regional DCs carry both their own direct
 bulk-customer demand and the demand of the customer DCs beneath them. Regional
 and customer DCs **pull** on a weekly reorder-point review.
 
+Two implementations share these mechanics. The original, `models/twin/digital_twin.py`,
+reads CSV and writes CSV. The optimized `digital_twin_fast.py` is the one
+`scenario_config.json`'s `digital_twin.entrypoint` runs. It reads Parquet inputs, writes
+Parquet detail tables and adds the scenario override engine. Differences are noted
+where they matter.
+
 It is the project's only physics engine. The same code generates the historical
 record and scores candidate policies, so the history a policy is measured
 against and the outcome it is scored on come from identical mechanics. Two
@@ -1357,18 +1500,24 @@ arrival day, and a run directory that describes itself.
 Every simulated day runs the same six steps in the same order:
 
 1. **Receive** — shipments whose arrival day is today land and become on-hand.
-2. **Clear backlog** — outstanding backorders are filled from what just arrived.
+2. **Clear backlog** — outstanding backorders are filled from *all* on-hand
+   stock, not only from what just arrived. Units used to clear backlog are not
+   counted in `shipments`.
 3. **Serve customer demand** — from stock on hand. A shortfall at a customer DC
-   is a **lost sale** (margin forgone); at a plant or regional DC it
+   is a **lost sale** (margin forgone); at a plant DC or regional DC it
    **backorders**.
-4. **Review** (weekly) — every pulling node compares its inventory position
-   against its reorder point and places an order up to its order-up-to level.
-   Plants run their production plan in the same step.
-5. **Fulfil** — parents ship against the open order book. This runs *every*
-   day, not only on review day: a parent picks across the week as stock frees
-   up. When it cannot cover everything its children asked for, the remainder is
-   split **pro rata**.
-6. **Snapshot** — on-hand is accumulated for the week's holding cost.
+4. **Review** (weekly, on the first day of the week) — every active pulling
+   pair (RDC/CDC with a policy row) computes its inventory position as
+   `on_hand − backlog + on_order`. If that is at or below its reorder point, it
+   orders up to its order-up-to level. Plants run their production plan in the
+   same step, after the orders are placed.
+5. **Fulfil** — parents ship against the open order book, plant DCs first,
+   then regional DCs. This runs *every* day, not only on review day: a parent
+   picks across the week as stock frees up. A parent releases only stock above
+   its own policy `safety_stock`. When it cannot cover everything its children
+   asked for, the rest is split **pro rata** to the quantities requested, and
+   each grant is floored to whole units.
+6. **Snapshot** — end-of-day on-hand is accumulated for the week's holding cost.
 
 At week close, any internal order still open is cancelled and booked as
 internal shortfall; the child re-orders at the next review. That is what makes
@@ -1378,12 +1527,14 @@ internal shortfall; the child re-orders at the next review. That is what makes
 
 | Mode | Horizon | Demand | Opening state |
 |---|---|---|---|
-| `history` | the span the order history covers | replayed from `orders.csv` | cold start, zero stock |
-| `forward` | the planning horizon | forecast x a forecast-error ratio resampled from in-sample history | from `--state` |
+| `history` | the span the order history covers ({HISTORY_WEEKS} weeks by default) | replayed from `orders` at delivery date | cold start, zero stock |
+| `forward` | the planning horizon (52 weeks from {first_fwd} by default) | forecast x a forecast-error ratio resampled from in-sample history, weighted by volume and capped at 10, split over 7 days | from `--state` (original: a cold start if omitted; optimized: defaults to the config's `digital_twin.state`) |
+
+`--horizon-weeks` overrides either default.
 
 ### Assumptions
 
-Every run records these in its own `run_manifest.json`.
+{assum_intro}
 
 {assum}
 
@@ -1391,7 +1542,8 @@ Every run records these in its own `run_manifest.json`.
 
 ## Part 2 — The optimization seam
 
-One standalone CSV, five required columns:
+One standalone table, five required columns. The original twin reads it as CSV; the
+optimized twin reads CSV or Parquet by file suffix:
 
 ```
 dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
@@ -1400,11 +1552,15 @@ dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
 Those five are all the twin reads. **Extra columns are ignored**, so an
 optimizer's native output — cluster id, target service level, arm label,
 anything — can be handed over verbatim. A missing required column raises an
-error rather than quietly defaulting to zero.
+error rather than quietly defaulting to zero. An optional `period` column makes
+the policy time-varying: a pair with no row in a week keeps its last seen values,
+and weeks before its first row are 0. A (node, SKU) with no policy row is
+*inactive*. It never orders and has no `inventory` row, but it still faces
+customer demand and accrues holding and stockout cost.
 
 ```bash
-python models/twin/digital_twin.py --mode forward --run-name meio_v2 \
-    --policy "output datasets/meio_v2/policy.csv" \
+python models/twin/digital_twin.py --mode forward --run-name meio_v2 \\
+    --policy "output datasets/meio_v2/policy.csv" \\
     --state  "output datasets/history/opening_position.csv"
 ```
 
@@ -1412,7 +1568,8 @@ python models/twin/digital_twin.py --mode forward --run-name meio_v2 \
 and an opening state and differ solely in the policy. `--policy` and `--state`
 are separate arguments precisely so a policy swap cannot move the starting
 position. Demand, lead-time and production random draws come from independent
-streams, so changing the policy does not shift the demand the policy faces.
+streams, so changing the policy does not shift the demand the policy faces. Lead-time
+draws do diverge once two policies ship different lines (see assumption 10).
 
 Echelon positioning needs no structural input: "push buffer to the customer
 DCs" is simply a higher CDC order-up-to level and a lower RDC one, in the same
@@ -1448,7 +1605,30 @@ python models/twin/digital_twin.py --mode forward \\
 The run writes `scenario_config.json`, `run_manifest.json`, and all simulation
 artefacts into the same standardized folder. The resolved execution settings
 are added to the saved scenario config, while the original `--run-name` flow
-continues to work for existing automation.
+continues to work for existing automation. Without `--scenario-config`, the
+original writes to `<out-root>/<run-name>/`, or to `<out-root>/projections/baseline/`
+when the run name is `baseline`.
+
+The paragraphs above describe the original twin. **The optimized twin
+(`digital_twin_fast.py`) differs:**
+
+- It always runs under a scenario config: `--scenario-config`, or the repo-root
+  `scenario_config.json` by default. Any of `--run-name`, `--mode`, `--seed`,
+  `--policy`, `--state`, `--data-dir` and `--out-root` that you omit comes from the
+  config's `digital_twin` block; `--state` is defaulted only in forward mode.
+- The run folder is `<output_root>/SCENARIO_####_Name/<run_name>/`. A raw copy of the
+  config also goes in `SCENARIO_####_Name/`.
+- `changes.overrides` (schema `models/overrides/override.schema.json`) is compiled by
+  the override engine, and the *actual*-side overrides are applied in forward mode.
+  These cover economics (unit cost, margin, holding rate, storage cost, logistics
+  cost), demand volume and volatility, opening on-hand and in-transit stock, lane
+  lead-time mean and std, lane outages, plant/family capacity and schedule adherence. A
+  receipt goes to `<overrides.output_root>/SCENARIO_####_Name/receipts/twin_<run_name>.json`.
+- Legacy `demand_surge_pct` keys still go through `scenario_engine.py`. Any other
+  unknown `changes` key raises an error instead of being ignored, and any `changes`
+  in history mode stop the run.
+- `--lean-outputs` skips the three large detail tables. `--skip-output-documentation`
+  leaves this file alone.
 
 The policy table's full column-by-column dictionary is Part 5 of
 `input datasets/DATASET_DOCUMENTATION.md`.
@@ -1461,6 +1641,8 @@ The policy table's full column-by-column dictionary is Part 5 of
 |---|---|---|---|---|
 {run_rows}
 
+{runs_note}
+
 A run folder is self-describing: `run_manifest.json` records the exact knobs,
 seed, input paths and assumption set, so two folders can be diffed without
 reference to the code that produced them.
@@ -1468,6 +1650,15 @@ reference to the code that produced them.
 ---
 
 ## Part 4 — Artefact reference
+
+The artefacts below marked "history runs only" (`opening_position`, `forward_policy`,
+`acceptance`) are written by the dataset generator (`supply_brain_generator_v5.py`)
+into `output datasets/history/` around its history-mode twin run, not by the twin
+itself. That run's inventory, receipts and production go to `input datasets/`, and
+their run-folder copies are deleted. File names below use the original twin's `.csv`
+names. The optimized twin writes `inventory`, `replenishment_receipts`, `production`
+and `policy` as `.parquet`, keeps `cost_summary`, `service_summary` and
+`service_by_node` as `.csv`, and with `--lean-outputs` skips the first three.
 
 ### `opening_position.csv` — history runs only
 
@@ -1480,8 +1671,8 @@ history. This is what a forward run consumes via `--state`.
 | `dc_id`, `sku_id` | location and product |
 | `opening_stock` | units on hand at the cut-over |
 | `in_transit_qty` | units already dispatched but not yet arrived |
-| `in_transit_eta_week_start` | the week that pipeline stock lands |
-| `inventory_position` | `opening_stock + in_transit_qty` — what a reorder point is compared against |
+| `in_transit_eta_week_start` | date of the earliest pending arrival (blank if none); the twin lands the whole `in_transit_qty` on that day |
+| `inventory_position` | `opening_stock + in_transit_qty`. The twin's review uses `on_hand − backlog + on_order`. That equals this column at the cut-over only because a forward run opens with zero backlog: history's terminal backlog, open orders and production EMA are not carried over |
 | `safety_stock`, `reorder_point`, `order_up_to_level` | policy, for reference |
 | `lead_time_*`, `cum_lead_time_*` | inbound lane and plant-to-node totals |
 
@@ -1498,38 +1689,45 @@ used to simulate the past — lives in `input datasets/` because it ran the past
 
 ### `policy.csv` — every run
 
-Exactly the `(safety_stock, reorder_point, order_up_to_level)` that run
-executed, normalised to the five-column contract. The audit trail: whatever was
-fed in via `--policy`, this is what the engine actually used.
+The `(safety_stock, reorder_point, order_up_to_level)` the run used, normalised
+to the five-column contract, one row per active (policy) pair. For a
+time-varying policy (with a `period` column) this is only the **first-week
+snapshot**. The full input is recorded at `build_notes.policy_source` in
+`run_manifest.json`.
 
 ### `inventory.csv` — forward runs
 
-Grain: **period x dc x sku**. The primary physics output.
+Grain: **period x dc x sku**, active (policy) pairs only. The primary physics output.
 
 | Column | Meaning |
 |---|---|
+| `period`, `week_start_date`, `sku_id`, `dc_id` | keys |
 | `opening_stock` | on hand at the start of the week |
-| `receipts` | units received from the parent |
+| `receipts` | units received from the parent (from the plant, for a plant DC) |
 | `demand_qty` | total demand = customer + internal |
-| `demand_customer_qty`, `demand_replen_qty` | external / internal split |
-| `unmet_customer_qty` | external demand not served from stock |
+| `demand_customer_qty`, `demand_replen_qty` | external / internal split; internal demand is booked at the parent |
+| `unmet_qty` | `unmet_customer_qty + unmet_replen_qty` |
+| `unmet_customer_qty` | external demand not served from stock on the day it arrived (RDC backorders count here even if filled later) |
 | `unmet_replen_qty` | internal order balance still open at week close, then cancelled |
-| `shipments` | units shipped to satisfy demand — customer served plus internal orders filled |
-| `lost_margin_usd` | margin forgone on lost sales |
+| `shipments` | computed as `demand_qty − unmet_qty` (customer served plus internal orders filled); units used to clear backlog are not included |
+| `lost_margin_usd` | margin forgone on lost sales (customer DCs only) |
 | `fulfilment_type` | `lost_sale` (customer DC) or `backorder` (plant / regional DC) |
-| `closing_stock`, `backlog` | end-of-week position |
-| `safety_stock`, `reorder_point`, `order_up_to_level` | the policy in force |
-| `avg_on_hand` | mean daily on-hand — the holding-cost base |
+| `closing_stock` | end-of-week on hand. No backlog column is written |
+| `safety_stock`, `reorder_point`, `order_up_to_level` | the policy in force that week |
+| `avg_on_hand` | mean end-of-day on-hand over the week — the holding-cost base |
 | `holding_cost_usd` | `avg_on_hand x (storage + carrying% x unit_cost) / 52` |
-| `lead_time_*`, `cum_lead_time_*` | inbound lane and plant-to-node |
+| `lead_time_mean_days`, `lead_time_std_days`, `cum_lead_time_mean_days`, `cum_lead_time_std_days` | inbound lane and plant-to-node |
 
-`demand_qty = shipments + unmet_qty` holds on every row. Note that `demand_qty`
-is an echelon total and counts a unit once per tier it passes through;
-`demand_customer_qty` is the external figure that reconciles to real orders.
+`demand_qty = shipments + unmet_qty` holds on every row by construction. A stock
+identity (`opening + receipts − shipments = closing`) does not hold on rows where
+backlog was cleared. Note that `demand_qty` is an echelon total and counts a unit once
+per tier it passes through; `demand_customer_qty` is the external figure that reconciles
+to real orders.
 
 ### `replenishment_receipts.csv` — forward runs
 
-Grain: **one row per (ship day, lane, sku)**.
+Grain: **one row per (ship day, lane, sku)**, including plant-to-plant-DC
+production shipments, whose `origin_node_id` is `PLANT` and `short_qty` 0.
 
 `receipt_id`, `period`, `order_week_start`, `sku_id`, `dc_id`,
 `origin_node_id`, `qty_ordered`, `qty_received`, `promised_lead_days`,
@@ -1537,65 +1735,116 @@ Grain: **one row per (ship day, lane, sku)**.
 
 Each order line gets its own realised transit time drawn from its lane's mean
 and standard deviation — receipts arrive on their own draw, never the average.
-`promised_lead_days` is the lane's ~90th percentile, the committed lead time
-quoted to the child, which is what puts on-time delivery near 90% with a
-genuine late tail rather than a coin flip. `short_qty` is the balance the parent
-could not cover.
+`actual_lead_days` is that continuous draw (rounded to 2 dp), while
+`arrival_day = ship_day + max(1, ceil(draw))`. `promised_lead_days` is the lane's
+~90th percentile (mean + {PROMISE_Z:g} x std), the committed lead time quoted to the child.
+`on_time_flag` compares the *continuous* draw with the promise, so on-time
+delivery sits near 90% by construction, whatever the policy. `period` and
+`order_week_start` are the ship week. `short_qty` is the requested balance the parent
+could not cover on that ship day, and `qty_ordered = qty_received + short_qty`.
+Both repeat the outstanding balance on every partial-ship day, so summing them
+overstates. In the optimized twin, a dispatch into a lane closed by a
+`supply.lane_outage` override departs the day after the outage ends. That wait is
+in `arrival_day` but not in `actual_lead_days` or `on_time_flag`.
 
 ### `production.csv` — forward runs
 
-Grain: **period x plant x sku**.
+Grain: **period x plant x sku**, for rows where the plan asked for more than zero.
+Columns: `period`, `week_start_date`, `plant_id`, `sku_id`, `production_family`,
+`is_primary`, `plan_uncapped_qty`, `planned_qty`, `actual_qty`, `adherence_pct`,
+`capacity_limited_flag`.
 
 `plan_uncapped_qty` (what the rolling plan asked for) -> `planned_qty` (after
 family line capacity, then plant-wide capacity) -> `actual_qty` (after schedule
-adherence). `capacity_limited_flag` marks a clipped plant-week, and
-`adherence_pct` records the attainment draw.
+adherence, floored). `capacity_limited_flag` marks a plant-week clipped by the
+**plant-wide** limit; a family-line clip alone does not set it. `adherence_pct`
+records the U({ADHERENCE_RANGE[0]:.2f}, {ADHERENCE_RANGE[1]:.2f}) draw. In the optimized twin, a `supply.schedule_adherence`
+override multiplies that draw, capped at 100%, but `adherence_pct` still shows the
+raw draw. `is_primary` marks the plant with the largest `allocation_share` for the
+SKU; ties produce more than one primary.
 
 ### `service_summary.csv` / `service_by_node.csv`
 
-Per SKU and per node: demand, units served, unmet, customer fill rate, internal
-fill rate, average on-hand and holding cost.
+Per SKU and per node, over active pairs only: demand, units served, unmet, customer
+fill rate, internal fill rate, average on-hand and holding cost.
+
+- `service_summary` columns: `sku_id`, `total_demand`, `unmet`,
+  `replen_demand`, `replen_unmet`, `avg_on_hand`, `holding_cost_usd`,
+  `served_from_stock`, `fill_rate_customer`, `fill_rate_replen`, `category`.
+- `service_by_node` columns: `dc_id`, `node_type`, `skus`, `total_demand`, `unmet`,
+  `replen_demand`, `replen_unmet`, `avg_on_hand`, `holding_cost_usd`,
+  `fill_rate_customer`, `fill_rate_replen`.
 
 ### `cost_summary.csv`
 
-Per node: `avg_units_on_hand`, `avg_inventory_value_usd`, `holding_cost_usd`,
-`stockout_cost_usd`, `transport_cost_usd`, `total_landed_cost_usd`.
+Per node: `dc_id`, `node_type`, `avg_units_on_hand`, `avg_inventory_value_usd`,
+`holding_cost_usd`, `stockout_cost_usd`, `transport_cost_usd`,
+`total_landed_cost_usd`, sorted by total landed cost, highest first.
 
-`total_landed_cost_usd` is the scalar an optimizer minimises. Stockout cost is
-margin-per-unit x units short, on the margin basis named in the manifest.
+`total_landed_cost_usd` is the scalar an optimizer minimises:
+holding + stockout + transport. The three cost components accumulate over **every**
+(node, SKU) cell, inactive pairs included. The two inventory columns come from the
+`inventory` rows, which cover active pairs only.
+
+- **Holding** is charged on end-of-day on-hand. In-transit (pipeline) stock is not
+  charged.
+- **Stockout cost** is margin-per-unit (`{MARGIN_COLUMN}`, the margin basis named in the
+  manifest) x units short. It is charged at every node, including RDC backorders that
+  are filled later, so it does not reconcile with `lost_margin_usd` (CDC lost sales
+  only).
+- **Transport** is qty x lane `logistics_cost_per_unit_usd`, charged to the receiving
+  node. Plant-to-plant-DC freight is not included.
 
 ### `run_kpis.json`
 
-Headline metrics for cross-run comparison: `customer_fill_rate` with its
-customer-DC and regional-DC split, `pct_demand_weeks_in_full`,
-`internal_replen_fill_rate`, inventory value, the three cost components, total
-landed cost, and `margin_basis`.
+Headline metrics for cross-run comparison: `horizon_weeks`, `first_period`,
+`last_period`, `customer_demand_units`, `customer_fill_rate` with its
+customer-DC and regional-DC split (`customer_fill_rate_cdc`,
+`customer_fill_rate_rdc`), `pct_demand_weeks_in_full`,
+`internal_replen_fill_rate`, `avg_units_on_hand_network`,
+`avg_inventory_value_usd`, `safety_stock_value_usd`, the three cost components,
+`total_landed_cost_usd`, `pct_weeks_at_zero_stock` and `margin_basis`.
 
-**Read `pct_demand_weeks_in_full` alongside the fill rate.** Unit fill rate
-counts a week served 90% as 0.9 of a unit fill; in-full counts it as a failed
-order line. The two typically differ by about 5 points, and if the objective is
-on-time-in-full then in-full is the honest number.
+- **Fill rates** are unit-based and computed over active pairs only.
+  `customer_fill_rate` = 1 − unmet / demand for external demand, measured on the day
+  of demand, so an RDC backorder counts as unmet even if it is filled later.
+  `internal_replen_fill_rate` = 1 − cancelled / requested internal orders, measured at
+  the parent.
+- **Cost KPIs** cover every cell (see `cost_summary`).
+- **`safety_stock_value_usd`** values the policy's safety stock (the mean over weeks
+  for a time-varying policy) at unit cost. Plant-DC safety stock, which is never
+  released, is included.
+- **`pct_weeks_at_zero_stock`** counts all active node-SKU-weeks, including those with
+  no demand.
+
+{in_full_note}
 
 ### `scenario_config.json`
 
 The normalized scenario contract. Required fields are `scenario_name` and
 `changes`; `details` is a JSON object for relevant scenario context. The
 `execution` object records the mode, seed, policy, state, horizon, and output
-folder actually used.
+folder actually used. The original twin writes it only with `--scenario-config`.
+The optimized twin always writes it into the run folder, and also puts a raw copy of
+the input config in the parent `SCENARIO_####_Name/` folder.
 
 ### `run_manifest.json`
 
 `schema_version`, `run_name`, `label`, `mode`, `generated_at`, `seed`,
-`policy_source`, `state_source`, `margin_basis`, `runtime_seconds`,
-`assumptions` in plain language, `build_notes` (resolved routing counts,
-demand basis, realised-to-forecast ratio), and the complete `scenario` object
-when the run was launched with `--scenario-config`.
+`policy_override` (the `--policy` argument), `margin_basis`, `runtime_seconds`,
+`assumptions` in plain language (the list in Part 1),
+`build_notes`, and the complete `scenario` object when the run was launched with a
+scenario config. `build_notes` holds `policy_source`, `policy_rows`,
+`policy_time_varying`, `state_source`, resolved routing counts, demand basis,
+realised-to-forecast ratio and network sizes. It also holds `scenario_applied` for a
+legacy demand surge, and `overrides_applied` for optimized-twin override runs. The
+optimized twin adds `lean_outputs.not_written` when run with `--lean-outputs`.
 
 ### `acceptance.csv` — history runs only
 
-Each operating metric against its declared target band, with a pass flag. The
-physics is fixed; when a metric misses, the policy knobs in the generator are
-what move.
+Written by the generator. Each operating metric (`metric`, `observed`, `lo`,
+`hi`, `pass`) against its declared target band. The physics is fixed; when a metric
+misses, the policy knobs in the generator are what move.
 
 ---
 
@@ -1610,13 +1859,28 @@ what move.
   routed across them.
 - **Single-sourcing per (node, SKU).** Routing is one parent per pair, taken
   from `sku_sourcing_map.csv`.
-- **Only a demand-surge scenario type is applied.** `--scenario-config`'s
-  `changes` object is read and actually affects the simulation when it
-  contains `demand_surge_pct` (optionally `affected_region`/`affected_nodes`,
-  `duration_weeks`, `start_week_offset` -- see `scenario_engine.py`). Any
-  other key in `changes` is still saved to the self-describing scenario
-  folder for context but has no simulation effect -- lead-time and capacity
-  disruption types are not implemented yet.
+- **Scenario support differs by implementation.**
+  - **Original twin**: only `demand_surge_pct` is applied (optionally
+    `affected_region`/`affected_nodes`, `duration_weeks`, `start_week_offset` -- see
+    `scenario_engine.py`). Any other key in `changes` is saved to the
+    self-describing scenario folder for context but has no simulation effect.
+  - **Optimized twin**: also applies the override engine's actual-side overrides
+    (economics, demand volume/volatility, opening state, lead times, lane outages,
+    plant capacity, adherence) in forward mode. None of these override paths is
+    covered by the twin equivalence test.
+- **The demand-surge multiplier is rounded per daily cell** (half-to-even), so for
+  slow movers the realised surge can be below nominal or zero.
+- **Production allocation share is applied on top of routing.** The plant DC's
+  demand signal already covers only the RDCs routed to it, and the plan then
+  multiplies both that signal and the DC's position by the plant's
+  `allocation_share`. Each plant therefore plans `allocation_share` x the quantity
+  its own DC's signal implies. For SKUs split across plants this is likely a
+  double count (open audit item; behaviour shown as coded).
+- **Common random numbers hold for demand only** (see assumption 10).
+- **Plant-DC `reorder_point` / `order_up_to_level` are never used**; a plant DC's
+  policy affects the run only through its safety-stock hold-back.
+- **No terminal-state accounting.** Stock still in transit at the end of the
+  horizon is never received or valued.
 - **Demand is aggregated to (node, SKU, day).** Forward mode synthesises demand
   from the forecast, so there are no discrete order lines and no true
   order-level on-time-in-full; `pct_demand_weeks_in_full` is measured at

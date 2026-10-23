@@ -8,7 +8,14 @@ This follows one scenario end to end:
 - the proof that it did;
 - the results.
 
-Everything below comes from the real run on 9 Oct 2026, stored in these folders:
+> **Read this first (23 Oct 2026).** This page is the record of the 9 Oct run. Since then:
+> - **The run's folders are gone.** None of the three folders below is in the repository, so the receipts, checks and results in §5–§6 cannot be re-derived from repo files. The number SCENARIO_0003 now belongs to a different scenario, `SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays` (a dairy demand cut with protest-driven lead-time increases), and SCENARIO_0004 is its revised version. Both ran on Clark-Scarf v2.
+> - **The pipeline moved.** The root config now runs `models/MEIO/MEIO_Weekly/final_submission_optimized/` (`run_weekly_tools.py`, `roll_forward_policy.py`, `meio_optimizer_weekly.py`, `meio_weekly_lib.py`, `clark_scarf_v2.py`) and the Twin `digital_twin_fast.py`. §4 below is updated to that code. `models/twin/digital_twin.py`, which this run used, no longer applies `changes.overrides`.
+> - **Twin outputs moved.** Twin runs are now written to `output datasets/SCENARIO_####_Name/<arm>/`, without the `projections/` segment.
+> - **A third arm.** A scenario with plan and actual changes now also runs **reactive** (`reactive_twin.py`: MEIO is not told and re-plans every week from what the Twin has simulated), plus a one-off no-scenario reactive control under the baseline folder.
+> - **MEIO's default z** now comes from the segmentation cluster ladder (`sku_clusters.csv`), not the segment ladder this run used (z 2.05 for Fast-Moving in §5).
+
+Everything below comes from the real run on 9 Oct 2026, stored at the time in these folders (no longer in the repository):
 
 | What | Where |
 |---|---|
@@ -43,7 +50,7 @@ orchestrator (Sonnet) ── create_draft, resolve_window
   │
   ├── build_scenario_config  → output datasets/overrides/SCENARIO_0003_…/scenario_config.json + card
   ├── request_human_approval → LangGraph interrupt(); a person approves → approval.json (config SHA-256)
-  ├── run_scenario           → detached `run-job`: prepared arm, then unprepared arm
+  ├── run_scenario           → detached `run-job`: prepared arm, then unprepared arm (9 Oct; today a reactive arm follows)
   │        prepared   = run_meio_then_twin.py: MEIO re-plans with the PLAN side → Twin runs the ACTUAL side
   │        unprepared = Twin only: baseline policy (SCENARIO_0002) meets the ACTUAL side
   ├── get_run_status
@@ -102,46 +109,49 @@ OVR-0003 is plan-only: a service target is a planning choice, and there is nothi
 Adding JSON to a config does nothing by itself. These are the steps that make it real.
 
 **Step 1: load and compile, strictly.** Both models call the same loader, [`models/overrides/compile.py`](../../models/overrides/compile.py), through `override_engine.load(config, …)`. The loader:
-- validates every override against the schema and catalog;
+- validates every override against the catalog (the JSON Schema check happens earlier, in the agent tools);
 - resolves each `scope` against master data into concrete rows, for example OVR-0001 → 397 (DC, SKU, customer) demand lines across 325 DC-SKU pairs;
 - turns each `window` into ISO weeks;
-- raises `OverrideError` on an unknown or unsupported measure or an empty match, so the run stops instead of silently skipping;
-- writes `overrides_resolved.json`, which records every override with its matched rows and weeks.
+- raises `OverrideError` on an unknown or unsupported measure or an empty match, so the run stops instead of silently skipping.
+
+When a model finishes, `write_receipts` (in [`models/overrides/__init__.py`](../../models/overrides/__init__.py)) also writes `overrides_resolved.json`, which records every override with its matched rows and weeks.
 
 Each model then takes only its side: `side("plan", "meio")` for MEIO and `side("actual", "twin_<run>")` for the Twin.
 
-**Step 2: MEIO applies the plan side** inside its weekly solve. `roll_forward_policy.run` re-solves each of the 52 target weeks, and the hooks (`PlanHooks` in [`models/overrides/meio.py`](../../models/overrides/meio.py)) are passed into each step ([roll_forward_policy.py:91-112](../../models/MEIO/MEIO_Weekly/final_submission/roll_forward_policy.py:91)):
+**Step 2: MEIO applies the plan side** inside its weekly solve. `roll_forward_policy.run` re-solves each of the 52 target weeks, and the hooks (`PlanHooks` in [`models/overrides/meio.py`](../../models/overrides/meio.py)) are passed into each step. In the current code ([roll_forward_policy.py:72-90](../../models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py:72)):
 
 ```python
 for wk_num in forward_weeks:
-    demand = lib.target_week_demand(..., target_week_num=wk_num, overrides=plan)   # demand.*
     lanes = plan.lanes(target_period) if plan else None                            # supply.lead_time_*
-    ...
-    policy = lib.solve_policy(demand, week_leadtime, ..., overrides=plan)          # service.target_csl -> z
+    ...                                                                            # per-week lead-time graph
+    policy = weekly.size_rdc_cdc(params, ..., week_leadtime, ..., wk_num, plan, rng)
+    #   Clark-Scarf v2 (csv2.solve) or MEIO Weekly (solve_policy), as meio.parameters names;
+    #   both call target_week_demand(..., overrides=plan) for demand.* and the z hook for service.target_csl
     rdc_smoothed = lib.smoothed_rdc_demand_for_pdc(..., overrides=plan)            # PDCs see the same demand
-    pdc_policy = lib.solve_pdc_policy(rdc_smoothed, ..., overrides=plan, period=target_period, lanes=lanes)
+    pdc_policy = lib.solve_pdc_policy(rdc_smoothed, ..., overrides=plan, period=target_period, lanes=lanes, ...)
     ...                                                                            # ^ supply.plant_capacity clip
-    if plan:
-        policy = plan.policy(policy, target_period)                                # policy.* rules, OUL >= ROP
+    policy = weekly.apply_policy_hook(plan, policy, target_period)                 # policy.* rules, OUL >= ROP
 ```
 
-| Seam | Code | What changes |
+This run predates that code: it ran MEIO Weekly through `final_submission/`, which no longer holds these scripts.
+
+| Seam | Code (current) | What changes |
 |---|---|---|
-| Demand | `target_week_demand` returns `overrides.demand(d, period)` ([meio_weekly_lib.py:512](../../models/MEIO/MEIO_Weekly/final_submission/meio_weekly_lib.py:512)) | The change is applied to MEIO's own weekly estimate, `target_mean`, **after** its 0.6 × forecast + 0.4 × seasonal blend. Scaling the raw forecast instead would plan a +25% event as about +15%. The CV is held, so σ scales with the mean. |
-| Service | `assign_z(df, overrides, period)` ([meio_weekly_lib.py:234](../../models/MEIO/MEIO_Weekly/final_submission/meio_weekly_lib.py:234)) | The z for matched pairs becomes Φ⁻¹(0.985) = 2.1701, in RDC/CDC and PDC sizing, in-window only. |
-| Capacity | `clip_to_plant_capacity(..., overrides, period)` ([meio_weekly_lib.py:609](../../models/MEIO/MEIO_Weekly/final_submission/meio_weekly_lib.py:609)) | The line's capacity in that week, before PDC throughput is clipped. |
-| Lead time | `build_leadtime_graph(..., lanes)` per target week | Lane means and standard deviations for that week (not used in this scenario). |
+| Demand | `target_week_demand` returns `overrides.demand(...)` ([meio_weekly_lib.py:597](../../models/MEIO/MEIO_Weekly/final_submission_optimized/meio_weekly_lib.py:597)) | The change is applied to MEIO's own weekly estimate, `target_mean`, **after** its 0.6 × forecast + 0.4 × seasonal blend. Scaling the raw forecast instead would plan a +25% event as about +15%. The CV is held, so σ scales with the mean. |
+| Service | `assign_z(df, overrides, period)` ([meio_weekly_lib.py:288](../../models/MEIO/MEIO_Weekly/final_submission_optimized/meio_weekly_lib.py:288)); Clark-Scarf v2 calls the same hook in `_z` ([clark_scarf_v2.py:349](../../models/MEIO/MEIO_Weekly/final_submission_optimized/clark_scarf_v2.py:349)) | The z for matched pairs becomes Φ⁻¹(0.985) = 2.1701, in RDC/CDC and PDC sizing, in-window only. |
+| Capacity | `clip_to_plant_capacity(..., overrides, period)` ([meio_weekly_lib.py:809](../../models/MEIO/MEIO_Weekly/final_submission_optimized/meio_weekly_lib.py:809)) | The line's capacity in that week, before PDC throughput is clipped. |
+| Lead time | `build_leadtime_graph(..., lanes)` per target week ([meio_weekly_lib.py:618](../../models/MEIO/MEIO_Weekly/final_submission_optimized/meio_weekly_lib.py:618)) | Lane means and standard deviations for that week (not used in this scenario). |
 
-**Step 3: the Twin applies the actual side** to its inputs and its daily loop ([`models/overrides/twin.py`](../../models/overrides/twin.py), called from [digital_twin.py](../../models/twin/digital_twin.py)):
+**Step 3: the Twin applies the actual side** to its inputs and its daily loop ([`models/overrides/twin.py`](../../models/overrides/twin.py)). This run used `models/twin/digital_twin.py`; today the calls are in [digital_twin_fast.py](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py), the Twin `scenario_config.json` names:
 
-| Seam | Code | What changes |
+| Seam | Code (current) | What changes |
 |---|---|---|
-| Demand | `fwd_rows = override_engine.twin.forecast_rows(overrides, fwd_rows)` ([digital_twin.py:658](../../models/twin/digital_twin.py:658)) | The forward forecast lines, scaled **before** the (period, dc, sku) group-by and before the forecast-error draw. Customer scope is honoured and the random draws are unchanged, so out-of-scope demand is bit-for-bit identical (common random numbers). |
-| Opening stock | `state = override_engine.twin.opening_state(overrides, state)` ([digital_twin.py:583](../../models/twin/digital_twin.py:583)) | RDC03's opening position, right after `opening_position.parquet` is read. |
-| Capacity | `cap_family_week` from `capacity_weeks(...)` ([digital_twin.py:370](../../models/twin/digital_twin.py:370)); used in `_produce` ([digital_twin.py:1014](../../models/twin/digital_twin.py:1014)) | Line capacity by production week: `inp.cap_family_week.get((wk, p, fam), inp.cap_family.get((p, fam)))`. |
-| Lanes, outages, adherence, economics | `lane_week`, `lane_blocks`, `adherence_week`, `economics()` | Not used in this scenario. |
+| Demand | `fwd_rows = _pl(override_engine.twin.forecast_rows(overrides, _pd(fwd_rows)))` ([digital_twin_fast.py:506](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py:506)) | The forward forecast lines, scaled **before** the (period, dc, sku) group-by and before the forecast-error draw. Customer scope is honoured and the random draws are unchanged, so out-of-scope demand is bit-for-bit identical (common random numbers). |
+| Opening stock | `state = _pl(override_engine.twin.opening_state(overrides, _pd(state)))` ([digital_twin_fast.py:406](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py:406)) | RDC03's opening position, right after the opening-position file (`digital_twin.state`) is read. |
+| Capacity | `cap_family_week` from `capacity_weeks(...)` ([digital_twin_fast.py:276](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py:276)); used in `_produce` ([digital_twin_fast.py:741](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py:741)) | Line capacity by production week: `inp.cap_family_week.get((wk, p, fam), inp.cap_family.get((p, fam)))`. |
+| Lanes, outages, adherence, economics | `lane_weeks`, `lane_blocks`, `adherence_weeks`, `economics()` ([digital_twin_fast.py:187](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py:187), [:274-278](../../models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py:274)) | Not used in this scenario. |
 
-**Step 4: receipts.** Each model writes what it actually applied to `receipts/<model>.json` in the scenario's override folder. The Twin also writes the receipt into `run_manifest.json` under `build_notes.overrides_applied`. The analyst agent is instructed to check the receipts before it reports.
+**Step 4: receipts.** Each model writes what it actually applied to `receipts/<model>.json` in the scenario's override folder: `meio.json` from the rolling MEIO, `meio_weekly.json` from the single-week MEIO, and `twin_<arm>.json` from each Twin run. The Twin also writes the receipt into `run_manifest.json` under `build_notes.overrides_applied`. The analyst agent is instructed to check the receipts before it reports.
 
 ## 5. Proof that each override reached the model
 
@@ -254,28 +264,30 @@ The 400 changed rows outside the window are all at PDCs. PDC sizing smooths RDC 
   - the analyst instructions now require checking receipts per side, say that "applied" is not the same as "binding", and lead the breakdown with the in-scope result;
   - MEIO receipts now total `pair_weeks` and units across weeks, and pair-weight `*_mean` values (the first dry run had summed z means to "16.4").
 
-  28 agent tests and 13 engine tests pass after these changes.
+  28 agent tests and 13 engine tests passed after these changes (9 Oct). On 23 Oct there are 30 agent tests, and the engine tests fail at collection because they still import from `final_submission/` and drive `models/twin/digital_twin.py`.
 - **Not changed:** `scenario_card.md` still shows the "engine not ready" warnings from approval time. It is the record of what the person approved, under the config SHA-256, so it is kept as-is.
 
 ## 8. Reproduce it
 
-Run the scenario from its approved config. Run outputs go to `output datasets/MEIO|projections/SCENARIO_0003_…`. The scenario has already run, so the gate refuses until a person re-approves it with `--allow-overwrite`.
+This run's config is no longer in the repository, so it cannot be re-run as it was. To run the same request today, give it to the agents again (or rebuild the four overrides by hand with `python -m Agents.tools call ...`). `build_scenario_config` takes the next free number (SCENARIO_0005 today) and the current config's MEIO and Twin, and a person approves the new config.
+
+The same commands work on any scenario on disk, for example SCENARIO_0004. Run outputs go to `output datasets/MEIO/SCENARIO_####_…` and `output datasets/SCENARIO_####_…/<arm>/`. A scenario that has already run is refused until a person re-approves it with `--allow-overwrite`.
 
 ```bash
-python -m Agents.tools approve SCENARIO_0003_Southeast_Heatwave_July_Maintenance_Flood --by "<your name>" --allow-overwrite
+python -m Agents.tools approve SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays --by "<your name>" --allow-overwrite
 ```
 
 ```bash
-python -m Agents.tools call run_scenario --agent orchestrator --args "{\"scenario_folder\": \"SCENARIO_0003_Southeast_Heatwave_July_Maintenance_Flood\"}"
+python -m Agents.tools call run_scenario --agent orchestrator --args "{\"scenario_folder\": \"SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays\"}"
 ```
 
-Or one arm by hand: MEIO re-plans with the plan side, then the Twin runs the actual side.
+Or the prepared arm by hand: MEIO re-plans with the plan side, then the Twin runs the actual side.
 
 ```bash
-python run_meio_then_twin.py --scenario-config "output datasets/overrides/SCENARIO_0003_Southeast_Heatwave_July_Maintenance_Flood/scenario_config.json" --yes
+python run_meio_then_twin.py --scenario-config "output datasets/overrides/SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays/scenario_config.json" --yes
 ```
 
-The engine's own tests: each seam in both models, on the real data.
+The engine's own tests (each seam in both models, on the real data) are run with the command below, but in the current tree they fail at collection (see §7).
 
 ```bash
 python -m pytest models/overrides/tests -q

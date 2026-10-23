@@ -9,7 +9,11 @@ code (`meio_weekly_lib.py`) is still imported by several alternative models (GSM
 Sim-Optimize) as the formula they build on top of.
 
 Source: `models/MEIO/MEIO_Weekly/meio_weekly_lib.py`, `meio_optimizer_weekly.py`,
-`roll_forward_policy.py`. README: `models/MEIO/MEIO_Weekly/README.md`.
+`roll_forward_policy.py`. README: `models/MEIO/MEIO_Weekly/README.md`. The pipeline uses
+the polars port in `models/MEIO/MEIO_Weekly/final_submission_optimized/meio_weekly_lib.py`.
+It has the same constants and formulas, and Clark-Scarf v2 takes its demand estimates,
+lead times, z and PDC sizing from it. A config with no `meio.parameters` section still
+sizes with MEIO Weekly.
 
 ## Definition
 
@@ -36,23 +40,48 @@ differs from what the lost version targeted.
 - **Forecast-bias correction.** `forecast_qty` was found to persistently under-predict
   `actual_qty`. A z-score safety stock only buffers *random* variance, not a systematic
   bias, so next week's forecast is multiplied by the trailing 13-week actual/forecast
-  ratio before anything is sized against it.
+  ratio before anything is sized against it. The ratio is Σactual/Σforecast over the
+  trailing weeks with forecast > 0, clipped to [0.5, 2.0], and defaults to 1.0 with no
+  history.
 - **Blended trailing CV.** Demand uncertainty uses the average of a 13-week and 52-week
   trailing coefficient of variation — a 13-week window alone was found to understate
-  full-year volatility.
+  full-year volatility. It is the simple mean of the two CVs of *actuals* (std with
+  ddof=1 over mean), each capped at 3.0. A missing CV falls back to the cross-pair median.
+  σ for the target week is target_mean × CV.
 - **DC-specific cost.** `cost_parameters.csv` is keyed by `(dc_id, subcategory)`, not
   `category` — holding and stockout cost are DC-specific. (The committed annual
   `meio_optimizer.py` was found broken against this exact assumption —
   `KeyError: 'category'` — fixed in the same change that built this tool.)
 - **RDC/CDC protection interval matched to the dataset's own baseline convention**
   (review period + lead time, not lead time alone), `ORDER_COVER_WEEKS=1.5` with a 1.2x
-  floor on order-up-to cover, per-echelon sigma uplift, segment-based z (not a
-  cost-derived one).
+  floor on order-up-to cover, per-echelon sigma uplift (PDC 1.45 / RDC 1.25 / CDC 1.00),
+  and a z that is not cost-derived. As coded (`solve_policy`), with P = 1 + L weeks:
+  SS = z·√(P·(uplift·σ)² + μ²·σ_L²), s = μP + SS, S = max(s + 1.5·μ, 1.2·s).
+  - **Lead times** come from the published `network_lanes` means and standard
+    deviations. They are **cumulative from the plant**: Plant→PDC→RDC→CDC along the
+    single fastest inbound lane at each node, with variances summed. A CDC is sized
+    against the whole chain, not just its own RDC→CDC lane.
+  - **z source.** Originally the dataset's 3-way segment ladder (Fast-Moving 2.05 /
+    Seasonal 1.64 / Intermediate 1.28). Since 2026-10-18 the library reads the
+    canonical v5 cluster ladder from `output datasets/segmentation/sku_clusters.csv`
+    (`safety_factor_z` 1.881 / 1.717 / 1.282). The segment ladder is now only a fallback
+    for SKUs the cluster file doesn't cover.
+- **PDC sizing** (`solve_pdc_policy`), a push node: μ = sum of the RDC target demand it
+  sources (via `sku_sourcing_map`), averaged over a 5-week window centred on the target
+  week and clipped to plant capacity. SS = z·√L·μ·1.45·0.5, which uses μ as a stand-in
+  for σ. s = SS + μL and S = 4.5·μ + SS, with L the Plant→PDC lane in weeks.
 - **De-seasonalized demand blend** (v5): target-week demand blends a de-seasonalized
   trailing level with the bias-corrected forecast, replacing a flat trailing-mean
   fallback that silently zeroed ~38% of active SKU-DC pairs' entire policy for any
   single target week with a literal $0 forecast (worst for Seasonal-segment SKUs) —
-  the single biggest fill-rate jump of any tuning round.
+  the single biggest fill-rate jump of any tuning round. As coded:
+  target_mean = 0.6 × (forecast × bias) + 0.4 × (deseasonalized level × seasonal index).
+  - The deseasonalized level is the trailing 52-week mean of actual ÷ index.
+  - The seasonal index is per (subcategory, week-of-year), pooled over every SKU and DC
+    in `orders` 2023–2025, normalized to the subcategory mean and clipped to [0.2, 5.0].
+    Because it includes 2025, the 2025 real-data backtests are not strictly free of
+    lookahead.
+  - The 0.6 weight is hand-set.
 
 ## Advantages
 
@@ -121,18 +150,29 @@ version actually compared against Clark-Scarf v1 and the other alternative model
 Real-2025-demand validation (not just the synthetic basis this tool was tuned against)
 showed Clark-Scarf v2 pulling ahead by a wider margin than synthetic testing suggested:
 customer fill rate +0.15pp vs. actual for MEIO Weekly, vs. **+1.75pp** for Clark-Scarf v2
-at its adopted configuration (alpha=0.2, netting_discount=0.0) — see `Clark Scarf v2.md`
+at its then-adopted configuration (alpha=0.2, netting_discount=0.0) — see `Clark Scarf v2.md`
 for the full head-to-head. MEIO Weekly's real-data result is preserved at
 `models/MEIO/MEIO_Weekly/final_submission/results/meio_weekly_vs_actual_report.md` and
-`.../meio_weekly_vs_actual.csv` for context on why it wasn't chosen; it was not
-regenerated under the later cluster-based service-level default, since it wasn't the
-model that ended up adopted.
+`.../meio_weekly_vs_actual.csv` for context on why it wasn't chosen. That copy was not
+regenerated under the later cluster-based service-level default.
+
+**Current figures (2026-10-23).** The optimized pipeline's re-run, in
+`output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results/`, widens the
+gap:
+- `meio_weekly_vs_actual.csv`: MEIO Weekly at 93.00% customer fill, **−0.08pp** vs. the
+  baseline-policy "actual" arm's 93.08%, with 88.86% internal fill. Single seed.
+- `netting_discount_multiseed.csv`: Clark-Scarf v2 at alpha=0.2 gains +1.52pp (5-seed
+  mean; +1.43pp in the single-seed headline).
+
+The choice of Clark-Scarf v2 over MEIO Weekly rests on single-seed evidence for the
+MEIO Weekly side.
 
 ## Comparison snapshots
 
 ![MEIO Weekly vs. actual, real 2025 demand (the result that ended its run as the chosen model)](images/meio_weekly_vs_actual.png)
 *+0.15pp customer fill rate vs. actual — the real-data result Clark-Scarf v2's
-+1.75pp was measured against, see "Why it was phased out" above.*
++1.75pp was measured against, see "Why it was phased out" above (the current re-run
+reads −0.08pp).*
 
 ![MEIO Weekly rolling policy vs. real 2025 demand](images/meio_weekly_rolling_backtest_real_data.png)
 *Rolling weekly policy, walk-forward real-demand backtest — the test this tool was

@@ -1,8 +1,9 @@
 # Bandit — Thompson Sampling over Service-Level Tiers
 
-**Status: phased out** (not advanced past the single-week bake-off as a MEIO policy
-model), but its underlying strategy — multi-armed bandits for service-level decisions —
-was a project-level exploration documented separately
+**Status: phased out.** As a MEIO policy model it was scored in the single-week bake-off
+and one single-seed rolling run, and never validated against real demand. However, its
+underlying strategy — multi-armed bandits for service-level decisions — was a
+project-level exploration documented separately
 (`Obsidian-Notes/Multi-Armed Bandits — Supply Brain Strategy.md`), and its twin-validated
 Thompson Sampling mechanism was reused for `Cluster Bandit.md`.
 
@@ -10,14 +11,25 @@ Source: `models/MEIO/MEIO_Weekly/alt_models/bandit_model.py` (ships as "v2" — 
 are documented and fixed in the same file, there is no separate `bandit_v1.py`),
 `bandit_rolling.py` (52-week rolling variant).
 
+> **Note (2026-10-23), current-code caveat:** both scripts set each arm's z
+> by overwriting `meio_weekly_lib.Z_BY_SEGMENT`. Since 2026-10-18,
+> `assign_z()` takes z from the canonical segmentation output
+> (`output datasets/segmentation/sku_clusters.csv`), which covers all 500
+> SKUs. `Z_BY_SEGMENT` is now only a fallback that never fires, so under the
+> current code every arm builds the identical policy and a re-run would
+> measure only seed noise. Every result on this page was recorded before that
+> change.
+
 ## Definition
 
 A working implementation of the "6.3 Service-level target selection" decision point
 specified in the project's own bandit strategy note. Each of the dataset's 3 demand
 segments (Fast-Moving, Seasonal, Intermediate) is treated as an independent **Thompson
-Sampling bandit** choosing among service-level (CSL) tiers — pull an "arm" (a target
-CSL), observe a reward (the digital twin's simulated cost/fill outcome), update a belief
-distribution over that arm's value, repeat.
+Sampling bandit** choosing among service-level (CSL) tiers. Each round pulls an "arm" (a
+target CSL), observes a reward from the digital twin, updates a belief distribution over
+that arm's value, and repeats. The reward is **cost only**: the baseline policy's total
+landed cost minus the candidate policy's, both scored through the twin at the same seed,
+minus the tier-order penalty. Fill rate is logged but is not part of the reward.
 
 ## Method
 
@@ -25,12 +37,24 @@ distribution over that arm's value, repeat.
 current hand-tuned default as a named 5th arm (e.g. Fast-Moving's z=2.05 ≈ 98% — not
 exactly any of the 4 fixed tiers).
 
-**Belief model**: Normal-Normal conjugate update (`PRIOR_MEAN=0`, `PRIOR_VAR=2e12`,
-`OBS_VAR=5e11`) — standard Thompson Sampling machinery.
+Each fixed tier is used as `z = Phi^-1(tier)`; the "current" arm's z comes from
+`Z_BY_SEGMENT` (2.05 / 1.64 / 1.28).
 
-**Tier-order penalty**: an explicit `PENALTY_PER_Z_VIOLATION_USD` ($300,000, disclosed
-as a modeling choice, not a calibrated business input — no real $-per-tier-break number
-exists to calibrate against) discourages the bandit from converging to an order that
+**Belief model**: Normal-Normal conjugate update (`PRIOR_MEAN=0`, `PRIOR_VAR=2e12`,
+`OBS_VAR=5e11`) — standard Thompson Sampling machinery. After its rounds, each
+segment keeps the arm with the highest posterior mean.
+
+**Loop**: one bandit per segment, run sequentially (Fast-Moving, then Seasonal, then
+Intermediate). Each bandit holds the other segments at their latest choice. Every round
+builds a frozen single-week policy (as-of 2025-W52, target 2026-W01) and makes two twin
+runs: the candidate, and the baseline `forward_policy.csv` at the same seed
+(`2026 + round count`). Defaults: `--rounds-per-segment 8` (5 forced + 3 Thompson),
+`--seasonal-phase-rounds 6`, `--seed 7`.
+
+**Tier-order penalty**: an explicit `PENALTY_PER_Z_VIOLATION_USD` ($300,000 per unit of z
+by which a lower tier's z exceeds the tier above it). It is disclosed as a modeling
+choice, not a calibrated business input; no real $-per-tier-break number exists to
+calibrate against. It discourages the bandit from converging to an order that
 contradicts the dataset's own baseline convention (Fast-Moving > Seasonal >
 Intermediate protection).
 
@@ -60,6 +84,25 @@ Intermediate protection).
    attempted here. What *is* tested on the frozen single-week basis: does the Seasonal
    segment's converged tier actually differ between a peak week and a trough week? If it
    does, that's direct evidence the fuller contextual rebuild is worth the investment.
+   **Result** (`alt_output/bandit_seasonal_phase_check.csv`): the peak (week-of-year 48)
+   chose 95% (z=1.645) and the trough (week 3) chose current(94.9%) (z=1.640). The gap of
+   0.005 is below the script's 0.15 "meaningful" threshold, so the answer is functionally
+   the same in both phases. This is no evidence for the contextual rebuild, on 6 rounds
+   per phase.
+
+## Recorded results
+
+- **Frozen run** (`alt_output/bandit_belief_history.csv`, highest posterior mean per
+  segment): Fast-Moving → 99%, Seasonal → 97%, Intermediate → 90% (z=1.2816,
+  essentially its 1.28 default). Most arms were played only once or twice, so these
+  picks rest on very few observations.
+- **Rolling variant** (`bandit_rolling.py`, default 5 rounds/segment = forced
+  exploration only, seed 13; `alt_output/bandit_rolling_belief_history.csv`):
+  Fast-Moving → current(98.0%), Seasonal → 95%, Intermediate → 90%. Scored in
+  `alt_output/final_rolling_comparison.csv`: 92.79% fill / $36,746,462 total landed
+  cost, vs. the hand-tuned MEIO Weekly rolling v10 at 92.75% / $36,721,903 and baseline
+  at 90.97% / $36,215,502. It was effectively tied with the hand-tuned policy (fill
+  +0.04pp at +$24.6K), so it found nothing better.
 
 ## Advantages
 
@@ -83,9 +126,12 @@ Intermediate protection).
   not a real fix — the bandit still cannot adapt its recommendation within a year as
   phases change, the exact failure mode the strategy note warned about.
 - A bandit converges over many rounds; on the single frozen-week bake-off basis it only
-  gets as many rounds as the comparison script's `rounds_per_segment` budget allows
-  (several twin evaluations per segment), which bounds how much genuine exploration vs.
-  exploitation tradeoff it can demonstrate.
+  gets as many rounds as the comparison script's `rounds_per_segment` budget allows (8,
+  of which 5 are forced exploration; each round costs two twin runs), which bounds how
+  much genuine exploration vs. exploitation tradeoff it can demonstrate.
+- Each round uses a different twin seed, so part of the reward difference between arms
+  is seed-to-seed noise, not the arm itself. The paired baseline run at the same seed
+  removes only some of that noise.
 
 ## Real comparison snapshot: single-week bake-off
 
@@ -118,6 +164,8 @@ the long-tail clusters holds up under a twin-validated search).
 ## Files referenced
 
 - `models/MEIO/MEIO_Weekly/alt_models/bandit_model.py`, `bandit_rolling.py`
+- `alt_output/bandit_belief_history.csv`, `bandit_seasonal_phase_check.csv`,
+  `bandit_rolling_belief_history.csv`, `final_rolling_comparison.csv`
 - `models/MEIO/MEIO_Weekly/alt_models/compare_models.py`,
   `alt_output/model_comparison_summary.csv`, `alt_output/model_comparison_report.md`
 - `Obsidian-Notes/Multi-Armed Bandits — Supply Brain Strategy.md` (the strategy

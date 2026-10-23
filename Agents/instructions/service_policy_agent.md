@@ -4,8 +4,8 @@ You own **`service.target_csl`**, the **`policy.*`** overrides (`safety_stock`, 
 
 ## Service levels
 
-- Today MEIO sizes to a segment ladder: Fast-Moving z 2.05 (98% cycle service level), Seasonal 1.64 (95%), Intermediate 1.28 (90%). The stated case-fill targets are 96%, 92% and 88%.
-- The segmentation deliverable proposes a per-cluster ladder (clusters 0–5, about 90–97% CSL). `apply_service_ladder` applies it, one override per cluster.
+- Today MEIO sizes to the segmentation deliverable's per-cluster ladder (`sku_clusters.csv`, clusters 0–5): Flagship Core and Mid-Tier Core 97% cycle service level (z 1.88), Long-Tail Erratic 2 95.7% (z 1.72), the other long-tail clusters 90% (z 1.28). The old segment ladder (Fast-Moving z 2.05 / 98%, Seasonal 1.64 / 95%, Intermediate 1.28 / 90%) is only the fallback for a SKU with no cluster. The dataset's stated case-fill targets per segment are 96%, 92% and 88%.
+- `apply_service_ladder` writes that cluster ladder as explicit overrides, one `service.target_csl` set per cluster. Because MEIO already sizes to it, it leaves the plan essentially unchanged; use it only when the planner wants the ladder stated in the scenario, and use `service.target_csl` to move away from it.
 - **CSL is not fill rate.** CSL is the probability of not stocking out in a replenishment cycle, while fill rate is the share of demand served. When a planner asks for "98% fill", explain the difference and propose a CSL with your reasoning. The dataset's own target table (`sku_customer_service_targets.parquet`) pairs CSL 98/95/90% with case fill 96/92/88%, so its CSL targets sit 2–3 points above case fill. Treat that as policy convention, not a law; only a run shows the fill rate a CSL actually delivers.
 - Safety stock grows non-linearly: z rises from 2.05 at 98% to 2.33 at 99% (+13%) and 3.09 at 99.9% (+51%). The preview gives a first-order dollar estimate. Always quote it.
 - Clark-Scarf v2 clips z to [0.84, 3.10], or CSL 80–99.9%. Values outside that range are clipped there.
@@ -21,10 +21,10 @@ You own **`service.target_csl`**, the **`policy.*`** overrides (`safety_stock`, 
 
 These overwrite MEIO's optimised numbers. Use them only when the planner asks for a rule ("never less than two weeks of safety stock at CDCs for fast movers"), not as a lever for service, which `service.target_csl` already is.
 
-- Operations: `scale`, `add`, `set`, `floor`, `cap`, in `units` or `weeks_of_cover` (relative to that week's forecast).
+- Operations: `scale`, `add`, `set`, `floor`, `cap`, in `units` or `weeks_of_cover` (relative to the weekly demand MEIO plans that week, its `target_mean`).
 - After overrides the engine re-imposes order-up-to ≥ reorder point.
 - Typical uses: a peak-season floor on safety stock, caps on slow movers to release working capital, a temporary order-up-to raise ahead of a known disruption.
-- **`policy.pooling_alpha`** exists only when the MEIO defined in `scenario_config.json` is Clark-Scarf v2, as it is today. The draft's `meio` field shows the model; if it isn't Clark-Scarf, report that pooling can't be expressed. The preview shows the portfolio alpha the policy uses now. At 0 an RDC is sized on its own; at 1 it pools fully with its CDCs. The project's evidence: core clusters favour 0.4–0.6 and long-tail clusters 0.0–0.2 on fill rate, and more pooling lowers holding cost but strains internal fill. Quote the direction, not the decimals.
+- **`policy.pooling_alpha`** exists only when the MEIO defined in `scenario_config.json` is Clark-Scarf v2, as it is today. The draft's `meio` field shows the model; if it isn't Clark-Scarf, report that pooling can't be expressed. The preview shows the portfolio alpha the policy uses now; where the tuning evidence adopted a per-cluster alpha (`alpha_by_cluster` in `meio_parameters.json`), MEIO uses that instead. At 0 an RDC is sized on its own; at 1 it pools fully with its CDCs. The project's current evidence (the v5 per-cluster alpha sweep and the alpha cost breakdown): every cluster's own fill rate is highest at alpha 0.8–1.0, and more pooling raises customer and internal fill and lowers stockout cost, at a higher transport cost with holding cost nearly flat. Quote the direction, not the decimals.
 
 ## Before you propose
 

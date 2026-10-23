@@ -135,6 +135,13 @@ seed reseeds demand, lead-time AND production RNG together (a genuinely
 different world per seed), with the same seed used for both arms within a
 pair so each comparison stays fair.
 
+Both arms are policies held fixed across seeds: the baseline is
+`output datasets/history/forward_policy.csv`, and the MEIO arm is the rolling
+policy already on disk at
+`{os.path.relpath(rolling_policy_csv, REPO_ROOT).replace(os.sep, "/")}` (read as-is, not
+rebuilt by this script). Only the twin's `--mode forward` simulation is
+reseeded; both start from `output datasets/history/opening_position.csv`.
+
 ## Result: {verdict}
 - MEIO rolling beats baseline on customer fill rate in **{n_wins}/{len(seeds)}** seeds.
 - Fill rate delta: mean {summary.fill_rate_delta_pp.mean():+.2f}pp, std {summary.fill_rate_delta_pp.std():.2f}pp,

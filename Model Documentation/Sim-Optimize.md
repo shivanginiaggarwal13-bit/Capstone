@@ -1,11 +1,17 @@
 # Sim-Optimize (Simulation-Optimization over MEIO Weekly's Own Formula)
 
-**Status: phased out** (not advanced past the single-week bake-off), but notable as the
+**Status: phased out** (scored in the single-week bake-off and one rolling-policy search,
+never validated against real demand), but notable as the
 best-scoring alternative model tried, and as the direct conceptual ancestor of the
 project's twin-as-reward-oracle search methodology that Clark-Scarf v2's own alpha
 search later reused.
 
-Source: `models/MEIO/MEIO_Weekly/alt_models/sim_optimize_model.py`.
+Source: `models/MEIO/MEIO_Weekly/alt_models/sim_optimize_model.py`,
+`sim_optimize_rolling.py` (52-week rolling variant).
+
+> **Note (2026-10-23):** all results here were recorded with MEIO Weekly's pre-2026-10-18
+> segment-based z. `meio_weekly_lib.assign_z()` now uses the canonical segmentation
+> cluster z, so a re-run would search around a different base policy.
 
 ## Definition
 
@@ -33,7 +39,13 @@ documented in `Obsidian-Notes/Multi-Armed Bandits — Supply Brain Strategy.md`.
 **Objective**: minimize `total_landed_cost_usd` from a full-horizon twin forward run
 scoring the resulting single-week (2026-W01) frozen policy — the same basis MEIO
 Weekly's own `simulate_policy.py` uses, so results are directly comparable to every
-prior hand-tuned round.
+prior hand-tuned round. Every trial is scored at the twin's default seed (2026). Fill rate
+is recorded but is not part of the objective.
+
+**Budget**: `--n-trials 15`, `--seed 42`. Trial 0 is always the hand-derived defaults
+(multipliers 1.0, `PDC_COVER_WEEKS=4.5`, `MEAN_BLEND_ALPHA=0.6`); the other 14 are uniform
+random draws within the ranges above. The `rdc_uplift_mult` and `pdc_uplift_mult`
+ranges are multipliers applied on top of the defaults.
 
 **Method, stated plainly**: random search, not Bayesian optimization or a real bandit —
 no new dependencies, fully transparent, and the search space is small enough (4
@@ -49,7 +61,8 @@ then restores them — trials are independent and order doesn't matter.
 - The digital twin itself is the reward oracle: every trial is scored by actually
   running the real physics simulation, not a proxy metric.
 - Trial-independent by construction (parameter patch/restore around each solve), so
-  trials can run in any order or in parallel.
+  trial order doesn't matter. The script runs them sequentially. Because it patches
+  module globals, it is not safe to run trials in parallel inside one process.
 - Outputs every trial's parameters and result (`sim_optimize_trials.csv`), not just the
   winner — the full search is auditable, not a black box.
 
@@ -58,10 +71,13 @@ then restores them — trials are independent and order doesn't matter.
 - **Best-performing alternative model in the single-week bake-off** — see table below.
   Scored closer to baseline than any other candidate (including Clark-Scarf v1,
   cost-tuned MEIO Weekly itself, GSM, and Bandit).
-- Directly validates the years of hand-tuning that produced MEIO Weekly's v1–v10 rounds:
-  if random search over the same 4 parameters can't beat the hand-tuned defaults by
-  much, that's evidence the hand-tuning had already found a reasonable region of the
-  search space, not that it was arbitrary.
+- Directly tests the hand-tuning that produced MEIO Weekly's v1–v10 rounds, with
+  `alt_output/sim_optimize_trials.csv` and `sim_optimize_rolling_trials.csv` as the
+  evidence:
+  - On the frozen basis, random search **did** beat the defaults. Trial 0 (defaults)
+    scored 83.43% / $38,889,776. The best trial (12: RDC uplift ×1.366, PDC uplift
+    ×1.344, PDC cover 3.94 wk, blend α 0.473) scored 85.78% / $38,190,521.
+  - On the rolling basis (below), the defaults won outright.
 - No methodological novelty or new dependency risk — a transparent, inspectable
   improvement over manual trial-and-error, not a new black box.
 
@@ -93,10 +109,23 @@ then restores them — trials are independent and order doesn't matter.
 Sim-Optimize placed **1st of 5 alternative models** (2nd overall after baseline),
 narrowly ahead of Bandit.
 
+## Rolling-policy variant (`sim_optimize_rolling.py`)
+
+This variant searches the same 4 constants, but each trial builds a full 52-week rolling
+policy via `roll_forward_policy.run()`. Defaults: `--n-trials 6`, `--seed 99`, trial 0 =
+defaults, one twin score per trial at the default seed. In
+`alt_output/sim_optimize_rolling_trials.csv`, **trial 0, the hand-tuned defaults, had the
+lowest cost**: 92.75% fill, $36,721,903. The final `sim_optimize_rolling_policy.csv` is
+therefore the MEIO Weekly v10 rolling policy, and the two score identically in
+`alt_output/final_rolling_comparison.csv`. Other trials raised fill rate (up to 93.88%,
+trial 1) only at higher cost ($36,982,111). Under the cost-only objective, the search
+found nothing better than the hand-tuned rolling policy.
+
 ## Why it was phased out
 
 Even as the best-performing alternative, it still underperformed the dataset's baseline
-by a meaningful margin, and — unlike Clark-Scarf v2 — it never advanced to real-2025-demand
+by a meaningful margin on the frozen basis. On the rolling basis its best answer was the
+hand-tuned policy itself. Unlike Clark-Scarf v2, it never advanced to real-2025-demand
 validation. Its search methodology (twin-as-oracle, parameter search) was not abandoned
 as an idea, though: Clark-Scarf v2's own alpha search reuses exactly this
 pattern — "grid search, twin as reward oracle" — applied to the pooling-factor
@@ -111,6 +140,8 @@ parameter instead of MEIO Weekly's formula constants.
 
 - `models/MEIO/MEIO_Weekly/alt_models/sim_optimize_model.py`,
   `alt_models/sim_optimize_rolling.py`
+- `alt_output/sim_optimize_trials.csv`, `sim_optimize_rolling_trials.csv`,
+  `final_rolling_comparison.csv`
 - `models/MEIO/MEIO_Weekly/alt_models/compare_models.py`,
   `alt_output/model_comparison_summary.csv`, `alt_output/model_comparison_report.md`
 - `Obsidian-Notes/Multi-Armed Bandits — Supply Brain Strategy.md` (cited lineage)

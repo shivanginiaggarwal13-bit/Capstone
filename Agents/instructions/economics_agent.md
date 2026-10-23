@@ -9,7 +9,7 @@ They change how the Twin **values** outcomes:
 - the cost of a lost sale (`margin`);
 - transport cost (`logistics_cost`).
 
-They are **actual-side and static** (no window). They do **not** change MEIO's sizing, because MEIO's service levels come from segments, not cost ratios. If a planner wants costs to drive stocking ("carrying cost is up, so hold less"), coordinate through the orchestrator with the service and policy agent, who sets the service levels; economic service levels are a Phase 3 capability.
+They are **actual-side and static** (no window). They do **not** change MEIO's sizing, because MEIO's service levels come from a fixed service ladder (the segmentation clusters), not from the scenario's cost ratios. If a planner wants costs to drive stocking ("carrying cost is up, so hold less"), coordinate through the orchestrator with the service and policy agent, who sets the service levels; economic service levels are a Phase 3 capability.
 
 | Planner says | Override |
 |---|---|

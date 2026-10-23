@@ -136,6 +136,10 @@ simulated outcome for prior 2026 weeks. What genuinely varies week to week
 is each week's own published forecast_qty and its
 seasonal_index(subcategory, week-of-year). See `roll_forward_policy.py`'s
 docstring for the full reasoning on why this is a fair, if narrower, test.
+Each week's demand = bias-corrected forecast blended
+`MEAN_BLEND_ALPHA={roll_forward_policy.lib.MEAN_BLEND_ALPHA:g}` toward the de-seasonalized level x seasonal
+index; z from `meio_weekly_lib.assign_z()`. Both twin runs use `--mode forward`
+at the twin's default seed (no `--seed` passed).
 
 ## Result
 - Customer fill rate: baseline {baseline_kpi['customer_fill_rate']:.2%} ->
@@ -161,7 +165,7 @@ any single estimation refinement with more than it likely earned.
 ## Files
 - `simulation_output/twin_runs/{{baseline_asis,meio_rolling}}/` (gitignored; full twin run detail)
 - `rolling_simulation_summary.csv`, `chart_rolling_fill_rate.png`
-- `output/rolling_2026/meio_policy_rolling.csv` (gitignored; the 52-week policy itself, ~404K rows)
+- `{os.path.relpath(rolling_policy_csv, REPO_ROOT).replace(os.sep, "/")}` (repo-relative; the 52-week policy itself, written by `roll_forward_policy.py`)
 """
     with open(os.path.join(SCRIPT_DIR, "rolling_simulation_report.md"), "w") as f:
         f.write(report)

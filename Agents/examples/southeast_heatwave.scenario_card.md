@@ -1,5 +1,11 @@
 # SCENARIO_0003_Southeast_Heatwave -- scenario card
 
+> **Example from 9 Oct 2026, generated before the override engine was installed. Kept to match `southeast_heatwave.scenario_config.json`; out of date in these ways (23 Oct):**
+> - **Engine support.** The "Checks" warning no longer holds: `python -m Agents.tools readiness` reports all 19 measures supported. A card built today ends with "Ready: engine 1.0 applies every measure in this scenario."
+> - **Runs.** A plan-and-actual scenario now also runs a **reactive** arm (MEIO is not told and re-plans every week from what the Twin has simulated), so today's `arms_for()` gives prepared, unprepared, reactive.
+> - **Entrypoints.** The paired config names `models/MEIO/MEIO_Weekly/final_submission/{run_weekly_tools,meio_optimizer_weekly,roll_forward_policy}.py`, which are no longer in that folder, and the Twin `models/twin/digital_twin.py`, which ignores `changes.overrides` (it applies only the legacy `demand_surge_pct`). The current root config uses `final_submission_optimized/` and `digital_twin_fast.py`; rebuild the scenario from it (`build_scenario_config`) before running.
+> - **Numbering.** SCENARIO_0003 is now taken by `SCENARIO_0003_Veganism_Dairy_Decline_Protest_Shipping_Delays`, so a rebuild gets the next free number.
+
 **Request:** What happens if a July heatwave pushes Southeast beverage demand up 25%, and at the same time PLANT01's liquid-fill line loses 30% capacity for two weeks mid-July? We'd protect Fast-Moving SKUs at 98.5% through July.
 
 **Hypothesis:** Re-planning for the known heatwave recovers most of the fill-rate loss for a modest increase in working capital

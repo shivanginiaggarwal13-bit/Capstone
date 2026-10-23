@@ -23,7 +23,7 @@ A unit `add` applies **per matched (DC, SKU) pair**. To place a total quantity, 
 ## Things to tell the orchestrator
 
 - **Inventory changes are opening-position only.** "A fire on 1 June destroys RDC04's stock" cannot be expressed exactly until mid-horizon shocks arrive (Phase 3). The closest available approximation is an opening-position change, and it hits in week 1, not in June. Say so, and let the planner choose.
-- Because MEIO does not see the position, the prepared and unprepared arms are identical for an inventory-only scenario. The (s, S) policy reacts to the new position by itself in the Twin.
+- Because MEIO does not see the position, an inventory-only scenario is actual-only: it runs the unprepared and reactive arms and no prepared arm, since there is nothing to re-plan in advance. The (s, S) policy reacts to the new position by itself in the Twin.
 - Pairs that don't exist in the opening position cannot be created. If a scope matches nothing, report it.
 
 ## Before you propose

@@ -9,12 +9,21 @@
 - **Strictness.** An override the engine cannot apply exactly stops the run, and every application leaves a receipt.
 - **Regression.** With no overrides, the Twin's outputs and the MEIO rolling policy are byte-identical to the committed SCENARIO_0002 run.
 
+**Status update (23 Oct 2026), checked against the code.**
+- **Pipeline.** The root `scenario_config.json` now points at the optimized port in `models/MEIO/MEIO_Weekly/final_submission_optimized/`: `run_weekly_tools.py` (runner), `meio_optimizer_weekly.py`, `roll_forward_policy.py` and the Twin `digital_twin_fast.py`. The engine hooks live there. `models/twin/digital_twin.py` in this tree does not import `models/overrides`: it applies only the legacy `demand_surge_pct` and saves any other `changes` key without effect.
+- **MEIO tuning.** `meio_parameters.py` is now in `final_submission_optimized/` (11 tests in its `tests/test_meio_parameters.py`). SCENARIO_0002's `meio_parameters.json` resolves to alpha 0.6, netting 0.0, DDLT quadrature and per-cluster alphas of 0.6–1.0 (`alpha_by_cluster`). MEIO's z now comes from the segmentation cluster ladder (`output datasets/segmentation/sku_clusters.csv`, `safety_factor_z`), with the old segment ladder only as the fallback for a SKU with no cluster.
+- **Third evaluation arm.** `reactive` (`reactive_twin.py`) and its no-scenario control were added; see §3.4.
+- **Models.** `runtime/llm.py` gained an `nvidia` provider (NVIDIA Build API through `langchain-openai`), and `profiles.yaml` now defaults to it (`z-ai/glm-5.3-flash`). The Anthropic profiles were renamed (`claude`, `anthropic-test`, `anthropic-production`); see §4.
+- **Front end.** `App/streamlit_app.py` hosts an in-process agent chat with the approval interrupt (Simulation centre).
+- **Scenarios on disk.** The 9 Oct heatwave scenario's folders are gone. `SCENARIO_0003_` and `SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays` (built 21 and 23 Oct, both on Clark-Scarf v2) are the scenarios now in `output datasets/overrides/`, and both ran.
+- **Tests.** 30 agent tests (21 tools, 9 runtime). The 13 engine tests no longer collect: they import `meio_weekly_lib` from `final_submission/`, which no longer holds it, and call `models/twin/digital_twin.run_twin(..., overrides=...)`, which no longer takes overrides (§8).
+
 §5 is kept as the design record, and §5.6 notes where the build differs from it.
 
 **Decisions taken (9 Oct).**
 - **MEIO.** Scenarios run the MEIO that `scenario_config.json` defines; agents never choose a model.
 - **Runtime.** The agents run on LangGraph.
-- **Test models.** The orchestrator runs on Sonnet 4.6 and the workers on Haiku 4.5, configured in `runtime/profiles.yaml`.
+- **Test models.** The orchestrator runs on Sonnet 4.6 and the workers on Haiku 4.5, configured in `runtime/profiles.yaml`. *Changed since:* that pairing is now the `anthropic-test` profile, and the default profile is `nvidia` (GLM 5.3 Flash for every agent).
 - **Output location.** Everything the override layer and engine write goes to `output datasets/overrides/SCENARIO_####_Name/`, with the root taken from the config's `overrides.output_root`.
 
 ---
@@ -33,6 +42,13 @@
 | G8 | Model naming is ambiguous | The root scenario is `MEIO_CLARK_SCARF_V2` and `final_submission/README.md` recommends Clark-Scarf v2, but `roll_forward_policy.py` sizes with `meio_weekly_lib.solve_policy` | **Resolved:** `meio.parameters.model` names the model (Clark-Scarf v2 since 9 Oct), and both code paths carry the engine hooks. Scenarios copy the section, so they run the same model with the same tuned parameters. |
 | G10 | The baseline on disk predates the current config's paths | `SCENARIO_0002`'s saved config points at `MEIO_Weekly/Archive/...`, while the root config points at `final_submission/...`. The rolling-policy code is identical, so this is not a real difference. | `validate_draft` compares the policy script's *content*, seed and opening state, and warns only on a real difference. Regenerate the baseline after Phase 0 as the regression reference. |
 | G9 | 4 of 6 library demand surges target pairs that don't exist | SCN0001/0003/0005/0006 name a (CDC, SKU) with no forecast, history or stock | Any surge mechanism multiplies zero; the tools now refuse and suggest alternatives |
+
+**Where these stand (23 Oct).** The line numbers above refer to the 9 Oct code, not the current tree.
+- **Resolved:** G1 (`run_weekly_tools.py --scenario-config`, passed by `run_meio_then_twin.py`), G2 (`models/scenario.resolve_path` resolves from the repository root), G3 (the rolling and single-week MEIO apply plan-side overrides), G7 (`meio_optimizer_weekly.py` skips the shared history CSV and chart for any non-root config) and G8.
+- **Resolved for the configured Twin only:** G4. `digital_twin_fast.py` and `reactive_twin.py` apply every measure and refuse unknown keys; `models/twin/digital_twin.py` still applies only `demand_surge_pct`.
+- **Partly:** G5. `digital_twin_fast.py` loads through `models/scenario.load_config`, but it still borrows `load_scenario_config` from `models/twin/digital_twin.py`, which validates on its own.
+- **Kept:** G6. The module globals remain for the research scripts; the pipeline passes overrides explicitly.
+- **Open:** G9 (the tools still refuse the four rows). G10 applied to the 9 Oct baseline; SCENARIO_0002 has since been regenerated on the current config.
 
 What already works in our favour:
 - One shared config drives both models.
@@ -173,16 +189,23 @@ This is the protocol of `final_submission/scenario_test.py`, made automatic by `
 
 The analyst reports **impact if unprepared** (unprepared − baseline), **value of re-planning** (prepared − unprepared) and **cost of preparing** (the prepared − baseline inventory investment).
 
+**Added after the design (built by 23 Oct):**
+- **reactive**: `final_submission_optimized/reactive_twin.py`. Week 1 runs today's policy; before each later week's review, MEIO re-sizes that week as of the previous one, after appending the simulated demand to its history and rescaling lane lead times where arrived shipments moved beyond a ±5% deadband and 3 standard errors. MEIO is told none of the plan-side overrides; the Twin applies the actual side at the same seed. `arms_for()` adds it whenever the Twin simulates something.
+- **reactive control**: `counterfactual_reactive_no_scenario` under the baseline scenario, the same weekly re-planning on the root config with no overrides. `run_job` builds it once per baseline and seed.
+- `compare_runs` reports **value of reacting** (reactive − unprepared, `react_value`) and splits it into the normal-year effect (control − baseline) and the reaction to this scenario.
+- `arms_for()` now returns prepared, unprepared and reactive for plan + actual scenarios, unprepared and reactive for actual-only ones, and prepared alone for plan-only ones.
+
 ### 3.5 Config shape
 
 `build_scenario_config` copies the root config's `digital_twin`, `meio`, `artifacts` and `overrides` sections. The `meio` section is copied **verbatim**: a scenario runs the MEIO the config defines and never picks its own. Entrypoints, seed and opening state therefore match the baseline. It then adds:
 
 - `changes.overrides`;
-- `artifacts.scenario`, ending in the scenario folder as `run_meio_then_twin.scenario_paths` requires;
+- `artifacts.scenario`, ending in the scenario folder as `models/scenario.resolve_scenario_path` requires (`build_config` checks it);
 - `overrides {engine: "models/overrides", output_root: "output datasets/overrides"}`, inherited from the root config. The engine derives `<output_root>/SCENARIO_####_Name` the same way MEIO derives its own folder;
-- `digital_twin.run_name = "prepared"`;
+- `digital_twin.run_name = "prepared"` and the draft's seed;
 - `evaluation {baseline_scenario, baseline_run, arms}`;
-- `details {request, hypothesis, created_by, created_at}`.
+- `details {owner, hypothesis, request, created_by, created_at, notes}`;
+- `schema_version: "1.1"`.
 
 The file is written to `output datasets/overrides/SCENARIO_####_Name/scenario_config.json`, beside its card and approval. It is loaded through `models/scenario.load_config` before it is final, so both models are guaranteed to accept it.
 
@@ -199,7 +222,7 @@ The file is written to `output datasets/overrides/SCENARIO_####_Name/scenario_co
 | `service_policy_agent` | `service.*`, `policy.*` | `apply_service_ladder` |
 | `economics_agent` | `economics.*` (+ demand via the price macro) | `add_price_event` |
 | `validator_agent` | read-only | `validate_draft`, `preview_impact`, independent faithfulness review |
-| `analyst_agent` | read-only | `compare_runs`, `service_breakdown`, `policy_diff`, `get_application_receipts` |
+| `analyst_agent` | read-only | `compare_runs`, `service_breakdown`, `scope_service`, `policy_diff`, `get_application_receipts` |
 
 - **Instructions.** [`instructions/`](instructions/) holds `_shared_context.md` (network, horizon, contract, KPIs, honesty rules and limitations, prepended to every agent) plus one file per agent.
 - **Tools.** [`tools/`](tools/), with the Claude tool specs and allowlists in `registry.py`. People use the same tools through `python -m Agents.tools`.
@@ -214,7 +237,7 @@ The file is written to `output datasets/overrides/SCENARIO_####_Name/scenario_co
 - **Previews.** Every proposal returns an instant input-size preview: units and dollars, lanes and the share of demand moving over them, capacity against load, weeks of cover, CSL moves with a safety-stock dollar estimate. That puts magnitude errors in front of the planner before compute is spent.
 - **The gate.**
   - `build_scenario_config` writes `scenario_card.md`.
-  - `request_human_approval` pauses the LangGraph run with `interrupt()`. A person resumes it at the terminal, or through the Claude Desktop bridge, or later with `python -m Agents.tools approve <scenario> --by <name>`. That writes `approval.json` with the config's SHA-256.
+  - `request_human_approval` pauses the LangGraph run with `interrupt()`. A person resumes it at the terminal, or through the Claude Desktop bridge, or in the Streamlit app's agent chat, or later with `python -m Agents.tools approve <scenario> --by <name>` (the app's Approve button runs the same command with `--yes`). That writes `approval.json` with the config's SHA-256.
   - `run_scenario` refuses if the hash changed, if outputs would be overwritten without `--allow-overwrite`, or if the engine doesn't declare every measure used.
 - **Runtime: LangGraph** ([`runtime/graph.py`](runtime/graph.py)).
   - **Agent graphs.** Each agent is a `model ⇄ tools` graph bound to its allowlisted tools.
@@ -222,20 +245,24 @@ The file is written to `output datasets/overrides/SCENARIO_####_Name/scenario_co
   - **Approval.** The approval tool is routed to its own node, so resuming never re-runs earlier tools.
   - **Validator evidence.** The validator's graph starts with an `evidence` node that runs `list_overrides` and `validate_draft`. The live test showed a small model reviewing from the brief alone; this makes that impossible.
   - **Checkpointing.** The orchestrator graph is checkpointed (`InMemorySaver`).
-- **Models** come from [`runtime/profiles.yaml`](runtime/profiles.yaml):
+- **Models** come from [`runtime/profiles.yaml`](runtime/profiles.yaml). As planned (9 Oct):
   - `test`: `claude-sonnet-4-6` orchestrator (effort medium, adaptive thinking) and `claude-haiku-4-5` workers;
   - `desktop`: the same roles on Claude Desktop's `sonnet` and `haiku`, through the no-key bridge ([`runtime/bridge.py`](runtime/bridge.py));
   - `production`: an Opus 5.5 candidate with server-side refusal fallback.
 
-  Each agent's tools + shared context + instructions prefix is byte-stable, with a cache breakpoint on the system prompt.
+  *Changed since (23 Oct):* `runtime/llm.py` has three providers, `nvidia`, `anthropic` and `desktop`. The default profile is `nvidia` (`z-ai/glm-5.3-flash` for every agent, `NVIDIA_API_KEY`), and `test`, `nvidia-fast` (`google/gemma-4-31b-it`) and `production` are NVIDIA profiles too. `desktop` is unchanged. The Anthropic profiles are `claude` (`claude-opus-5` orchestrator with effort high and refusal fallback, `claude-haiku-4-5` workers; the app's "Claude" option), `anthropic-test` (the former `test`) and `anthropic-production` (the former Opus 5.5 `production`).
+
+  Each agent's tools + shared context + instructions prefix is byte-stable, with a cache breakpoint on the system prompt (a `cache_control` block in `graph.system_message`).
 
 ---
 
 ## 5. Model-side work, phase by phase
 
-Line numbers refer to the current `main` (commit `6bca22d`).
+Line numbers refer to the current `main` (commit `6bca22d`). They are the 9 Oct design record; the hooks now live in `final_submission_optimized/` (§5.6), so they no longer match the current tree.
 
 ### 5.0 Phase 0 — pipeline plumbing (½ day)
+
+**Status (23 Oct): done**, except the single loader (partly; see G5 in §1). `readiness` reports `phase0_pipeline: true`.
 
 | Change | Where |
 |---|---|
@@ -253,6 +280,8 @@ Line numbers refer to the current `main` (commit `6bca22d`).
 - `python -m Agents.tools readiness` shows `phase0_pipeline: true`.
 
 ### 5.1 Phase 1 — override engine and v1 measures (2 days)
+
+**Status (23 Oct): done**, with the layout changes in §5.6. The Twin hooks below were planned for `models/twin/digital_twin.py`; in the current tree they are in `final_submission_optimized/digital_twin_fast.py` (and reused by `reactive_twin.py`), and `models/twin/digital_twin.py` has none. The MEIO hooks are in the `final_submission_optimized/` copies of `roll_forward_policy.py`, `meio_optimizer_weekly.py`, `meio_weekly_lib.py` and `clark_scarf_v2.py`. The single-week MEIO writes its own receipt, `receipts/meio_weekly.json`.
 
 Create `models/overrides/`, generalising `models/twin/scenario_engine.py`:
 
@@ -285,7 +314,7 @@ output datasets/overrides/SCENARIO_0003_Southeast_Heatwave/
                             engine: what the Twin applied, per override and run
 ```
 
-The engine never writes into the code tree or into `input datasets/`. The MEIO policy and Twin projections stay in their existing `output datasets/MEIO/` and `output datasets/projections/` folders, under the same scenario name.
+The engine never writes into the code tree or into `input datasets/`. The MEIO policy and Twin projections stay in their existing `output datasets/MEIO/` and `output datasets/projections/` folders, under the same scenario name. *As built:* `digital_twin_fast.py` writes each Twin run to `output datasets/SCENARIO_####_Name/<run>/`, with no `projections/` segment, and the reactive arm adds `receipts/twin_reactive.json`.
 
 Moving `catalog.py` and the scope logic is what guarantees that what an agent previews is exactly what the engine applies. After the move, `Agents/tools/paths.SCHEMA_PATH` and the two imports point at `models/overrides`. That is a two-line change.
 
@@ -323,6 +352,8 @@ Set `SUPPORTED_MEASURES` to the Phase 1 set.
 
 ### 5.2 Phase 2 — time-varying supply physics (1½ days)
 
+**Status (23 Oct): done**, except the anticipation option (`plan_lead_weeks` does not exist in the code).
+
 - **Twin.**
   - Lane parameters by week: `TwinInputs.lane_by_week` holds only overridden (week, lane) pairs. `_lead_times(origin, dest, n)` (:735) and the promise lookup in `_ship` (:895) take the dispatch week.
   - Capacity by week: `_produce` uses week-indexed `cap_plant` / `cap_family` (:955-969).
@@ -334,6 +365,8 @@ Set `SUPPORTED_MEASURES` to the Phase 1 set.
 - **Anticipation option** (`plan_lead_weeks`, default 0): shifts plan-side windows earlier by the protection interval, so a prepared policy has stock arriving for a surge's first week. The validator warns when a surge starts inside the lead time and anticipation is 0.
 
 ### 5.3 Phase 3 — stretch
+
+**Status (23 Oct):** only lane-outage v1 is built (`twin.lane_blocks`: dispatches wait for the lane to reopen). Everything else in this list is not done.
 
 - **Lane outage**: v1 holds dispatches until reopen; v2 adds failover to the second inbound lane (time-varying `supplier_of`).
 - **Mid-horizon inventory events** (a fire in week 22).
@@ -349,11 +382,13 @@ The LangGraph runtime is built. It was live-tested through Claude Desktop on 9 O
 - **First API run** with `--profile test` (`claude-sonnet-4-6` / `claude-haiku-4-5`) once credentials exist. Check:
   - that the gateway in `ANTHROPIC_BASE_URL` accepts these model IDs;
   - that `usage.cache_read_input_tokens` grows across an agent's turns.
-- **Validator model.** Haiku authored overrides reliably, but as validator it made reasoning slips even with the evidence node. Measure Sonnet as validator on the eval set (one line in `profiles.yaml`).
-- **Eval set.** About 20 planner requests with golden override sets, covering each measure, each visibility case, the library, promotions, multi-lever scenarios and deliberately ambiguous asks. Score exact match on (measure, scope, operation, value, window, sides), plus a rubric-graded check of the scenario card and the clarifying questions. Gate prompt changes on it. The live-test request and its four overrides are the first golden case.
-- **Persistent checkpointer.** Swap `InMemorySaver` for a SQLite or Postgres saver so a session paused at the approval gate survives a restart.
-- Turn on `strict: true` tool schemas once they are verified against the API.
-- **Optional front ends:** an MCP server over the same `registry` (no new logic), LangGraph Studio for tracing, or a thin Streamlit page for the scenario card and approval.
+
+  *Changed (23 Oct):* that pairing is now `--profile anthropic-test`; `test` is an NVIDIA profile. The repository records no Anthropic API run. The NVIDIA provider was exercised far enough to tune its settings (the `max_tokens` and timeout notes in `profiles.yaml` and `llm.py`), and its offline profile tests pass.
+- **Validator model.** Haiku authored overrides reliably, but as validator it made reasoning slips even with the evidence node. Measure Sonnet as validator on the eval set (one line in `profiles.yaml`). *Status:* not done; no profile sets the validator to Sonnet.
+- **Eval set.** About 20 planner requests with golden override sets, covering each measure, each visibility case, the library, promotions, multi-lever scenarios and deliberately ambiguous asks. Score exact match on (measure, scope, operation, value, window, sides), plus a rubric-graded check of the scenario card and the clarifying questions. Gate prompt changes on it. The live-test request and its four overrides are the first golden case. *Status:* not done; there is no eval set in the repository.
+- **Persistent checkpointer.** Swap `InMemorySaver` for a SQLite or Postgres saver so a session paused at the approval gate survives a restart. *Status:* not done; `graph.Team` still uses `InMemorySaver`.
+- Turn on `strict: true` tool schemas once they are verified against the API. *Status:* not done.
+- **Optional front ends:** an MCP server over the same `registry` (no new logic), LangGraph Studio for tracing, or a thin Streamlit page for the scenario card and approval. *Status:* the Streamlit front end is built (`App/streamlit_app.py`, Simulation centre: agent chat on the `desktop` or `claude` profile with the approval interrupt answered in the chat, scenario cards and approval state, an Approve button, and the arms' results). No MCP server or LangGraph Studio configuration exists.
 
 ### 5.5 Phase 5 — demo and documentation (½ day)
 
@@ -363,6 +398,8 @@ Three showcase scenarios, each with two seeds:
 3. A rail-lane lead-time spike from the library.
 
 Update the root `README.md` (the agentic layer, readiness) and the generated `OUTPUT_DOCUMENTATION.md`.
+
+*Status (23 Oct):* none of the three showcase scenarios is on disk. The scenarios that ran are SCENARIO_0003 and SCENARIO_0004 (a dairy demand decline with protest-driven lead-time increases), each on one seed. The root `README.md` does not describe the agent layer.
 
 ### 5.6 As built (9 Oct)
 
@@ -375,6 +412,16 @@ Phases 0–2 are done. Where the build departs from the design above:
 - **Lanes and capacity** are applied per week in both models. The Twin keys lead times and outages by dispatch week, and capacity and adherence by production week. MEIO rebuilds the lead-time graph and the PDC lead times for each target period.
 - **Clark-Scarf.** `clark_scarf_v2.solve` carries the same hooks, plus `PlanHooks.alpha` for `policy.pooling_alpha`. There is no separate runner: `roll_forward_policy.py` and `meio_optimizer_weekly.py` call whichever model `meio.parameters` names (`size_rdc_cdc`). In the pipeline it runs with deterministic DDLT quadrature. Monte Carlo's shared random stream moved about 75% of rows when 20 rows' demand changed, which would have buried prepared-vs-unprepared deltas in noise.
 - **Not done:** the anticipation option (`plan_lead_weeks`) and all of Phase 3.
+
+### 5.7 As built, later changes (to 23 Oct)
+
+- **Optimized pipeline.** The root config's entrypoints moved to `final_submission_optimized/`, a polars port of the MEIO and Twin code. `run_weekly_tools.py` always runs the `meio_optimizer_weekly.py` and `roll_forward_policy.py` next to it, whatever `meio.weekly_entrypoint` / `rolling_entrypoint` say. The Twin is `digital_twin_fast.py`, which applies the actual side through `models/overrides/twin.py` and writes runs to `output datasets/SCENARIO_####_Name/<run>/`. `Agents/tools/paths.PROJECTIONS_DIR` was changed to match (`output datasets`).
+- **Reactive arm** (§3.4): `reactive_twin.py`, the reactive control, `arms_for()`, `compare_runs` and `scope_service` support for it, and the analyst instructions.
+- **MEIO service level.** z now comes from the segmentation cluster ladder in `sku_clusters.csv`; `service.target_csl` replaces or shifts it.
+- **Lane outage v1** is built and tested (§5.3; the 9 Oct engine tests in §8 already covered it, so "all of Phase 3" above overstates what was missing), and all 19 measures are in `SUPPORTED_MEASURES`.
+- **Models.** NVIDIA provider and profiles (§4).
+- **Front end.** The Streamlit agent chat and approval (§5.4).
+- **Still not done:** `plan_lead_weeks`, the rest of Phase 3, the eval set, the persistent checkpointer and strict schemas.
 
 ---
 
@@ -412,6 +459,15 @@ The **minimum demoable slice** is Phases 0 and 1 by Monday: demand, inventory, s
 ---
 
 ## 8. Verification done so far
+
+**Re-checked 23 Oct.**
+- `python -m pytest Agents/tests` now collects **30 tests** (21 tools, 9 runtime). 29 passed; `test_nvidia_profile_uses_openai` failed only because `langchain-openai` was not installed in the test environment.
+- The runtime's profile tests now check the `nvidia` profile (a `ChatOpenAI` on the NVIDIA base URL with `z-ai/glm-5.3-flash`, 4096 max tokens, temperature 0.5), the NVIDIA `production` profile and the `desktop` bridge. The Sonnet 4.6, Haiku 4.5 and Opus 5.5 payload checks listed below were removed.
+- `test_compare_reproduces_known_result` now checks that `compare_runs` reproduces the deltas computed from the two `run_kpis.json` files, and their direction (MEIO above the static policy on customer fill, below it on internal fill). It no longer pins +1.7 / −7.9 pp; today's SCENARIO_0002 vs SCENARIO_0001 files give +13.86 pp customer fill and −10.81 pp internal fill.
+- `python -m pytest models/overrides/tests` **fails at collection**. `test_engine.py` puts `final_submission/` on the path for `meio_weekly_lib`, which now exists only in `final_submission_optimized/` and `MEIO_Weekly/`, and it calls `models/twin/digital_twin.run_twin(..., overrides=...)`, which takes no `overrides` argument in this tree. The engine's 9 Oct results below therefore cannot be re-run as written.
+- The 9 Oct regression and SCENARIO_0003 results below refer to runs whose outputs are no longer in the repository.
+
+**As recorded on 9 Oct:**
 
 - `python -m pytest Agents/tests` passes **28 tests** on the real datasets.
   - **Tools (20):**
@@ -460,6 +516,7 @@ The **minimum demoable slice** is Phases 0 and 1 by Monday: demand, inventory, s
 - **Not yet verified:**
   - the API path itself, which needs credentials;
   - Sonnet 4.6 specifically, which Desktop cannot select.
+- **Later scenario runs (21 and 23 Oct).** SCENARIO_0003 and SCENARIO_0004 (Veganism_Dairy_Decline_Protest_Shipping_Delays) ran through `run_scenario` on Clark-Scarf v2, with every arm succeeding (`status.json`). SCENARIO_0003's approved arms were prepared and unprepared; a reactive run and `receipts/twin_reactive.json` also exist for it, made outside `run_job`. SCENARIO_0004 ran prepared, unprepared and reactive.
 
 ---
 
@@ -468,11 +525,11 @@ The **minimum demoable slice** is Phases 0 and 1 by Monday: demand, inventory, s
 **Taken (9 Oct):**
 - **MEIO.** Scenarios run the MEIO defined in `scenario_config.json`.
 - **Runtime.** The agents run on LangGraph.
-- **Test models.** Sonnet 4.6 for the orchestrator and Haiku for the workers, in `profiles.yaml`.
+- **Test models.** Sonnet 4.6 for the orchestrator and Haiku for the workers, in `profiles.yaml`. *Changed since:* now the `anthropic-test` profile; the default profile is `nvidia`.
 - **Output location.** Override files go to `output datasets/overrides/SCENARIO_####_Name/`, from the config's `overrides.output_root`.
 
-**Still open:**
-1. **Validator model.** Haiku workers authored overrides well. The Haiku validator needed the code-level evidence node and still made reasoning slips. Recommend `validator_agent: {model: claude-sonnet-4-6}`, to confirm on the eval set.
-2. **Production models.** `production` in `profiles.yaml` is an Opus 5.5 candidate, to be decided on the eval set.
+**Still open (status 23 Oct in italics):**
+1. **Validator model.** Haiku workers authored overrides well. The Haiku validator needed the code-level evidence node and still made reasoning slips. Recommend `validator_agent: {model: claude-sonnet-4-6}`, to confirm on the eval set. *Not decided; no profile sets it, and there is no eval set.*
+2. **Production models.** `production` in `profiles.yaml` is an Opus 5.5 candidate, to be decided on the eval set. *Changed: `production` is now an NVIDIA GLM 5.3 Flash profile, and the Opus 5.5 candidate is `anthropic-production`. Not decided.*
 3. **Library fix (G9).** Correct SCN0001/0003/0005/0006 in the generator, or keep the refusal.
 4. **Committing drafts.** Scenario folders under `output datasets/overrides/` are tracked like the other outputs. Pre-scenario drafts and transcripts stay in the git-ignored `Agents/workspace/`.

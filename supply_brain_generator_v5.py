@@ -2069,6 +2069,11 @@ def validate(opening_path=None):
 # ============================================================================
 # STEP 5: write DATASET_DOCUMENTATION.md (data dictionary + FK map + elasticity METHOD)
 # ============================================================================
+# Part number the data profile (EDA) takes inside DATASET_DOCUMENTATION.md. The EDA's own
+# "2.x" subsections are renumbered to "<part>.x" when it is folded in.
+_DOC_PROFILE_PART = 7
+
+
 def _facility_cost_doc_section():
     """Build the holding-cost appendix for DATASET_DOCUMENTATION.md.
 
@@ -2081,7 +2086,7 @@ def _facility_cost_doc_section():
         return ""
     L = []
     A = L.append
-    A("\n### 5.3 Holding cost — how `cost_parameters.csv` is derived\n")
+    A("\n### 6.3 Holding cost — how `cost_parameters.csv` is derived\n")
     A(f"`cost_parameters.csv` has **{len(d):,} rows** on a **dc_id x subcategory** key "
       f"({d.dc_id.nunique()} storage facilities x {d.subcategory.nunique()} subcategories) and "
       f"ships {len(LEAN_COST_COLS)} columns:\n")
@@ -2158,7 +2163,8 @@ def _facility_cost_doc_section():
           .agg(dcs=("dc_id", "nunique"), pop=("metro_population_millions", "first"),
                ci=("metro_construction_index", "first"), cr=("cap_rate_pct", "first"),
                el=("electricity_usd_per_kwh", "first"),
-               role=("metro_market_role", "first")).reset_index().sort_values("pop", ascending=False))
+               role=("metro_market_role", "first")).reset_index()
+          .sort_values("pop", ascending=False, kind="stable"))   # stable: ties keep metro order
     for r in g.itertuples():
         A(f"| {r.city}, {r.state} | {r.region} | {r.dcs} | {r.pop} | {r.ci:.2f} | "
           f"{r.cr:.1f}% | {r.el:.3f} | {r.role} |")
@@ -2238,48 +2244,89 @@ def _facility_cost_doc_section():
     return "\n".join(L) + "\n"
 
 
-def _price_elasticity_doc_section():
-    return r'''
-### 5.1 Price elasticity — how to estimate it from `orders`
+# Bounds applied to the generated promotional elasticity (step1_masters:
+# np.clip(elast * PROMO_MULT, -4.5, 3.0)). Documentation only -- keep in step.
+_PROMO_ELAST_CLIP = (-4.5, 3.0)
+
+
+def _price_elasticity_doc_section(st):
+    """Section 6.1. `st` holds the figures computed by _doc_stats() and the
+    category-level elasticity recovery from generate_eda()."""
+    P = _DOC_PROFILE_PART
+    er = st.get("elasticity") or []
+    if er:
+        _rat = [e[3] for e in er if e[3] == e[3]]
+        _n_gt = sum(1 for e in er if e[2] <= e[1])
+        recovered = (f" Recovered from the data (§{P}.8), promo/base runs "
+                     f"{min(_rat):.2f}-{max(_rat):.2f}x by category, larger than\n"
+                     f"    base in {_n_gt} of {len(er)}.")
+    else:
+        recovered = ""
+    lo, hi = _PROMO_ELAST_CLIP
+    return f'''
+### 6.1 Price elasticity — how to estimate it from `orders`
 
 The data carries TWO distinct price responses, and no elasticity column is shipped -- you estimate both
 from `orders`, exactly as you would on a real client extract:
 * **base (regular) elasticity** -- response of demand to the everyday **shelf** price
-    (`base_price_usd`, which drifts with mild inflation and steps at 1-3 revisions/yr).
+    (`base_price_usd`, which drifts with ~4%/yr inflation plus a small random walk and steps at
+    3-6 revisions/yr).
 * **promotional (deal) elasticity** -- response to a temporary **discount** (`discount_pct`,
-    ~30% of VOLUME; v3's documentation claimed ~30% of SKU-weeks but the shipped data reached
-    only 11.6% of volume); larger in magnitude than base (grounded at ~1.75x; CPG research
-    puts promo ~1.5-2x regular). Promotions are followed by a **forward-buy dip** in the next
+    ~{st["promo_vol"]*100:.0f}% of VOLUME; v3's documentation claimed ~30% of SKU-weeks but the shipped data reached
+    only 11.6% of volume). It is generated as {PROMO_MULT}x the base elasticity (CPG research puts promo
+    ~1.5-2x regular), clipped to [{lo}, +{hi}]. The clip inverts the ordering for very elastic
+    groups (base below about {lo / PROMO_MULT:.1f}), where the promotional response ends up *weaker* than the
+    base.{recovered} Promotions are followed by a **forward-buy dip** in the next
     1-2 weeks for storable categories (pantry-loading payback), which is the signature that
     separates a deal response from a base response.
-* Estimate at **`subcategory`** level (22-25 groups), not `category` (5). The subcategory IS
+* Estimate at **`subcategory`** level ({st["n_subcat"]} groups), not `category` ({st["n_cat"]}). The subcategory IS
     the real product group each SKU's elasticity was drawn from; pooling to category mixes
-    genuinely different responses together.
+    genuinely different responses together. (The snippet below and §{P}.8 pool to category
+    for stable numbers, and inherit that mixing.)
 * `off_invoice_pct` and the other trade-term columns give **cross-sectional** price variation
     on top of the time-series variation in `base_price_usd`; both are needed to separate base
     from promotional response.
 '''
 
 
-def _forecast_doc_section():
-    return r'''
-### 5.2 The two forecasts — how `demand_forecast` is built
+def _forecast_doc_section(st):
+    """Section 6.2 plus the elasticity-estimation method. Figures come from
+    _doc_stats(); spans are derived from the calendar constants."""
+    P = _DOC_PROFILE_PART
+    span = st["span"].replace("–", "-")
+    burn = st["burn_span"].replace("–", "-")
+    ev = st["last_yr"]
+    er = st.get("elasticity") or []
+    _n_gt = sum(1 for e in er if e[2] <= e[1])
+    holds = (f", and in this instance it holds in {_n_gt} of {len(er)} categories (§{P}.8)"
+             if er else "")
+    red = 1 - st["wmape_promo_incl"] / st["wmape_promo_base"] if st["wmape_promo_base"] else 0.0
+    _rw = _frac_words(red, tol=0.03)
+    red_words = f"roughly {_rw}" if not _rw.endswith("%") else f"about {_rw}"
+    return f'''
+### 6.2 The two forecasts — how `demand_forecast` is built
 
 v3 set `forecast_qty = actual_qty * (1 + noise)`, which made the forecast a relabelled copy of
 the actual: `corr(forecast, actual) = 0.981`, and 97.6% of the WMAPE variance was explained by
 the `segment` column alone. It also meant promo weeks were **no harder** than normal weeks,
 directly contradicting v3's own documentation.
 
-v4 forecasts **ex ante** in three layers:
-* **Layer 0 -- de-batch.** Forecast at SKU x DC x week, then disaggregate to customer by
-  historical share. 62% of the apparent volatility at customer grain is order batching, not
-  demand.
-* **Layer 1 -- baseline.** De-promote the history, then seasonal-naive from t-52 rescaled by
-  the trailing 13-week level ratio. Only weeks strictly before t are ever used. This is why
-  2023-24 exist: a seasonal model needs at least two prior cycles.
-* **Layer 2 -- lift.** Uplift per series estimated from PRIOR promo weeks, applied to the
-  PLANNED promo calendar with ~35% planner misestimation. Applying the true lift would rebuild
-  the leak.
+v4 forecasts in three layers. The baseline is ex ante; the lift and the customer split are not
+strictly so:
+* **Layer 0 -- de-batch.** Forecast at SKU x DC x week, then disaggregate to customer by each
+  customer's share of the full {span} history (which includes the evaluated year). At customer
+  grain about {st["zero_cells"]*100:.0f}% of in-sample weekly cells have no order at all, because slower items are
+  ordered every two or three weeks. Much of the apparent volatility there is the order
+  calendar, not demand.
+* **Layer 1 -- baseline.** De-promote the history (promo weeks masked and interpolated), then
+  seasonal-naive from t-52 rescaled by the trailing 13-week level ratio. Apart from that
+  interpolation, only weeks before t are used. The forward year applies one year-over-year
+  ratio, fixed at the cut-over, to the de-promoted {ev} shape. This is why {burn} exist: a
+  seasonal model needs at least two prior cycles.
+* **Layer 2 -- lift.** Uplift per series is the median observed uplift over the promo weeks of
+  the whole {ACTUAL_WEEKS}-week history, including the {ev} weeks it is then scored on. It is applied to
+  the PLANNED promo calendar with ~35% planner misestimation. Applying the true lift would
+  rebuild the leak.
 #### The two published series
 
 `demand_forecast` publishes **two usable forecasts** on the same rows, plus the bridge between
@@ -2300,20 +2347,21 @@ evaluated year:
 
 | Series | Weekly CV |
 |---|---|
-| `forecast_baseline_qty` | ~0.16 -- deliberately smooth |
-| `forecast_qty` | ~0.19 |
-| **actual demand** | **~0.19** |
+| `forecast_baseline_qty` | ~{st["cv_baseline"]:.2f} -- deliberately smooth |
+| `forecast_qty` | ~{st["cv_forecast"]:.2f} |
+| **actual demand** | **~{st["cv_actual"]:.2f}** |
 
 The promo-inclusive forecast tracks the lumpiness of actual demand; the baseline does not,
-because promotional weeks have been stripped out of it. On promotional weeks specifically,
-applying the promo calendar cuts WMAPE by roughly a third (about 0.57 baseline-only versus
-0.39 with promotions).
+because promotional weeks have been stripped out of it. On promotional weeks specifically
+(rows with a planned promotion, `forecast_promo_lift_qty > 0`), applying the promo calendar cuts
+WMAPE by {red_words} (about {st["wmape_promo_base"]:.2f} baseline-only versus {st["wmape_promo_incl"]:.2f} with promotions).
 
 **If the two look nearly identical in your own test, check what you aggregated.** Promotional
-lift is only about 15% of total volume (roughly 30% of volume on deal at about 2x lift), so it
-cannot move a portfolio-level CV by a large multiple. It shows up clearly in three places: the
-week-of-year promo profile (promo volume share swings from about 15% in the January trough to
-about 45% in the Thanksgiving/Christmas window), promo-week accuracy, and any single SKU-DC
+lift is only about {st["lift_share"]*100:.0f}% of forecast volume in the evaluated year (roughly {st["promo_vol"]*100:.0f}% of volume moves on
+deal, and only the incremental part of it is lift), so it cannot move a portfolio-level CV by a
+large multiple. It shows up clearly in three places: the
+week-of-year promo profile (promo volume share swings from about {st["promo_woy_lo"]*100:.0f}% in the January trough to
+about {st["promo_woy_hi"]*100:.0f}% in the Thanksgiving/Christmas window), promo-week accuracy, and any single SKU-DC
 series. It will look muted if you aggregate across the whole portfolio and the whole year at
 once.
 
@@ -2321,17 +2369,22 @@ Both panels are **complete**: every (SKU, DC, customer, week) cell exists, with 
 zero-demand rows. v3's in-sample panel was 66% filled with no zero-demand rows at all, while
 its forward panel was 100% dense.
 
+#### Estimating the two elasticities (method for §6.1)
+
 Recommended method -- one regression with BOTH price terms and SKU + week fixed effects:
 
-    ln(order_qty)_{i,t} = alpha_i + gamma_t
-                        + beta_base  * ln(base_price_usd)_{i,t}
-                        + beta_promo * ln(1 - discount_pct)_{i,t} + e
+    ln(order_qty)_{{i,t}} = alpha_i + gamma_t
+                        + beta_base  * ln(base_price_usd)_{{i,t}}
+                        + beta_promo * ln(1 - discount_pct)_{{i,t}} + e
 
 * `alpha_i` (SKU FE) absorbs baseline volume/price; `gamma_t` (week FE) absorbs common seasonality.
 * `beta_base` is identified from shelf-price drift/revisions; `beta_promo` from discount depth.
-* Expect |beta_promo| > |beta_base|. Estimate per category (pool SKUs) for stable numbers.
+* Do not assume |beta_promo| > |beta_base| everywhere: the clip described in §6.1 reverses it for
+  very elastic groups{holds}. Estimate per
+  category (pool SKUs) for stable numbers.
 
-Minimal snippet (statsmodels):
+Minimal snippet (statsmodels; if `orders.csv` in your checkout is a Git LFS pointer, read
+`orders.parquet` instead):
 
     import pandas as pd, numpy as np, statsmodels.formula.api as smf
     o = pd.read_csv("orders.csv").merge(pd.read_csv("sku_master.csv")[["sku_id","category"]], on="sku_id")
@@ -2347,9 +2400,6 @@ demeaned ln_q on [demeaned ln_base, demeaned ln_promo].
 Caveats: (1) to isolate the forward-buy effect, add lagged-promo controls or expect the post-promo dip;
 (2) always include the week FE; (3) both elasticities are negative for most groups, a few real groups
 are near-zero/positive and kept verbatim, so a pooled category value can be pulled toward zero.
-
-"""
-doc += _facility_cost_doc_section()
 '''
 
 
@@ -2358,11 +2408,11 @@ doc += _facility_cost_doc_section()
 _Z_NOMINAL = {2.05: 98, 1.64: 95, 1.28: 90}
 
 
-def _policy_doc_section():
+def _policy_doc_section(st):
     """Plain-words data dictionary for the policy table.
 
-    Numbers are read off the table that was just written, so the prose cannot
-    drift away from the data.
+    Numbers are read off the table that was just written (and, via `st`, off
+    the order history and lanes), so the prose cannot drift away from the data.
     """
     OUT = OUTPUT_DIR
     b = pd.read_csv(f"{OUT}/baseline_policy.csv")
@@ -2392,6 +2442,25 @@ def _policy_doc_section():
         f"{r.order_up_to_level:,} | {r.z} |" for r in ex.itertuples(index=False))
     ex_seg = b.loc[b.sku_id == _ex_sku, "segment"].iloc[0]
     ex_fam = b.loc[b.sku_id == _ex_sku, "production_family"].iloc[0]
+
+    # prose that depends on the order history, lanes and sourcing map
+    _gap = st["mu_gap"]
+    if abs(_gap) < 0.005:
+        mu_level = (f"In aggregate `mu` sits at about the {st['last_yr']} weekly level.")
+    elif _gap < 0:
+        mu_level = (f"Because `mu`\naverages in the lower {st['burn_span']} volumes, in aggregate it sits "
+                    f"about {abs(_gap)*100:.0f}% below the\n{st['last_yr']} weekly level.")
+    else:
+        mu_level = (f"Because `mu`\naverages in the higher {st['burn_span']} volumes, in aggregate it sits "
+                    f"about {_gap*100:.0f}% above the\n{st['last_yr']} weekly level.")
+    if st["n_fb1"] == 0:
+        fb = "No row in this instance needs\neither fallback."
+    else:
+        fb = (f"In this instance {st['n_fb1']:,} rows have no sourcing entry"
+              f" ({st['n_fb2']:,} of them also have no inbound lane).")
+    _L = st["plant_pdc_lt"]
+    pdc_L = f"{_L[0]:g}" if _L[0] == _L[1] else f"{_L[0]:g}-{_L[1]:g}"
+    _MIN_S = f"{MIN_S_MULTIPLE:g}"
 
     return f"""
 ---
@@ -2487,20 +2556,46 @@ shortfall arriving from upstream or the timing of demand inside a week.
 protection window   P  = 1 week (the review) + lead time of the lane this SKU travels
 safety_stock           = z x sqrt( P x sigma_demand^2 + mu_demand^2 x sigma_leadtime^2 )
 reorder_point    s     = mu_demand x P + safety_stock
-order_up_to_level S    = s + mu_demand x {ORDER_COVER_WEEKS} weeks
+order_up_to_level S    = max( s + mu_demand x {ORDER_COVER_WEEKS} weeks , {_MIN_S} x s )
 ```
 
-`mu` and `sigma` are that location's weekly demand mean and standard deviation
-for that SKU. The lane lead time comes from `sku_sourcing_map.csv` — the route
-the SKU actually travels, which matters a great deal: one plant-DC-to-regional-DC
-lane runs half a day and another nearly thirteen.
+The `{_MIN_S} x s` floor binds in about {st['floor_share']*100:.0f}% of regional and customer DC rows.
 
-Sigma is also uplifted upstream ({", ".join(f"{k} x{v}" for k, v in SIGMA_UPLIFT.items())}),
-because a parent absorbs its children's order lumpiness on top of its own demand.
+`mu` and `sigma` come from that location's weekly orders for that SKU over the
+**full {st['span']} order history**, not the {st['last_yr']} year alone. They are on different
+bases. `mu` is total units divided by all {st['n_weeks']} weeks, zero weeks included.
+`sigma` is the standard deviation over only the weeks in which the location
+actually ordered the SKU. Both include seasonality and trend. {mu_level}
+
+Demand here means orders placed **at that location only**. A regional DC's
+`mu` and `sigma` are its own bulk customers' orders. They do not include the
+replenishment flow it passes on to its customer DCs.
+
+The lane lead time comes from `sku_sourcing_map.csv` — the route the SKU
+actually travels, which matters a great deal: one plant-DC-to-regional-DC lane
+runs {_days(st['pdc_rdc_lt'][0])} and another {_days(st['pdc_rdc_lt'][1])}. A pair without a sourcing entry
+would fall back to the shortest lane into the node, and failing that to a
+3.0-day mean and 1.0-day standard deviation. {fb}
+
+Sigma is uplifted at regional DCs (x{SIGMA_UPLIFT['RDC']}; customer DCs x{SIGMA_UPLIFT['CDC']}) as an allowance
+for the order lumpiness a parent absorbs from its children, even though, as
+noted above, the children's flow itself is not in the regional DC's `mu`. The
+plant-DC factor (x{SIGMA_UPLIFT['PDC']}) multiplies throughput rather than a sigma (below).
 
 **Plant DCs are the exception.** They are not *pulled* by a reorder point —
-production *pushes* finished goods into them. Their `S` is therefore a holding
-ceiling sized on throughput (about {PDC_COVER_WEEKS} weeks of it), not a trigger,
+production *pushes* finished goods into them. Their throughput `mu` is the sum
+of the `mu` of every regional DC that sources the SKU from them. That again
+counts regional DCs' own customer demand only, not the customer-DC flow behind
+them. The three numbers are heuristics proportional to throughput, not to its
+variability:
+
+```
+safety_stock       = z x sqrt(L / 7) x mu x {SIGMA_UPLIFT['PDC']} x 0.5     L = plant-to-plant-DC lead time, days ({pdc_L})
+reorder_point  s   = safety_stock + mu x L / 7
+order_up_to    S   = mu x {PDC_COVER_WEEKS} weeks + safety_stock
+```
+
+`S` is a holding ceiling sized on throughput (about {PDC_COVER_WEEKS} weeks of it), not a trigger,
 which is what the {ratio.get('PDC', float('nan')):.1f}x `S / s` ratio above is showing.
 
 ### Worked example — `{_ex_sku}`, {ex_seg.lower()}, {ex_fam}
@@ -2513,8 +2608,9 @@ One product, {len(ex)} locations, {len(ex)} different policies:
 
 `z` is identical everywhere, because it is a property of the product. Everything
 else varies with **local demand** and **lane length**. The largest regional DC
-carries orders of magnitude more than the smallest customer DC, because it serves
-big customers directly *and* restocks the customer DCs beneath it. A row of
+carries orders of magnitude more than the smallest customer DC because its own
+bulk customers order far more. Its policy does not include the customer DCs it
+restocks. A row of
 zeros, if one appears above, is a location that barely sells this product at all
 — it is stocked on paper but the arithmetic says hold nothing and never reorder.
 
@@ -2548,6 +2644,12 @@ def write_schema_doc():
     root = os.path.dirname(os.path.abspath(OUT))
     world = sorted(os.path.basename(f) for f in os.listdir(OUT)
                    if f.endswith(".csv"))
+    # calendar facts that do NOT follow START_YEAR automatically
+    _trend_yrs = f"{min(YEAR_TREND)}-{max(YEAR_TREND)}"
+    _w1 = f"{WEEK1_MONDAY.day} {WEEK1_MONDAY.strftime('%B')}"
+    _w53 = [y for y in YEARS if dt.date(y, 12, 28).isocalendar()[1] == 53]
+    _w53_note = (f"; ISO {', '.join(f'{y}-W53' for y in _w53)} "
+                 f"{'is' if len(_w53) == 1 else 'are'} not generated" if _w53 else "")
     doc = f"""# Supply Brain — data layout
 
 *Auto-generated {dt.datetime.now().strftime('%Y-%m-%d %H:%M')} by
@@ -2573,12 +2675,19 @@ them: they are the record of the past, which is input to any analysis. Only
 what looks *forward* moves to `output datasets/`. The generator prints a
 warning if a forward artefact ever appears in the input folder.
 
-The horizon boundary is derived, never hardcoded to a calendar year. History is
+The horizon boundary is derived from the generator's horizon constants. History is
 the span the order history covers ({period_label(1)}..{period_label(ACTUAL_WEEKS)},
 {ACTUAL_WEEKS} weeks) and the forward horizon is everything after it
 ({period_label(FWD_START_WEEK)}..{period_label(TOTAL_WEEKS)}, {FWD_WEEKS} weeks).
-Change `START_YEAR` or the week counts in the generator and every label,
-filename and split follows.
+Period labels and the history/forward split follow `START_YEAR` and the week
+counts, but not everything does: `YEAR_TREND` is keyed by calendar year
+({_trend_yrs}) and `WEEK1_MONDAY` is fixed to {_w1} of `START_YEAR`. Changing the
+start year means updating those as well.
+
+The generator writes CSV. Every input table also has a `.parquet` copy in the
+repository, and the final MEIO pipeline and fast twin read those. `orders.csv`
+and `inventory.csv` are Git LFS pointer files, so without LFS only their parquet
+copies hold data.
 
 ---
 
@@ -2587,7 +2696,7 @@ filename and split follows.
 | Document | Written by | Covers |
 |---|---|---|
 | `input datasets/DATASET_DOCUMENTATION.md` | `supply_brain_generator_v5.py` | Every input table, the business assumptions behind it, how each layer is generated, the policy dictionary, and a data profile |
-| `output datasets/OUTPUT_DOCUMENTATION.md` | `models/twin/digital_twin.py` | What the twin does, its event order and assumptions, and the schema of every artefact a run produces |
+| `output datasets/OUTPUT_DOCUMENTATION.md` | `models/twin/digital_twin.py` (also rewritten by `digital_twin_fast.py`) | What the twin does, its event order and assumptions, and the schema of every artefact a run produces |
 
 ---
 
@@ -2603,10 +2712,20 @@ filename and split follows.
                         └─ forward_policy, opening_position, summaries
                                                     ─► output datasets/<run>/
                   scenarios, validate, document    ─► input datasets/
+                                                       (SCHEMA.md ─► project root,
+                                                        OUTPUT_DOCUMENTATION.md ─► output datasets/)
 
-forward scenario  twin (forward mode)               ─► output datasets/<scenario>/
-                     --policy <forward_policy.csv>
-                     --state  <opening_position.csv>
+forward scenario  twin (forward mode)               ─► output datasets/projections/baseline/
+                     --policy <forward_policy.csv>        (run name "baseline"),
+                     --state  <opening_position.csv>      output datasets/<run-name>/ otherwise,
+                                                          output datasets/SCENARIO_####_Name/
+                                                          with --scenario-config
+
+MEIO pipeline     run_meio_then_twin.py (reads scenario_config.json)
+                    1. Clark-Scarf v2 MEIO          ─► output datasets/MEIO/SCENARIO_####_Name/
+                                                         rolling_2026/meio_policy_rolling.parquet
+                    2. digital_twin_fast.py         ─► output datasets/SCENARIO_####_Name/<run_name>/
+                       (forward, same opening_position.csv)
 ```
 
 Build the dataset:
@@ -2624,8 +2743,16 @@ python models/twin/digital_twin.py --mode forward --run-name baseline \
 ```
 
 Stages run independently: `--stage world` rebuilds the given data, `--stage
-history` re-simulates the past against it. `--skip-docs` omits validation,
-documentation and the data profile.
+history` re-simulates the past against it (`--stage` accepts only `world`,
+`history` and `all`). `--skip-docs` omits validation, documentation and the data
+profile. `--seed` (default 2026) seeds the history-mode twin run only; the seeds
+that build the world are fixed in code.
+
+Run the final MEIO policy build and score it in the fast twin:
+
+```bash
+python run_meio_then_twin.py --scenario-config scenario_config.json
+```
 
 ---
 
@@ -2633,7 +2760,7 @@ documentation and the data profile.
 
 | Field | Meaning |
 |---|---|
-| `period` | ISO week label `YYYY-Www` |
+| `period` | ISO week label `YYYY-Www` ({WEEKS_PER_YEAR} weeks per year{_w53_note}) |
 | `week_start_date` | Monday of that week |
 | `dc_id` | `PDC01`…`RDC08`…`CDC15` — plant DC, regional DC, customer DC |
 | `sku_id` | `SKU0001`… |
@@ -2653,14 +2780,18 @@ cancelled at week close and re-ordered at the next review.
 
 ## The optimization seam
 
-One standalone CSV, five required columns:
+One standalone table, five required columns:
 
 ```
 dc_id, sku_id, safety_stock, reorder_point, order_up_to_level
 ```
 
 That is the only thing an optimizer changes. Extra columns are ignored, so an
-optimizer's native output can be handed over verbatim. Opening state comes from
+optimizer's native output can be handed over verbatim. The exception is an
+optional `period` column: when it is present, the policy is time-varying, with one
+row per week. The MEIO rolling policy (`meio_policy_rolling.parquet`, {period_label(FWD_START_WEEK)}..W{woy(TOTAL_WEEKS):02d})
+uses this. The canonical twin reads the policy as CSV; the fast twin
+(`digital_twin_fast.py`) reads CSV or parquet. Opening state comes from
 a separate `--state` file and is never touched by a policy swap, so two runs
 start from an identical physical position and the difference between them
 measures the decision rather than the starting point.
@@ -2670,6 +2801,186 @@ Full dictionary: Part 5 of `input datasets/DATASET_DOCUMENTATION.md`.
     with open(os.path.join(root, "SCHEMA.md"), "w", encoding="utf-8") as f:
         f.write(doc)
     print(f"  wrote SCHEMA.md ({doc.count(chr(10)):,} lines)")
+
+
+_TIER_WORD = {"PLANT": "plant", "PLANT_DC": "plant-DC", "REGIONAL_DC": "regional-DC",
+              "CUSTOMER_DC": "customer-DC"}
+_MODE_WORD = {"Train": "rail", "Truck": "truck"}
+_POSTURE_WORD = {"EDLC": "everyday-low-cost", "HIGH_LOW": "high-low", "CONTRACT": "contract"}
+_NUM_WORD = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight",
+             9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen",
+             15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+             20: "twenty"}
+
+
+def _frac_words(x, tol=0.02):
+    """A share in words when it sits close to a simple fraction ("half", "a third"),
+    otherwise as a percentage. Keeps computed figures readable in prose."""
+    for v, w in ((0.5, "half"), (1 / 3, "a third"), (2 / 3, "two-thirds"),
+                 (0.25, "a quarter"), (0.75, "three-quarters"), (0.2, "a fifth")):
+        if abs(x - v) <= tol:
+            return w
+    return f"{x*100:.0f}%"
+
+
+def _one_in(x, noun):
+    """'one <noun> in five' when 1/x is close to a whole number, else 'N% of <noun>s'."""
+    if x > 0:
+        n = round(1 / x)
+        if 2 <= n <= 20 and abs(1 / x - n) / n < 0.05:
+            return f"one {noun} in {_NUM_WORD[n]}"
+    return f"{x*100:.0f}% of {noun}s"
+
+
+def _days(x):
+    """A lead time in words: 'half a day', 'nearly thirteen days', or '3.2 days'."""
+    if abs(x - 0.5) < 0.05:
+        return "half a day"
+    if x >= 2 and x - math.floor(x) >= 0.75 and math.ceil(x) in _NUM_WORD:
+        return f"nearly {_NUM_WORD[math.ceil(x)]} days"
+    return f"{x:.1f} days"
+
+
+def _doc_stats(OUT, sku, orders, inv, fcst, rcpt, ban):
+    """Figures the narrative in DATASET_DOCUMENTATION.md quotes, computed from the tables
+    just written so the prose cannot drift from the data. Read-only: nothing here feeds
+    back into any generated table."""
+    st = {}
+    st["first_yr"] = period_label(1)[:4]
+    st["burn_last_yr"] = period_label(BURN_WEEKS)[:4]
+    st["last_yr"] = period_label(ACTUAL_WEEKS)[:4]
+    st["fwd_yr"] = period_label(FWD_START_WEEK)[:4]
+    st["span"] = f"{st['first_yr']}–{st['last_yr'][2:]}"
+    st["burn_span"] = f"{st['first_yr']}–{st['burn_last_yr'][2:]}"
+    st["n_subcat"] = sku.subcategory.nunique()
+    st["n_cat"] = sku.category.nunique()
+    st["promo_vol"] = float(orders.loc[orders.on_promo, "order_qty"].sum()
+                            / orders.order_qty.sum())
+    st["margin_lo"], st["margin_hi"] = float(sku.margin_pct.min()), float(sku.margin_pct.max())
+
+    # --- commercial postures: promotional exposure by pricing strategy ------
+    ob = orders[["b2b_customer_id", "order_qty", "on_promo", "discount_pct"]].merge(
+        ban[["b2b_customer_id", "pricing_strategy"]], on="b2b_customer_id")
+    _tot = ob.groupby("pricing_strategy").order_qty.sum()
+    _pq = ob[ob.on_promo].groupby("pricing_strategy").order_qty.sum().reindex(_tot.index).fillna(0)
+    st["posture_share"] = (_pq / _tot).to_dict()
+    st["posture_depth"] = ob[ob.on_promo].groupby("pricing_strategy").discount_pct.mean().to_dict()
+    promos = pd.read_csv(f"{OUT}/promotions.csv", usecols=["b2b_customer_id"])
+    st["promo_all_share"] = float((promos.b2b_customer_id == "ALL").mean())
+    _contract = set(ban.loc[ban.pricing_strategy == "CONTRACT", "b2b_customer_id"])
+    st["contract_targeted"] = bool(promos.b2b_customer_id.isin(_contract).any())
+    _wk = orders.period.str[-2:].astype(int)
+    _woy = (orders.order_qty.where(orders.on_promo, 0).groupby(_wk).sum()
+            / orders.order_qty.groupby(_wk).sum())
+    st["promo_woy_lo"], st["promo_woy_hi"] = float(_woy.min()), float(_woy.max())
+
+    # --- lanes actually used (the sourcing map is the routing the twin runs) -
+    lanes = pd.read_csv(f"{OUT}/network_lanes.csv")
+    smap = pd.read_csv(f"{OUT}/sku_sourcing_map.csv")
+    _used = set(zip(smap.origin_node_id, smap.dc_id))
+    lu = pd.Series([(o, d) in _used for o, d in
+                    zip(lanes.origin_node_id, lanes.destination_node_id)], index=lanes.index)
+    lat = (lanes.origin_node_type == "REGIONAL_DC") & (lanes.destination_node_type == "REGIONAL_DC")
+    st["n_lanes"] = len(lanes)
+    st["n_unused"] = int((~lu).sum())
+    st["n_lat"] = int(lat.sum())
+    st["n_fail_unused"] = int(((lanes.destination_node_type == "CUSTOMER_DC") & ~lu).sum())
+    st["n_other_unused"] = st["n_unused"] - st["n_fail_unused"] - int((lat & ~lu).sum())
+    st["cdc_single"] = bool((smap[smap.dc_id.str.startswith("CDC")]
+                             .groupby("dc_id").origin_node_id.nunique() <= 1).all())
+    ul = lanes[lu]
+    _lo = ul.lead_time_mean_days.min()
+    _at_lo = set(ul.loc[ul.lead_time_mean_days == _lo, "destination_node_type"])
+    _lo_words = {"PLANT_DC": "a co-located plant DC",
+                 "REGIONAL_DC": "a regional DC in the same metro as its plant DC",
+                 "CUSTOMER_DC": "a customer DC in the same metro as its regional DC"}
+    st["lt_lo"] = float(_lo)
+    _lw = [w for t, w in _lo_words.items() if t in _at_lo]
+    st["lt_lo_where"] = (", ".join(_lw[:-1]) + ("," if len(_lw) > 2 else "") + " or " + _lw[-1]
+                         if len(_lw) > 1 else "".join(_lw))
+    _hi = ul.loc[ul.lead_time_mean_days.idxmax()]
+    st["lt_hi"] = float(_hi.lead_time_mean_days)
+    st["lt_hi_lane"] = (f"{_TIER_WORD.get(_hi.origin_node_type, _hi.origin_node_type)}-to-"
+                        f"{_TIER_WORD.get(_hi.destination_node_type, _hi.destination_node_type)} "
+                        f"{_MODE_WORD.get(_hi.transport_mode, _hi.transport_mode)} lane")
+    _c = ul[ul.destination_node_type == "CUSTOMER_DC"].lead_time_mean_days
+    st["cdc_lt"] = (float(_c.min()), float(_c.max()))
+    _p = ul[(ul.origin_node_type == "PLANT_DC")
+            & (ul.destination_node_type == "REGIONAL_DC")].lead_time_mean_days
+    st["pdc_rdc_lt"] = (float(_p.min()), float(_p.max()))
+    _pl = lanes[lanes.destination_node_type == "PLANT_DC"].lead_time_mean_days
+    st["plant_pdc_lt"] = (float(_pl.min()), float(_pl.max()))
+
+    # --- service by echelon ---------------------------------------------------
+    _t = inv.dc_id.str[:3]
+
+    def _fill(kind, tier):
+        m = _t == tier
+        d = inv.loc[m, f"demand_{kind}_qty"].sum()
+        return float(1 - inv.loc[m, f"unmet_{kind}_qty"].sum() / d) if d > 0 else float("nan")
+    st["fill_rdc_cust"] = _fill("customer", "RDC")
+    st["fill_cdc_cust"] = _fill("customer", "CDC")
+    st["fill_pdc_replen"] = _fill("replen", "PDC")
+    st["fill_rdc_replen"] = _fill("replen", "RDC")
+    _wf = inv.groupby("period")[["demand_customer_qty", "unmet_customer_qty"]].sum().sort_index()
+    _wf = 1 - _wf.unmet_customer_qty / _wf.demand_customer_qty.replace(0, np.nan)
+    st["wk1_fill"] = float(_wf.iloc[0])
+    _r90 = np.flatnonzero(_wf.to_numpy() >= 0.90)
+    st["wk_reach90"] = int(_r90[0]) + 1 if len(_r90) else None
+    st["cold_start"] = bool(inv.loc[inv.period == period_label(1), "opening_stock"].sum() == 0)
+
+    # --- a short receipt vs a customer stockout the following week -----------
+    # Receipt arrival week (day 0 is the Monday of week 1); compare the next week at the
+    # same location, on location-weeks that have customer demand.
+    r = rcpt[["dc_id", "sku_id", "arrival_day", "short_qty"]].copy()
+    r["wk"] = r.arrival_day // 7 + 2
+    r = (r[r.wk <= ACTUAL_WEEKS].groupby(["dc_id", "sku_id", "wk"]).short_qty.max()
+         .gt(0).rename("short").reset_index())
+    r["period"] = r.wk.map({w: period_label(int(w)) for w in r.wk.unique()})
+    _nx = inv.loc[inv.demand_customer_qty > 0, ["dc_id", "sku_id", "period", "unmet_customer_qty"]]
+    j = r.merge(_nx, on=["dc_id", "sku_id", "period"])
+    _p1 = (j.loc[j.short, "unmet_customer_qty"] > 0).mean()
+    _p0 = (j.loc[~j.short, "unmet_customer_qty"] > 0).mean()
+    st["short_ratio"] = float(_p1 / _p0) if _p0 > 0 else float("nan")
+
+    # --- forecast quality over the evaluated year ------------------------------
+    ins = fcst[fcst.horizon == "in_sample"]
+    st["bias_all"] = float(ins.forecast_qty.sum() / ins.actual_qty.sum() - 1)
+    nz = ins[ins.actual_qty > 0].merge(sku[["sku_id", "segment", "category"]], on="sku_id")
+    st["bias_nz"] = float(nz.forecast_qty.sum() / nz.actual_qty.sum() - 1)
+    _gb = pd.concat([nz.groupby(c)[["forecast_qty", "actual_qty"]].sum()
+                     for c in ("segment", "category")])
+    _gbias = _gb.forecast_qty / _gb.actual_qty - 1
+    st["bias_groups_neg"] = bool((_gbias < 0).all())
+    st["bias_groups_pos"] = bool((_gbias > 0).all())
+    st["zero_cells"] = float((ins.actual_qty == 0).mean())
+    pr = ins[ins.forecast_promo_lift_qty > 0]
+    _a = pr.actual_qty.sum()
+    st["wmape_promo_base"] = float((pr.forecast_baseline_qty - pr.actual_qty).abs().sum() / _a) if _a else float("nan")
+    st["wmape_promo_incl"] = float((pr.forecast_qty - pr.actual_qty).abs().sum() / _a) if _a else float("nan")
+    st["lift_share"] = float(ins.forecast_promo_lift_qty.sum() / ins.forecast_qty.sum())
+    _nat = ins.groupby("period")[["forecast_baseline_qty", "forecast_qty", "actual_qty"]].sum()
+    _cv = _nat.std() / _nat.mean()
+    st["cv_baseline"], st["cv_forecast"], st["cv_actual"] = (
+        float(_cv.forecast_baseline_qty), float(_cv.forecast_qty), float(_cv.actual_qty))
+
+    # --- baseline policy facts (mirrors derive_baseline_policy, basis="history")
+    b = pd.read_csv(f"{OUT}/baseline_policy.csv")
+    wk = orders.groupby(["period", "dc_id", "sku_id"], as_index=False).order_qty.sum()
+    st["n_weeks"] = int(wk.period.nunique())
+    mu = (wk.groupby(["dc_id", "sku_id"]).order_qty.sum() / st["n_weeks"]).rename("mu").reset_index()
+    nb = b[~b.dc_id.str.startswith("PDC")].merge(mu, on=["dc_id", "sku_id"], how="left")
+    nb["mu"] = nb.mu.fillna(0.0)
+    st["floor_share"] = float((nb.mu * max(REVIEW_WEEKS, ORDER_COVER_WEEKS)
+                               < (MIN_S_MULTIPLE - 1) * nb.reorder_point).mean())
+    _last = orders[orders.period.str[:4] == st["last_yr"]]
+    st["mu_gap"] = float((orders.order_qty.sum() / st["n_weeks"])
+                         / (_last.order_qty.sum() / _last.period.nunique()) - 1)
+    _pairs = set(zip(smap.dc_id, smap.sku_id))
+    _miss = nb[[(d, s) not in _pairs for d, s in zip(nb.dc_id, nb.sku_id)]]
+    st["n_fb1"] = len(_miss)
+    st["n_fb2"] = int((~_miss.dc_id.isin(set(lanes.destination_node_id))).sum())
+    return st
 
 
 def write_documentation():
@@ -2702,11 +3013,151 @@ def write_documentation():
     _putil = float((_pu.actual_qty / _pu.production_capacity_units_per_week).mean())
     _pupeak = float((_pu.actual_qty / _pu.production_capacity_units_per_week).max())
 
+    # ---- figures and data-dependent sentences quoted in the narrative ----------
+    P = _DOC_PROFILE_PART
+    st = _doc_stats(OUT, sku, orders, inv, fcst, rcpt, ban)
+    # The profile runs first so the elasticity it recovers can be quoted in Part 6.
+    _eda = generate_eda(OUT, as_section=True, stats=st)
+    _channels = ", ".join(f"`{c}`" for c in ban.channel_type.unique())
+
+    _ps, _pd = st["posture_share"], st["posture_depth"]
+    _pw = [k for k in ("EDLC", "HIGH_LOW", "CONTRACT") if k in _ps]
+    if st["contract_targeted"]:
+        contract_line = ("- **Contract accounts** (foodservice) take a flat negotiated price; about "
+                         f"{_ps.get('CONTRACT', 0)*100:.0f}% of their\n  volume moved on a discount in the history.")
+    else:
+        contract_line = ("- **Contract accounts** (foodservice) take a flat negotiated price and are never targeted by\n"
+                         "  account-specific promotions. Promotions aimed at every banner still reach them, though, so about\n"
+                         f"  {_ps.get('CONTRACT', 0)*100:.0f}% of their volume moved on a discount in the history.")
+    _shares = ", ".join(f"{_ps[k]*100:.0f}% of {_POSTURE_WORD[k]} volume" for k in _pw[:-1])
+    _shares += f" and {_ps[_pw[-1]]*100:.0f}% of {_POSTURE_WORD[_pw[-1]]} volume"
+    _dlo, _dhi = min(_pd.values()) * 100, max(_pd.values()) * 100
+    _depth = f"{_dlo:.0f}%" if round(_dlo) == round(_dhi) else f"{_dlo:.0f}–{_dhi:.0f}%"
+    _spread = max(_ps.values()) - min(_ps.values())
+    if _spread < 0.05:
+        posture_para = (
+            "In the shipped data the postures differ mainly in everyday terms (off-invoice allowance and\n"
+            f"trade-fund rates), not in promotional exposure. {_frac_words(st['promo_all_share']).capitalize()} "
+            "of all promotion events target every banner\n"
+            f"at once, so {_shares}\nmoved on a discount, at a similar average depth of {_depth}.")
+    else:
+        posture_para = (
+            f"Promotional exposure differs by posture: {_shares} moved on a discount, at an\n"
+            f"average depth of {_depth}. {_frac_words(st['promo_all_share']).capitalize()} of all "
+            "promotion events target every banner at once.")
+
+    if FACILITY_DETAIL is not None:
+        _d = FACILITY_DETAIL
+        _cs = (_d.groupby("dc_id").capital_charge_per_sqft_year_usd.first()
+               / _d.groupby("dc_id").total_facility_cost_per_sqft_year_usd.first())
+        capital_line = (f"On average {_cs.mean()*100:.0f}% of a warehouse's\nannual cost "
+                        f"({_cs.min()*100:.0f}–{_cs.max()*100:.0f}% by site, §6.3) is the amortised cost "
+                        "of having built it, not the cost of\nrunning it.")
+        cost_deriv = "Derivation in Part 6 (§6.3)."
+    else:   # facility build-up only exists in a run that also built the world
+        capital_line = ("A large part of a warehouse's\nannual cost is the amortised cost of having "
+                        "built it, not the cost of running it.")
+        cost_deriv = "Derivation of the rates is documented by a full (world + history) run."
+
+    _lo_where = f" ({st['lt_lo_where']})" if st["lt_lo_where"] else ""
+    if st["short_ratio"] == st["short_ratio"] and st["short_ratio"] > 1.05:
+        short_line = ("customer-facing stockout at that same location **more likely the week after**. "
+                      f"In this instance it\nis about {st['short_ratio']:.1f} times as likely as after "
+                      "a complete receipt.")
+    else:
+        short_line = ("customer-facing stockout at that same location more likely the week after, "
+                      "although in this\ninstance the effect is not material.")
+
+    _rc, _cc = st["fill_rdc_cust"], st["fill_cdc_cust"]
+    _big = abs(_rc - _cc) >= 0.05
+    _rdc_only = "only " if st["fill_rdc_replen"] < st["fill_pdc_replen"] - 0.05 else ""
+    echelon_para = (
+        f"**That headline hides a {'large ' if _big else ''}split by echelon.** Regional DCs fill "
+        f"{_rc*100:.1f}% of their bulk\ncustomers' demand. Customer DCs fill {'only ' if _big and _cc < _rc else ''}"
+        f"{_cc*100:.1f}% of direct-store-delivery demand, and because those\naccounts lose the sale, "
+        f"about {_one_in(1 - _cc, 'DSD unit')} goes unserved. Internally, plant DCs fill "
+        f"{st['fill_pdc_replen']*100:.1f}%\nof regional DC orders, while regional DCs fill "
+        f"{_rdc_only}{st['fill_rdc_replen']*100:.1f}% of customer DC orders.")
+
+    _b = st["bias_all"]
+    if abs(_b) < 0.02:
+        bias_head = "**The published forecast is close to unbiased.**"
+    else:
+        bias_head = f"**The published forecast is biased {'low' if _b < 0 else 'high'}.**"
+    _grp = (" and the bias is negative in every segment and every\ncategory" if st["bias_groups_neg"] else
+            " and the bias is positive in every segment and every\ncategory" if st["bias_groups_pos"] else
+            " and its sign varies across segments and\ncategories")
+    def _sgn(x):                                  # signed percentage with a true minus sign
+        return f"{x*100:+.1f}%".replace("-", "−")
+    bias_para = (f"{bias_head} Over the evaluated year it totals {abs(_b)*100:.1f}% "
+                 f"{'below' if _b < 0 else 'above'} actual\ndemand ({_sgn(st['bias_nz'])} on weeks "
+                 f"with non-zero demand),{_grp} (§{P}.9).")
+
+    if st["n_unused"]:
+        _parts = []
+        if st["n_fail_unused"]:
+            _parts.append(f"the {st['n_fail_unused']} failover lanes")
+        if st["n_lat"]:
+            _parts.append(f"the {st['n_lat']} laterals")
+        if st["n_other_unused"]:
+            _parts.append(f"{st['n_other_unused']} others")
+        unused_line = (f"{st['n_unused']} of the {st['n_lanes']} lanes ({' and '.join(_parts)})\n"
+                       "  carry nothing")
+    else:
+        unused_line = f"none of the {st['n_lanes']} lanes is idle"
+
+    # Part 8 rows that depend on the data
+    _wk90 = (f" and first passes 90% in week {st['wk_reach90']}" if st["wk_reach90"] else
+             " and never reaches 90% in the history")
+    if st["cold_start"]:
+        warmup_row = (f"| **Week 1 starts every location with zero stock** (a cold start). | Customer fill is "
+                      f"{st['wk1_fill']*100:.0f}% in the first week of {st['first_yr']}{_wk90}. The "
+                      f"{BURN_WEEKS}-week burn-in absorbs this warm-up; evaluate on {st['last_yr']}. |")
+    else:
+        warmup_row = (f"| **The first weeks are a warm-up.** | Customer fill is {st['wk1_fill']*100:.0f}% in "
+                      f"the first week of {st['first_yr']}{_wk90}. The {BURN_WEEKS}-week burn-in absorbs "
+                      f"it; evaluate on {st['last_yr']}. |")
+    bias_row_head = ("**The published forecast is biased low**" if _b <= -0.02 else
+                     "**The published forecast is biased high**" if _b >= 0.02 else
+                     "**The published forecast is roughly unbiased**")
+    _grp_short = (", negative in every segment and category" if st["bias_groups_neg"] else
+                  ", positive in every segment and category" if st["bias_groups_pos"] else "")
+    bias_row = (f"| {bias_row_head} ({_sgn(_b)} in total over the evaluated year{_grp_short}, §{P}.9), "
+                "and its promotional lift and customer split use information from the evaluated year (§2.10). | "
+                "Check and correct bias before using it as a demand signal, and treat its "
+                f"{st['last_yr']} accuracy as slightly optimistic. |")
+    regional_row = ("| **Regional and plant DC policies ignore the customer-DC flow they pass on.** A regional DC's "
+                    "`mu` and `sigma` are its own bulk customers' orders only, and a plant DC's throughput is the "
+                    "sum of those regional `mu` values (Part 5). | Regional DC buffers are sized for bulk demand "
+                    f"alone, and regional DCs fill {_rdc_only}{st['fill_rdc_replen']*100:.1f}% of customer DC orders. Do not "
+                    "read them as echelon-sized buffers. |\n")
+    cdc_row = (f"| **Customer-DC service is much weaker than the headline.** The {_cfill*100:.1f}% customer fill "
+               f"blends {_rc*100:.1f}% at regional DCs with {_cc*100:.1f}% at customer DCs (§2.9). | Report "
+               "service by echelon; a network average mostly reflects the bulk channel. |\n"
+               if _cc < _cfill - 0.05 else "")
+    lanes_row = ("| **Failover and lateral lanes are never used** (§2.13). | Resilience or transshipment "
+                 "results that rely on those lanes cannot be validated against history. |\n"
+                 if st["n_unused"] else "")
+
+    _scn_path = f"{OUT}/scenarios.csv"
+    _scn = pd.read_csv(_scn_path) if os.path.exists(_scn_path) else None
+    _n_scn = len(_scn) if _scn is not None else 0
+    scn_note = ""
+    if _scn is not None and len(_scn):
+        _sd = (pd.to_datetime(_scn.end_date) - pd.to_datetime(_scn.start_date)).dt.days + 1
+        if (_sd == 7 * (_scn.duration_weeks + 1)).all():
+            scn_note = (". `end_date` falls one week after the event's last week (the span is "
+                        "`duration_weeks` + 1 weeks), so take the event window as `start_date` plus "
+                        "`duration_weeks` weeks")
+        elif not (_sd == 7 * _scn.duration_weeks).all():
+            scn_note = (". `end_date` and `duration_weeks` do not always agree; take the event window "
+                        "as `start_date` plus `duration_weeks` weeks")
+
     doc = f"""# Supply Brain — Synthetic CPG Supply-Chain Dataset
 
 *Auto-generated {dt.datetime.now().strftime('%Y-%m-%d %H:%M')} by `supply_brain_generator_v5.py`.
 This document and the data are produced in the same run, so the figures below always describe the
-current instance. It supersedes the separate EDA report, whose content is folded in as Part 6.*
+current instance. It supersedes the separate EDA report, whose content is folded in as Part {P}.*
 
 ---
 
@@ -2730,12 +3181,13 @@ explains how the two folders divide.
 | **2** | **Business assumptions, in plain language** | Understand what world this data describes, and what it deliberately does not |
 | **3** | Time horizons | Know which years hold what |
 | **4** | Table reference and key map | Join the tables correctly |
-| **5** | How each layer is generated | Trust, challenge or re-derive a number |
-| **6** | Data profile | See the actual shape of this instance |
-| **7** | Known limitations | Avoid drawing a conclusion the data cannot support |
-| **8** | Reproducing and modifying | Change an assumption and re-run |
+| **5** | The policy table, in plain words | Understand the (s, S) policy that ran the history |
+| **6** | How each layer is generated | Trust, challenge or re-derive a number |
+| **{P}** | Data profile | See the actual shape of this instance |
+| **{P + 1}** | Known limitations | Avoid drawing a conclusion the data cannot support |
+| **{P + 2}** | Reproducing and modifying | Change an assumption and re-run |
 
-**Start with Part 2.** Every number in Parts 5 and 6 is a consequence of an assumption stated there.
+**Start with Part 2.** Every number in Parts 5 to {P} is a consequence of an assumption stated there.
 
 ---
 
@@ -2753,7 +3205,7 @@ place, and promotions that move volume at the expense of margin.
 |---|---|
 | Portfolio | {sku.sku_id.nunique():,} SKUs across {sku.category.nunique()} categories and {sku.subcategory.nunique()} subcategories |
 | Network | 4 plants → 4 plant DCs → 8 regional DCs → 15 customer DCs, {cpf.dc_id.nunique()} storage facilities in 20 US metros |
-| Customers | {len(ban)} B2B retail banners across {ban.channel_type.nunique()} channel types |
+| Customers | {len(ban)} B2B retail banners across {ban.channel_type.nunique()} channel types ({_channels}), covering the grocery, mass, club, convenience and foodservice banners of §2.1 |
 | History | {orders.period.nunique()} weeks of actual demand ({orders.period.min()} to {orders.period.max()}) |
 | Forward plan | {fcst[fcst.horizon == 'forward'].period.nunique()} weeks |
 | Annual revenue | ${orders.revenue_usd.sum()/len(orders.period.unique())*52/1e6:,.0f}M gross (run-rate) |
@@ -2803,34 +3255,37 @@ Three commercial postures are modelled:
   promotional funding.
 - **High-low accounts** (conventional grocery) take a higher everyday price with deep, frequent
   temporary reductions.
-- **Contract accounts** (foodservice) take a flat negotiated annual price and run no promotions.
+{contract_line}
+
+{posture_para}
 
 Convenience-store accounts take the smallest deductions of any channel, so we realise the highest
 pocket price from them — that is the direct-store-delivery service premium.
 
 **Gross margin is set wide enough to absorb trade spend.** List prices are struck at roughly
-40-47% gross margin so that promotional depth and trade allowances fit inside it. A small share of
+{st['margin_lo']*100:.0f}-{st['margin_hi']*100:.0f}% gross margin so that promotional depth and trade allowances fit inside it. A small share of
 volume still sells below cost on the deepest deals; that is a real loss-leader effect, not an error.
 
 ### 2.3 Where the products physically are
 
 Four plants produce, each feeding its own on-site plant distribution centre. Product then moves to
 eight regional distribution centres, and from there to fifteen customer-facing distribution
-centres. Regional DCs are also cross-connected to each other for rebalancing.
+centres. Regional DCs are also cross-connected to each other by lateral lanes, but no rebalancing
+flow is simulated across them (§2.13).
 
 A regional DC does **not** simply buy from its nearest plant DC. Because only some plants are
 qualified to make a given item (§2.4), each regional DC buys **each SKU from the nearest plant DC
-whose plant can actually make it** — so a Chicago regional DC stocking an Atlanta-only item pays
+whose plant can actually make it** (nearest by lane lead time) — so a Chicago regional DC stocking an Atlanta-only item pays
 the Atlanta lane. Every plant DC therefore has a lane to every regional DC, and a plant DC only
 ever holds SKUs its own plant produces.
 
 Warehouse-delivered accounts (mass, club, large grocery) are served from regional DCs. Direct-store
--delivery accounts (convenience, smaller grocery, foodservice) are served from customer DCs.
+-delivery accounts (convenience, smaller grocery, foodservice) are served from customer DCs.{" Each" + chr(10) + "customer DC is replenished from a single regional DC, the one on its shortest-lead-time lane." if st["cdc_single"] else ""}
 
 **Every distribution centre can store every subcategory.** We assume one uniform warehouse type — a
 plain ambient building. No product is assumed to need a freezer, a chiller, humidity control or a
 bonded store. This is a simplifying assumption, and it is the biggest single departure from a real
-food and beverage network (see Part 7).
+food and beverage network (see Part {P + 1}).
 
 ### 2.4 How production is sourced
 
@@ -2843,8 +3298,8 @@ its demand, so freight is minimised. High-volume SKUs are **dual-sourced** acros
 resilience, with the secondary plant costing slightly more per unit. Roughly a third of the
 portfolio is dual-sourced.
 
-Production plans are set from recent demand plus whatever it takes to restore about a week and a
-half of finished-goods cover, and they are **constrained by capacity** — first by the individual
+Production plans are set from recent demand plus whatever it takes to restore about two and a
+half weeks of finished-goods cover, and they are **constrained by capacity** — first by the individual
 production line for that family, then by the plant as a whole. Around {_caplim*100:.0f}% of
 SKU-weeks get clipped, at a mean plant utilisation of about {_putil*100:.0f}% and peaks near
 {_pupeak*100:.0f}%.
@@ -2868,8 +3323,10 @@ Demand at a given customer and DC in a given week is the product of several forc
   Northeast, baking staples in the Midwest, wine on both coasts, and cassava and manioc flour in
   Florida and Texas. Regions are genuinely different markets, not scaled copies of each other.
 - **Price response.** Everyday shelf prices drift and step, and demand responds with a
-  subcategory-specific elasticity. Promotional discounts get a stronger response than everyday
-  price moves, as CPG research consistently finds.
+  subcategory-specific elasticity. Promotional discounts are given a stronger response than
+  everyday price moves ({PROMO_MULT} times the base elasticity), as CPG research finds. The exception is
+  the most price-sensitive subcategories: there a cap on promotional elasticity makes the
+  promotional response the weaker of the two (§6.1).
 - **A promotional trade calendar** (below).
 - **Structural events.** Some SKUs gain or lose distribution mid-history, some take a permanent
   step price change, and a few launch part-way through. These are what make forecasting genuinely
@@ -2884,7 +3341,7 @@ About {_promo_vol*100:.0f}% of volume moves on promotion — in the normal range
 Promotions are **not spread evenly through the year**. They cluster into the national trade windows
 a US category manager would recognise: Super Bowl, Easter and spring, Memorial Day, July 4th,
 back-to-school, Halloween, Thanksgiving and Christmas, with January as the post-holiday trough.
-Promotional volume share swings from roughly 15% in the January trough to about 45% in the
+Promotional volume share swings from roughly {st['promo_woy_lo']*100:.0f}% in the January trough to about {st['promo_woy_hi']*100:.0f}% in the
 Thanksgiving–Christmas peak.
 
 Promotions are negotiated per account, so an event targets one banner or all of them. Deals are
@@ -2899,7 +3356,7 @@ period, so nothing can ever expire.
 
 This is intentional. It lets inventory, safety-stock and multi-echelon optimisation work be
 developed and debugged without perishability confounding the results. The consequence is that
-write-offs are exactly zero and waste is not a measurable outcome in this dataset.
+the write-off table is written empty and waste is not a measurable outcome in this dataset.
 
 **One knock-on to be aware of:** with no obsolescence cost, holding cost becomes the only cost of
 over-stocking. In a newsvendor calculation the economically optimal service level then pins near
@@ -2916,8 +3373,7 @@ Holding cost has two parts, and we model them separately:
 
 The first part is built up from what a warehouse actually costs to own: construction cost per
 square foot in that metro, the local property cap rate, building depreciation, electricity price,
-and local labour, maintenance, insurance and property tax. Around two-thirds of a warehouse's
-annual cost is the amortised cost of having built it, not the cost of running it.
+and local labour, maintenance, insurance and property tax. {capital_line}
 
 That means holding cost varies by **location** — a pallet in Boston costs materially more to keep
 than the same pallet at the Dallas plant DC — and by **product density**, because a bag of flour
@@ -2928,13 +3384,15 @@ occupies far more space per unit than a sachet of yeast.
 Each stocking location runs a reorder-point policy. Safety stock is sized from **both** sources of
 uncertainty — how variable the demand is and how variable the replenishment lead time is — with a
 service factor that differs by SKU segment: fast-moving items get the highest protection, seasonal
-items less, intermediate items least.
+items less, intermediate items least. (Plant DCs are the exception: they use a simpler rule
+proportional to throughput, Part 5.)
 
 Replenishment lead times are real network lead times. Each location buffers **its own inbound
 lane** — the leg from its immediate supplier — and we also publish the cumulative plant-to-node
-lead time for echelon work. Lanes range from about half a day at a co-located plant DC to nearly
-eight days at a distant customer DC. **Each individual receipt arrives at its own realised lead
-time**, not the average.
+lead time for echelon work. Inbound lanes in use range from about {_days(st['lt_lo'])}{_lo_where}
+to {_days(st['lt_hi'])} on the longest {st['lt_hi_lane']}. Customer DCs' inbound lanes run
+{st['cdc_lt'][0]:.1f}–{st['cdc_lt'][1]:.1f} days. **Each individual receipt arrives at its own realised lead time**,
+not the average.
 
 Suppliers quote a committed lead time above their average — the 90th percentile — so on-time
 delivery runs around {_otd*100:.0f}% with a genuine late tail rather than a coin flip.
@@ -2944,7 +3402,7 @@ hand. When a regional DC cannot cover both its bulk customers and its customer D
 are served first and the remaining stock is split pro-rata across the customer DCs; the unfilled
 balance of the internal order is cancelled, and the customer DC simply orders again the following
 week. So an upstream stockout becomes a downstream delay: a short inbound receipt makes a
-customer-facing stockout at that same location roughly **nine times more likely the week after**.
+{short_line}
 This is why the dataset distinguishes four demand and shortfall columns — customer versus internal
 replenishment — on every inventory row.
 
@@ -2953,9 +3411,12 @@ accounts backorder; direct-store-delivery accounts lose the sale. The customer-f
 rate is about {_cfill*100:.1f}%, and internal replenishment between echelons fills about
 {_rfill*100:.1f}%.
 
+{echelon_para}
+
 Plant DCs are supplied out of **finished goods that the plant actually produced**, and only for
-SKUs that plant is qualified to make. Plants build to a rolling plan — last week's demand signal
-plus whatever it takes to restore about a week and a half of finished-goods cover — and that plan is
+SKUs that plant is qualified to make. Plants build to a rolling plan — a smoothed recent demand
+signal (an exponentially weighted average of the replenishment orders placed on the plant DC)
+plus whatever it takes to restore about two and a half weeks of finished-goods cover — and that plan is
 clipped by production-line and plant-wide capacity. Capacity therefore binds in peak weeks
 (roughly {_caplim*100:.0f}% of SKU-weeks are clipped, at a mean plant utilisation of about
 {_putil*100:.0f}%), instead of being a number nobody consumes.
@@ -2969,10 +3430,16 @@ We publish **two** forecasts, not one:
 2. **A promotion-inclusive forecast** — the baseline plus the expected uplift from the *planned*
    promotional calendar. This is the number to replenish against.
 
-Both are produced **ex ante**: at any week, the forecast uses only information available before
-that week. Nothing looks ahead. The forecaster sees the *planned* promotional calendar but not the
-depth that actually ran, and its assumed uplift is imperfect — so promotional weeks remain harder
-to forecast than normal weeks, which is exactly the real-world condition.
+The baseline is produced **ex ante**: at any week it is built from earlier weeks only (apart from
+the interpolation that fills in de-promoted weeks). Two parts are not strictly ex ante. First, the
+per-series promotional uplift is estimated from every promotional week in the {st['span']} history,
+including the {st['last_yr']} weeks being scored. Second, the split from DC to customer uses each customer's
+share of the whole {st['span']} history. Both leak a little information from the evaluated year. The
+forecaster sees the *planned* promotional calendar but not the depth that actually ran, and its
+assumed uplift is deliberately imperfect. So promotional weeks remain harder to forecast than
+normal weeks, which is exactly the real-world condition.
+
+{bias_para}
 
 Publishing both separates two different failure modes: a poor baseline means the seasonal model is
 wrong, while a poor uplift means the promotional plan is wrong. They need different fixes, and no
@@ -2986,7 +3453,7 @@ policy*; whether the network achieves them is an outcome you can measure in the 
 
 ### 2.12 Disruptions
 
-A library of 30 labelled disruption scenarios covers demand surges, forecast misses, lane outages,
+A library of {_n_scn} labelled disruption scenarios covers demand surges, forecast misses, lane outages,
 lead-time spikes, plant shortfalls and regional events. Every one is dated into the **forward**
 year, so they stress the plan rather than replay history, and each carries a numeric magnitude,
 time-to-recover, time-to-survive and a probability.
@@ -2999,9 +3466,9 @@ Being explicit about the gaps matters more than the inclusions:
 - **No waste or obsolescence.** Shelf life cannot bind (§2.7).
 - **No binding warehouse or lane capacity.** *Production* capacity does bind (§2.9), but storage
   and transport are sized generously; nothing runs out of physical room or truck space.
-- **No lateral transshipment and no failover.** `network_lanes` declares 10 regional-DC-to-regional
+- **No lateral transshipment and no failover.** `network_lanes` declares {st['n_lat']} regional-DC-to-regional
   -DC lateral lanes and a second, longer inbound lane for every customer DC, but **no flow is
-  simulated across either** — 16 of the 76 lanes carry nothing. They are there so a resilience or
+  simulated across either** — {unused_line}. They are there so a resilience or
   transshipment model has somewhere to route to; they are not exercised in the history.
 - **No lot or batch traceability**, and therefore no true first-expiry-first-out testing.
 - **No returns, damages or reverse logistics.**
@@ -3019,7 +3486,7 @@ begins in late December of the prior calendar year, as ISO-style week numbering 
 |---|---|---|
 | Burn-in ({BURN_WEEKS} weeks) | 2023–2024 | Actual demand only. Exists so the forecaster has at least two prior seasonal cycles to learn from. |
 | Evaluated year ({HIST_WEEKS} weeks) | 2025 | Actual demand **and** both forecasts, so accuracy is measurable. |
-| Forward plan ({FWD_WEEKS} weeks) | 2026 | Both forecasts, a promotional calendar, a price plan and an opening inventory position. No actuals. |
+| Forward plan ({FWD_WEEKS} weeks) | 2026 | Both forecasts, a promotional calendar and a price plan. No actuals. (The opening inventory position is a run artefact in `output datasets/`.) |
 
 `orders`, `production` and `inventory` cover all {ACTUAL_WEEKS} actual weeks. `demand_forecast`
 covers the evaluated year and the forward plan.
@@ -3064,7 +3531,7 @@ All foreign keys are validated at generation time.
 | b2b_customer_master | banner | Channel type, delivery mode, pricing strategy |
 | b2b_customer_terms | banner | Off-invoice, trade fund, volume rebate, logistics allowance, promo frequency and depth multipliers |
 | customer_serving_dc | banner × DC | Which DC serves each banner, and its demand share |
-| cost_parameters | **DC × subcategory** (full cross product) | Storage cost per unit-year, inventory carrying %, stockout multiplier. Derivation in Part 5. |
+| cost_parameters | **DC × subcategory** (full cross product) | Storage cost per unit-year, inventory carrying %, stockout multiplier. {cost_deriv} |
 | seasonality_master | subcategory × month | Occasion-driven seasonal index plus the shared macro calendar |
 | regional_demand_index | region × subcategory | Regional consumption multiplier |
 | orders | SKU × DC × customer × **day** | Order lines grouped into baskets by `order_id`. Full price waterfall: list → base → invoice → net (pocket), plus `net_margin_usd`. |
@@ -3074,10 +3541,10 @@ All foreign keys are validated at generation time.
 | production | SKU × plant × week | The uncapped ask (`plan_uncapped_qty`), the capacity-clipped plan, actual output, schedule attainment and a `capacity_limited_flag`, by production family |
 | inventory | SKU × DC × week | Opening, receipts, demand, shipments, unmet, lost margin, closing, safety stock, reorder point, order-up-to, and lead time. Demand and shortfall are **split into customer versus internal replenishment** — `demand_customer_qty` sums exactly to `orders`, while `demand_qty` is an echelon total and counts a unit once per tier it passes through. Lead time appears twice: `lead_time_mean_days` is the node's own inbound lane (what its safety stock covers) and `cum_lead_time_mean_days` is the plant-to-node total (for echelon work). |
 | replenishment_receipts | receipt | Promised versus actual lead time, an on-time flag, and `qty_ordered` versus `qty_received` with the `short_qty` balance — every line is a real shipment from a real parent, so internal fill rate is measurable |
-| write_offs | SKU × DC × period | Empty by design (§2.7) |
+| write_offs | SKU × DC × period | Empty by design (§2.7): written as a header-only table, not computed from the simulation |
 | sku_sourcing_map | DC × SKU | The routing the twin executes: which parent serves each node for each SKU, and the `rule` that assigned it. Network structure, so it is an input — never recovered from simulated receipts |
 | baseline_policy | DC × SKU | Safety stock, reorder point and order-up-to level that ran the historical simulation, with the segment and service factor behind them. Full dictionary in Part 5 |
-| scenarios | scenario | 30 labelled disruptions in the forward year |
+| scenarios | scenario | {_n_scn} labelled disruptions in the forward year{scn_note} |
 
 ### Currency
 
@@ -3086,23 +3553,23 @@ All monetary fields are USD and suffixed `_usd`. `inventory_carrying_pct_annual`
 `storage_cost_per_unit_year_usd` is USD per unit per year.
 
 """
-    doc += _policy_doc_section()
-    doc += _price_elasticity_doc_section()
-    doc += _forecast_doc_section()
+    doc += _policy_doc_section(st)
+    doc += _price_elasticity_doc_section(st)
+    doc += _forecast_doc_section(st)
     doc += _facility_cost_doc_section()
     doc += f"""
 ---
 
-## Part 7 — Data profile
+## Part {P} — Data profile
 
 *Computed from this instance in the same run. This replaces the separate EDA report.*
 
 """
-    doc += generate_eda(OUT, as_section=True)
+    doc += _eda
     doc += f"""
 ---
 
-## Part 8 — Known limitations
+## Part {P + 1} — Known limitations
 
 Read these before drawing a conclusion the data cannot support.
 
@@ -3111,26 +3578,28 @@ Read these before drawing a conclusion the data cannot support.
 | **Synthetic data.** No real company's figures are in here. | The pipeline and the structure transfer; the specific numbers do not. Re-derive on live sell-through before committing to targets. |
 | **Shelf life cannot bind** (§2.7). | Zero write-offs. Waste is not measurable, and newsvendor service levels pin near 100%. |
 | **No special storage** (§2.3). | Holding-cost spread understates a real multi-temperature network, where refrigerated space costs roughly 2–3x ambient to build. |
-| **Production capacity binds, but only lightly.** It clips about {_capclip*100:.1f}% of the volume plants ask for, and the plan recovers most of it the following week. | Capacity is a real constraint you can model, but it is not yet the dominant driver of lost sales. Tighten `plant_master.production_capacity_units_per_week` if you want it to dominate. |
+| **Production capacity binds, but only lightly.** It clips about {_capclip*100:.1f}% of the volume plants ask for, and the unmet finished-goods cover feeds back into the following week's plan. | Capacity is a real constraint you can model, but it is not yet the dominant driver of lost sales. Tighten `plant_master.production_capacity_units_per_week` if you want it to dominate. |
 | **Warehouse and lane capacity never bind.** | Storage and transport impose no physical trade-off; add those limits before claiming a network plan is feasible. |
 | **Replenishment policy is static.** One safety stock, reorder point and order-up-to level per SKU-DC for all 156 weeks, fitted on the whole span. | The 2023 position already reflects 2025 demand. Refit on a rolling window before backtesting a policy. |
-| **Week 1 starts every location at its order-up-to level.** | The first weeks of 2023 are a warm-up artefact. The 104-week burn-in absorbs it; evaluate on 2025. |
+{regional_row}{warmup_row}
 | **On-time delivery is roughly constant** across SKUs, because every node's promised lead time is set to its own 90th percentile. | Do not use OTD as a discriminating feature. A fixed contractual promise by transport mode would fix this. |
 | **Order batching inflates apparent demand variability** at customer grain. | Measure variability and intermittency on aggregated DC-week or national-week series, not on the customer order calendar. |
-| **Ten B2B customers.** | Too few for meaningful customer segmentation. |
+{cdc_row}{bias_row}
+{lanes_row}| **Ten B2B customers.** | Too few for meaningful customer segmentation. |
 | **Elasticities are subcategory-level**, drawn from a small number of source groups. | Fine for portfolio work; do not read a single SKU's elasticity as an estimate. |
-| **One actuals path.** Fixed seeds mean one realisation of history. | For distributional questions, re-run with a different seed rather than treating this path as the mean. |
+| **One actuals path.** The world's random seeds are fixed in code, so there is one realisation of history. The `--seed` option changes only the digital twin's lead-time and production draws, not demand. | For distributional questions about demand, change the world seeds in the generator and regenerate rather than treating this path as the mean. |
 
 ---
 
-## Part 9 — Reproducing and modifying
+## Part {P + 2} — Reproducing and modifying
 
 ```bash
 python supply_brain_generator_v5.py        # writes every table plus this document
 ```
 
-Seeds are fixed, so output is byte-identical run to run. Set `SUPPLY_BRAIN_OUTPUT` to write
-elsewhere.
+Seeds are fixed in code, so a re-run is designed to regenerate the same realisation of the data. The generated
+documents are not byte-identical between runs, because they embed the generation timestamp. Set
+`SUPPLY_BRAIN_OUTPUT` to write elsewhere.
 
 The assumptions in Part 2 map to named constants at the top of the generator, so any one of them
 can be changed and the effect traced through:
@@ -3142,7 +3611,8 @@ can be changed and the effect traced through:
 | Brand price positions | `CATEGORY_BRANDS` |
 | Seasonality by subcategory | `SUBCATEGORY_SEASONALITY_MONTHLY`, `MACRO_CALENDAR_MONTHLY` |
 | Regional consumption | `REGION_DEMAND_INDEX` |
-| Promotional intensity and depth | promo event count, `PROMO_MULT` |
+| Promotional intensity and depth | promo event count and depth draws in the order-generation step (not top-level constants) |
+| Promotional vs base price response | `PROMO_MULT` |
 | Promotional timing | `PROMO_CALENDAR_WEIGHT` |
 | Customer trade terms | `CUSTOMER_TERMS` |
 | Plant process lines and sourcing | `PRODUCTION_FAMILY`, `PLANT_CAPABILITY` |
@@ -3150,10 +3620,12 @@ can be changed and the effect traced through:
 | Product storage density | `UNITS_PER_SQFT` |
 | Service-level tiers | `Z_BY_SEGMENT` and the segment target table |
 | Forecast horizon and burn-in | `BURN_WEEKS`, `HIST_WEEKS`, `FWD_WEEKS` |
-| Forecast uplift misestimation | `LIFT_MISEST` |
+| Forecast uplift misestimation | `LIFT_MISEST` (local to the forecast step) |
 
 Every generated table is checked at build time — referential integrity, no-gap coverage, and a set
-of behavioural assertions that fail loudly if an assumption in Part 2 stops holding.
+of behavioural checks that flag when an assumption in Part 2 stops holding. A failed check is
+printed and reported in the run's closing summary, but it does not stop the run or prevent the
+tables and this document from being written. Read the validation output after every regeneration.
 
 ---
 
@@ -3161,7 +3633,7 @@ of behavioural assertions that fail loudly if an assumption in Part 2 stops hold
 """
     with open(f"{OUT}/DATASET_DOCUMENTATION.md", "w", encoding="utf-8") as f:
         f.write(doc)
-    print(f"  wrote DATASET_DOCUMENTATION.md ({doc.count(chr(10)):,} lines, EDA merged in as Part 6)")
+    print(f"  wrote DATASET_DOCUMENTATION.md ({doc.count(chr(10)):,} lines, EDA merged in as Part {P})")
 
 
 def generate_scenarios(OUT):
@@ -3279,8 +3751,13 @@ def _demean(v,keys,passes=6):
         for k in keys: v=v-pd.Series(v).groupby(k).transform("mean").values
     return v
 
-def generate_eda(OUT, as_section=False):
+def generate_eda(OUT, as_section=False, stats=None):
+    """Data profile. Standalone it writes EDA_REPORT.md with "2.x" sections; with
+    as_section=True it returns the body renumbered as Part _DOC_PROFILE_PART of
+    DATASET_DOCUMENTATION.md. If `stats` is a dict, figures other parts of the
+    document quote (the category elasticity recovery) are stored in it."""
     R=lambda n: pd.read_csv(f"{OUT}/{n}.csv")
+    _sec = str(_DOC_PROFILE_PART) if as_section else "2"   # cross-reference prefix
     sku=R("sku_master"); orders=R("orders"); fc=R("demand_forecast"); prod=R("production")
     inv=R("inventory"); lanes=R("network_lanes"); ban=R("b2b_customer_master"); serve=R("customer_serving_dc")
     costp=R("cost_parameters"); plants=R("plant_master"); pdc=R("plant_dc_master")
@@ -3309,13 +3786,20 @@ def generate_eda(OUT, as_section=False):
            ("Gross margin",f"${rev-cogs:,.0f} ({(rev-cogs)/rev*100:.1f} pct)"),
            ("Forecast horizon",f"{fc.period.nunique()} weeks (2025 in-sample + 2026 forward)")])+"\n")
 
+    _sps=R("sku_plant_sourcing"); smap=R("sku_sourcing_map")
+    _dual_share=float((_sps.groupby("sku_id").plant_id.nunique()>=2).mean())
+    _used=set(zip(smap.origin_node_id,smap.dc_id))
+    _lane_used=np.array([(o,d) in _used for o,d in zip(lanes.origin_node_id,lanes.destination_node_id)])
+    _idle_lanes=int((~_lane_used).sum())
     A("\n---\n\n# Part 1 - Parameters and Assumptions\n")
     A("Synthetic CPG Food and Beverage supply chain, USD, grounded in an external real F&B sales dataset "
       "(per-unit prices, per-group elasticity, 2020-shape seasonality, ~80/20 concentration; 2020 COVID spike "
       "excluded). 5 categories x 100 SKUs, segmented ~50/30/20 Fast-Moving/Seasonal/Intermediate. Two price "
-      "elasticities per SKU (base shelf-price and promotional). Demand is day-level orders on a dual-sourced "
-      "US network (Plant -> Plant DC -> Regional DC -> Customer DC) with lateral RDC-to-RDC rebalancing lanes. "
-      "Supply-side parameters (cost/margin, holding, lead time, capacities) are modelled assumptions; demand-side is grounded.\n")
+      "elasticities per SKU (base shelf-price and promotional). Demand is day-level orders on a US network "
+      f"(Plant -> Plant DC -> Regional DC -> Customer DC); about {_frac_words(_dual_share)} of SKUs are dual-sourced across plants"
+      + (", and failover RDC-to-CDC and lateral RDC-to-RDC lanes are declared but carry no simulated flow. "
+         if _idle_lanes else ". ")
+      + "Supply-side parameters (cost/margin, holding, lead time, capacities) are modelled assumptions; demand-side is grounded.\n")
 
     A("\n---\n\n# Part 2 - Exploratory Data Analysis\n")
 
@@ -3447,6 +3931,8 @@ def generate_eda(OUT, as_section=False):
         q=("order_qty","sum"),bp=("base_price_usd","mean"),d=("discount_pct","mean")).merge(sku[["sku_id","category"]])
     w=w[(w.q>0)&(w.bp>0)]
     er=[]
+    if stats is not None:
+        stats["elasticity"]=er          # filled below; quoted in Part 6 of the main document
     for c,gg in w.groupby("category"):
         keys=(gg.sku_id.values,gg.period.values); y=_demean(np.log(gg.q.values),keys)
         X=np.column_stack([_demean(np.log(gg.bp.values),keys),_demean(np.log(1-gg.d.values),keys)])
@@ -3462,10 +3948,25 @@ def generate_eda(OUT, as_section=False):
         return ins.groupby(gcol).apply(lambda x:pd.Series({"MAPE_pct":x.ape.mean()*100,
             "WAPE_pct":x.ae.sum()/x.actual_qty.sum()*100,
             "bias_pct":(x.forecast_qty.sum()-x.actual_qty.sum())/x.actual_qty.sum()*100})).round(1).reset_index()
-    A("**By segment:**\n"+_tab(acc("segment"))+"\n")
-    A("\n**By category:**\n"+_tab(acc("category"))+"\n")
-    histu=orders.order_qty.sum(); fwdu=fc[fc.horizon=="forward"].forecast_qty.sum()
-    A(f"\nForward 2026 total forecast units {fwdu:,} vs 2025 actual {histu:,}, YoY {(fwdu/histu-1)*100:+.1f} pct.\n")
+    _acc_seg=acc("segment"); _acc_cat=acc("category")
+    A("**By segment:**\n"+_tab(_acc_seg)+"\n")
+    A("\n**By category:**\n"+_tab(_acc_cat)+"\n")
+    # YoY compares the forward year with the LAST in-sample year, not the whole multi-year history
+    _ly=period_label(ACTUAL_WEEKS)[:4]; _fy=period_label(FWD_START_WEEK)[:4]
+    histu=orders.loc[orders.period.str[:4]==_ly,"order_qty"].sum(); fwdu=fc[fc.horizon=="forward"].forecast_qty.sum()
+    A(f"\nForward {_fy} total forecast units {fwdu:,} vs {_ly} actual {histu:,}, YoY {(fwdu/histu-1)*100:+.1f} pct.\n")
+    _ins_all=fc[fc.horizon=="in_sample"]
+    _bias_full=(_ins_all.forecast_qty.sum()-_ins_all.actual_qty.sum())/_ins_all.actual_qty.sum()*100
+    _bias_nz=(ins.forecast_qty.sum()-ins.actual_qty.sum())/ins.actual_qty.sum()*100
+    _gb=pd.concat([_acc_seg.bias_pct,_acc_cat.bias_pct])
+    _bias_sign="negative" if (_gb<0).all() else ("positive" if (_gb>0).all() else "")
+    if _bias_sign:
+        A(f"Bias is {_bias_sign} in every segment and category above: the forecast "
+          f"{'under' if _bias_sign=='negative' else 'over'}-calls demand throughout the evaluated year "
+          f"({_bias_nz:+.1f} pct on these non-zero-actual rows; {_bias_full:+.1f} pct over the full panel, zero weeks included).\n")
+    else:
+        A(f"Bias varies in sign across segments and categories ({_bias_nz:+.1f} pct on these non-zero-actual rows; "
+          f"{_bias_full:+.1f} pct over the full panel, zero weeks included).\n")
     if HAVE_MPL:
         fig,ax=plt.subplots(figsize=(6.5,3.3)); ax.hist(ins.forecast_error_pct.clip(-1,1)*100,bins=40,color="#F58518")
         ax.set_title("In-sample forecast error pct (clipped +/-100)"); ax.set_xlabel("(forecast-actual)/actual pct")
@@ -3534,8 +4035,17 @@ def generate_eda(OUT, as_section=False):
       _tab(pd.DataFrame(card,columns=["hop","lanes","fan_out","fan_in"]))+"\n")
     cdc_src=lanes[lanes.destination_node_type=="CUSTOMER_DC"].groupby("destination_node_id").origin_node_id.nunique()
     n_lat=int(((lanes.origin_node_type=="REGIONAL_DC")&(lanes.destination_node_type=="REGIONAL_DC")).sum())
-    A(f"\nDual-sourcing: {int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs have >=2 inbound Regional DCs (failover); "
-      f"lateral RDC-to-RDC lanes: {n_lat}.\n")
+    _cdc_par=smap[smap.dc_id.astype(str).str.startswith("CDC")].groupby("dc_id").origin_node_id.nunique()
+    _cdc_single=bool((_cdc_par<=1).all())
+    _fail_idle=int(((lanes.destination_node_type=="CUSTOMER_DC").to_numpy()&~_lane_used).sum())
+    _lat_idle=int((((lanes.origin_node_type=="REGIONAL_DC")&(lanes.destination_node_type=="REGIONAL_DC")).to_numpy()&~_lane_used).sum())
+    A(f"\nDual-sourcing: {int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs have >=2 inbound Regional DCs (failover)"
+      f"{' on paper' if _cdc_single else ''}; lateral RDC-to-RDC lanes: {n_lat}."
+      + (f" In the simulated history every Customer DC is replenished from a single Regional DC, so the "
+         f"{_fail_idle} failover lanes and the {_lat_idle} lateral lanes carry no flow "
+         f"({_idle_lanes} of {len(lanes)} lanes unused)." if _cdc_single else
+         f" {_idle_lanes} of {len(lanes)} lanes carry no simulated flow.")
+      + "\n")
     lm=lanes.groupby(["origin_node_type","destination_node_type","transport_mode"]).agg(
         lanes=("lane_id","count"),avg_lead_d=("lead_time_mean_days","mean"),avg_mi=("distance_miles","mean"),
         avg_cost=("logistics_cost_per_unit_usd","mean")).round(2).reset_index()
@@ -3591,8 +4101,11 @@ def generate_eda(OUT, as_section=False):
         sc=scn.groupby("scenario_type").agg(count=("scenario_id","count"),avg_ttr_days=("ttr_days","mean"),
             avg_tts_days=("tts_days","mean")).round(1).reset_index()
         A(_tab(sc)+"\n")
-        A(f"\nTotal scenarios: {len(scn)} across {scn.scenario_type.nunique()} classes (supplier, geographic, "
-          "systemic, market-driven).\n")
+        _cls=", ".join(t.replace("leadtime","lead-time").replace("_"," ") for t in sorted(scn.scenario_type.unique()))
+        _sd=(pd.to_datetime(scn.end_date)-pd.to_datetime(scn.start_date)).dt.days+1
+        _scn_note=(" `end_date` runs one week past each event's last week; use `start_date` plus "
+                   "`duration_weeks` for the window." if (_sd==7*(scn.duration_weeks+1)).all() else "")
+        A(f"\nTotal scenarios: {len(scn)} across {scn.scenario_type.nunique()} classes ({_cls}).{_scn_note}\n")
     else:
         A("*scenarios.csv not present.*\n")
 
@@ -3600,12 +4113,24 @@ def generate_eda(OUT, as_section=False):
     A("## 2.16 Key findings\n")
     top_cat=bc.sort_values("revenue",ascending=False).iloc[0]
     most_el=min(er,key=lambda x:x[1]); least_el=max(er,key=lambda x:x[1])
+    _s=_acc_seg.set_index("segment")
+    _bw=_s.WAPE_pct.idxmin(); _ww=_s.WAPE_pct.idxmax(); _wm=_s.MAPE_pct.idxmax()
+    _worst=(f"{_ww} SKUs are worst on both WAPE ({_s.WAPE_pct[_ww]} pct) and MAPE ({_s.MAPE_pct[_ww]} pct)" if _ww==_wm else
+            f"{_ww} SKUs are worst on WAPE ({_s.WAPE_pct[_ww]} pct) and {_wm} on MAPE ({_s.MAPE_pct[_wm]} pct)")
+    _bias_clause=(f", and bias is {_bias_sign} everywhere" if _bias_sign else "")
+    _fc_finding=(f"Forecast accuracy is best for {_bw} SKUs (WAPE {_s.WAPE_pct[_bw]} pct); {_worst}{_bias_clause} "
+                 f"(see {_sec}.9); the forward year grows ~{(fwdu/histu-1)*100:+.0f} pct over {_ly} actuals.")
+    _t3=inv.dc_id.astype(str).str[:3]
+    _ech_fill={t:(1-inv.loc[_t3==t,"unmet_customer_qty"].sum()/inv.loc[_t3==t,"demand_customer_qty"].sum())*100
+               for t in ("RDC","CDC") if inv.loc[_t3==t,"demand_customer_qty"].sum()>0}
     findings=[
       f"Revenue is led by {top_cat['category']} ({top_cat['rev_pct']} pct of sales); demand is steeply concentrated (top 20 pct SKUs ~ {top20:.0f} pct of revenue).",
       f"Most price-elastic category (base): {most_el[0]} ({most_el[1]}); least: {least_el[0]} ({least_el[1]}). Promo elasticity exceeds base in {sum(1 for e in er if e[2]<=e[1])}/{len(er)} categories.",
-      f"Forecast accuracy degrades from fast-movers to seasonal SKUs (see 2.9); forward year grows ~{(fwdu/histu-1)*100:.0f} pct YoY.",
-      f"Network is fully dual-sourced ({int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs with failover) with {n_lat} lateral lanes, but failover and lateral lanes carry no simulated flow; whole-site storage utilization averages {du.util_pct.mean():.0f} pct.",
-      f"Customer-facing unit fill rate ~ {_cfill:.1f} pct at ${wk_val.mean():,.0f} avg working capital and {turns:.1f}x annual turns; {100-avail:.0f} pct of DC-SKU-weeks close at zero.",
+      _fc_finding,
+      (f"Every Customer DC has a declared failover lane ({int((cdc_src>=2).sum())}/{len(cdc)}) and there are {n_lat} lateral lanes, but in the simulated history each Customer DC is single-sourced and failover and lateral lanes carry no flow; whole-site storage utilization averages {du.util_pct.mean():.0f} pct."
+       if _cdc_single else
+       f"{int((cdc_src>=2).sum())}/{len(cdc)} Customer DCs have a declared failover lane and there are {n_lat} lateral lanes; {_idle_lanes} of {len(lanes)} lanes carry no simulated flow; whole-site storage utilization averages {du.util_pct.mean():.0f} pct."),
+      f"Customer-facing unit fill rate ~ {_cfill:.1f} pct (Regional DCs {_ech_fill.get('RDC', float('nan')):.1f} pct, Customer DCs {_ech_fill.get('CDC', float('nan')):.1f} pct) at ${wk_val.mean():,.0f} avg working capital and {turns:.1f}x annual turns; {100-avail:.0f} pct of DC-SKU-weeks close at zero.",
       f"No-gap coverage: every Customer DC has demand, inventory is modelled at all echelons (Plant DC, Regional DC, Customer DC), and a {len(pd.read_csv(f'{OUT}/scenarios.csv')) if os.path.exists(f'{OUT}/scenarios.csv') else 0}-scenario disruption library covers demand- and supply-side stresses.",
     ]
     A("\n".join(f"- {x}" for x in findings)+"\n")
@@ -3613,13 +4138,17 @@ def generate_eda(OUT, as_section=False):
 
     body = "\n".join(m) + "\n"
     if as_section:
-        # Folded into DATASET_DOCUMENTATION.md as Part 6: drop the standalone title, timestamp
-        # and footer, and demote the headings one level so they nest under the parent part.
+        # Folded into DATASET_DOCUMENTATION.md as Part _DOC_PROFILE_PART: drop the standalone
+        # title, timestamp and footer, renumber "2.x" to "<part>.x", and demote the headings so
+        # they nest under the parent part (the standalone "# Part 1/2" banners become plain
+        # subsection headings rather than clashing with the main document's own Parts).
         body = re.sub(r"^# Supply Brain - Comprehensive.*?\n", "", body, flags=re.M)
         body = re.sub(r"^\*Auto-generated.*?\n", "", body, flags=re.M)
         body = body.replace("\n---\n*End of report.*\n", "")
-        body = re.sub(r"^## 2\.(\d+) ", r"### 6.\1 ", body, flags=re.M)
-        body = re.sub(r"^## Executive snapshot", "### 6.0 Data snapshot", body, flags=re.M)
+        body = re.sub(r"^# Part 1 - Parameters and Assumptions", "### Parameters and assumptions (profile summary)", body, flags=re.M)
+        body = re.sub(r"^# Part 2 - Exploratory Data Analysis", "### Exploratory data analysis", body, flags=re.M)
+        body = re.sub(r"^## 2\.(\d+) ", rf"### {_DOC_PROFILE_PART}.\1 ", body, flags=re.M)
+        body = re.sub(r"^## Executive snapshot", f"### {_DOC_PROFILE_PART}.0 Data snapshot", body, flags=re.M)
         body = re.sub(r"^## ", "### ", body, flags=re.M)
         return body
     with open(f"{OUT}/EDA_REPORT.md", "w", encoding="utf-8") as f:

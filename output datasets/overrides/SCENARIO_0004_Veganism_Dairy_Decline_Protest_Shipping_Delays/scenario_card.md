@@ -4,9 +4,9 @@
 
 **Hypothesis:** With a structural ~25% decline in Fresh Dairy + Powdered Milk demand and a 6-week +10% widening of mean lead times from protests, does the current policy hold customer fill rate and cost, or does it drive lost sales / inventory buildup versus baseline -- and does planning ahead (prepared) outperform reacting week by week (reactive) once the protests hit?
 
-**Compared against:** `SCENARIO_0002_MEIO_CLARK_SCARF_V2/meio_policy` (seed 2026; MEIO as defined in the config: `models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py`)
+**Compared against:** `SCENARIO_0002_MEIO_CLARK_SCARF_V2/meio_policy` (seed 2026; MEIO as defined in the config: `clark_scarf_v2`, run by `models/MEIO/MEIO_Weekly/final_submission_optimized/run_weekly_tools.py` with the rolling policy from `roll_forward_policy.py`)
 
-**Runs:** prepared, unprepared, reactive -- prepared = MEIO re-plans with the plan-side changes; unprepared = today's policy meets the actual-side changes; reactive = MEIO is not told and re-plans every week from what the Twin has simulated so far.
+**Runs:** prepared, unprepared, reactive -- prepared = MEIO re-plans with the plan-side changes; unprepared = today's policy meets the actual-side changes; reactive = MEIO is not told and re-plans every week from what the Twin has simulated so far. The reactive arm is read against its no-scenario control, `SCENARIO_0002_MEIO_CLARK_SCARF_V2/counterfactual_reactive_no_scenario`, which the run builds only if none exists for seed 2026.
 
 ## Overrides
 
@@ -28,7 +28,7 @@ Ready: engine 1.0 applies every measure in this scenario.
 
 config sha256 `3c9bc2555f88a1fbfd4e2ce28ab88bfe93826c96a110c00c885b9540b145ef6c`
 
-Approving runs MEIO and the Digital Twin for this scenario (minutes of compute) and writes new scenario folders under `output datasets/`. To approve:
+Approving lets `run_scenario` run MEIO and the Digital Twin for this scenario (minutes of compute); the run writes new scenario folders under `output datasets/` (`MEIO/SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays/` and `SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays/<arm>/`). To approve:
 
 ```bash
 python -m Agents.tools approve SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays --by "<your name>"

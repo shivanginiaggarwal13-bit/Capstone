@@ -11,6 +11,61 @@ session) was lost from the repo and from disk before this one existed. This
 version targets the `digital-twin` branch's dataset generator (v5) schema,
 which differs from what the earlier version targeted.
 
+## Folder status (checked against the code, 2026-10-23) — read first
+
+**This folder is exploration history, not the final model.** The final MEIO
+model is **Clark-Scarf v2** in [`final_submission_optimized/`](final_submission_optimized/README.md)
+(live configuration per `meio_parameters.resolve()`: alpha=0.6 with per-cluster
+alpha on 367 SKUs, netting_discount=0.0, quadrature DDLT, cluster-based z; the
+write-ups' alpha=0.2 is the code's reference value); start there.
+`final_submission/` is the original, slower copy of the same method, and
+`alt_models/` holds the alternative-model bake-off (Clark-Scarf v1, GSM,
+Sim-Optimize, Bandit, Cluster Bandit, and the first Clark-Scarf v2
+prototype). Everything below documents the hand-tuned MEIO Weekly tool's
+v1-v10 tuning rounds, which ended with Clark-Scarf v2 chosen over it
+(real-data result below, and `final_submission_optimized/README.md`).
+
+Things that changed after most of the reports in this folder were generated:
+
+- **Service level z now comes from the segmentation output by default.**
+  Since 2026-10-18, `meio_weekly_lib.assign_z()` resolves z as
+  `Z_OVERRIDE_BY_SKU` → `output datasets/segmentation/sku_clusters.csv`'s
+  `safety_factor_z` (canonical output, currently segmentation v5, 6
+  archetypes, z = 1.881 / 1.717 / 1.282) → `Z_BY_SEGMENT` → `Z_DEFAULT`. That
+  file covers all 500 SKUs in `sku_master.csv`, so `Z_BY_SEGMENT`
+  (Fast-Moving 2.05, Seasonal 1.64, Intermediate 1.28) is effectively never
+  used by `solve_policy()` / `solve_pdc_policy()` / `clark_scarf_v2_model.py`
+  any more. Every `*_report.md` here, the tracked
+  `output datasets/MEIO/2026-W01/` files (z values 2.05/1.64/1.28) and the
+  single `meio_weekly_history.csv` row (run 2026-09-28) were produced under
+  the old segment-based z. Re-running them now gives different numbers.
+- **Twin used.** Every script here shells out to `models/twin/digital_twin.py`,
+  not `final_submission_optimized/digital_twin_fast.py`. The history-mode
+  (real-2025-demand) runs pass no `--state`, so they cold-start. That means the
+  2026-10-18 opening-state fix in `digital_twin_fast.py` (forward snapshot
+  injected as history-mode opening stock) does not apply to them.
+- **Git LFS.** `input datasets/orders.csv` and `inventory.csv` are LFS-tracked
+  (`.gitattributes`). Without `git lfs pull` they are 134-byte pointer files.
+  Every script here reads `orders.csv` through `build_seasonal_index()`, and
+  the twin's history mode replays it, so nothing runs until those files are
+  pulled.
+
+Script status. Imports and paths were checked; the scripts were not executed.
+
+| script | status |
+|---|---|
+| `meio_optimizer_weekly.py`, `roll_forward_policy.py`, `run_weekly_tools.py` | Run. Note `meio_optimizer_weekly.py`'s own docstring "Method" steps 4-5 (RDC<-CDC pooling, cost-derived newsvendor z) are stale; the method actually run is `meio_weekly_lib.solve_policy()`, described below. |
+| `backtest_csl.py`, `backtest_rolling_real.py`, `simulate_rolling_policy.py` | Run. |
+| `simulate_policy.py` | **Broken path.** It looks for the policy under `MEIO_Weekly/output/<newest>/meio_policy_weekly.csv`, but `meio_optimizer_weekly.py` now writes to `output datasets/MEIO/<target_week>/`. It fails at `os.listdir`. |
+| `multi_seed_robustness.py` | **Broken path.** It reads `MEIO_Weekly/output/rolling_2026/meio_policy_rolling.csv`, but `roll_forward_policy.py` now writes `output datasets/MEIO/rolling_2026/meio_policy_rolling.csv`. It exits with "not found -- run roll_forward_policy.py first" even after that script has run. |
+| `rerun_with_cluster_csl.py` | Runs, against the frozen v4 file `Clustering & Segmentation/segmentation_v4/sku_clusters.csv`. Its "segment (original)" control arm is **no longer segment-based**: clearing `Z_OVERRIDE_BY_SKU` now falls back to the canonical v5 cluster z, not `Z_BY_SEGMENT`. |
+| `cluster_csl_segment_breakdown.py` | Reads the gitignored `cluster_csl_output/` runs from `rerun_with_cluster_csl.py` (not on disk in a fresh checkout), using the v4 file. |
+| `alt_models/compare_models.py` | **Broken path.** It reads the MEIO Weekly policy from `MEIO_Weekly/output/2026-W01/`, which `weekly.run()` no longer writes. |
+| `alt_models/bandit_model.py`, `bandit_rolling.py` | Run, but their arms swap `lib.Z_BY_SEGMENT`, which `assign_z()` no longer consults (see above). Every arm therefore builds the same policy, and a re-run would not test service levels at all. |
+| `alt_models/clark_scarf_model.py`, `gsm_model.py` | Run. They still read `Z_BY_SEGMENT` directly (segment z), unlike `solve_policy()`. |
+| `alt_models/clark_scarf_v2_model.py`, `clark_scarf_v2_rolling.py`, `backtest_rolling_real_clark_scarf*.py` | Run, with cluster z via `assign_z()`. This prototype has no `netting_discount` parameter: it always nets the pooled RDC SS fully against downstream CDC SS, which is the final model's `netting_discount=1.0`, not its adopted 0.0. The real-data scripts also need `../backtest_rolling_output/actual/` (gitignored), which `backtest_rolling_real.py` produces. |
+| `alt_models/cluster_bandit*.py`, `cluster_alpha_response_curve.py` | Run against the v4 4-cluster file. `cluster_alpha_response_curve.py` also needs `../cluster_csl_output/baseline_ctrl/` (gitignored). |
+
 ## Run it weekly
 
 ```bash
@@ -31,17 +86,23 @@ deliverables' own `output datasets/<name>/` folders):
   DC** that answers the top-level question.
 
 To run this and `roll_forward_policy.py` (below) together, once each:
-`python run_weekly_tools.py`.
+`python run_weekly_tools.py` (optional `--as-of-week`, passed to both; each
+tool's output is logged to `run_logs/`, gitignored). `roll_forward_policy.py`
+(default `--as-of-week 2025-W52`) writes the 52-week rolling policy to
+`output datasets/MEIO/rolling_2026/meio_policy_rolling.csv` (repo-tracked).
 
-Every run also appends one row to `meio_weekly_history.csv` (repo-tracked)
-and redraws `chart_ss_trend.png` (repo-tracked) so you can see the
-recommended safety-stock trend across weeks.
+Every run also appends one row to `meio_weekly_history.csv` (repo-tracked).
+A re-run for the same target week replaces that week's row: the code
+de-duplicates on `target_week`, keeping the last row. It then redraws
+`chart_ss_trend.png` (repo-tracked) so you can see the recommended
+safety-stock trend across weeks.
 
 ## Method — and the fixes it bakes in
 
-Same newsvendor / RDC-CDC pooling method as the annual model (see its
-docstring), with three corrections found necessary during backtesting of
-the earlier version of this tool:
+The tool started from the annual model's newsvendor / RDC-CDC pooling
+method (see its docstring). The first four corrections below were found
+necessary during backtesting of the earlier version of this tool. Later
+rounds replaced the sizing method itself (summarized after the list):
 
 1. **Grain fix**: `demand_forecast.csv` is really `(period, sku, dc,
    b2b_customer)` grain — every loader here aggregates to true
@@ -61,11 +122,38 @@ the earlier version of this tool:
    reason — `KeyError: 'category'` — and was fixed in the same change that
    added this tool.)
 
-All of this lives in `meio_weekly_lib.py`, shared by all three scripts
-below so the backtest and simulation validate the *exact* estimation logic
-the live optimizer uses, not a re-implementation of it.
+What the code does today (`meio_weekly_lib.py` module docstring, points 5-11):
 
-## Validate it: three independent checks
+- **RDC/CDC sizing** (`solve_policy`) matches the dataset generator's
+  `derive_baseline_policy()`. There is no explicit RDC<-CDC pooling: each node is
+  sized against its own `demand_forecast.csv` row. The protection interval is
+  `P = REVIEW_WEEKS (1.0) + lead time`. The formulas are
+  `SS = z * sqrt(P * (sigma * SIGMA_UPLIFT)^2 + mu^2 * sigma_LT^2)`,
+  `s = mu * P + SS` and `S = max(s + 1.5 * mu, 1.2 * s)`, with
+  `SIGMA_UPLIFT = {PDC 1.45, RDC 1.25, CDC 1.00}`. Lead times are cumulative
+  Plant→node days along the fastest inbound lane (`build_leadtime_graph`).
+- **Service level z** comes from `assign_z()`: since 2026-10-18 this is the
+  canonical segmentation cluster z (see "Folder status"). It is no longer
+  cost-derived and no longer the `sku_master.csv` segment.
+- **Target-week demand** (`target_week_demand`):
+  `0.6 * forecast * bias_factor + 0.4 * deseasonalized_level * seasonal_index`
+  (`MEAN_BLEND_ALPHA = 0.6`). The bias factor is clipped to [0.5, 2.0]. The
+  seasonal index is per (subcategory, week-of-year), built from the 3-year
+  `orders.csv` history and clipped to [0.2, 5.0]. `target_std = target_mean * blended CV`.
+- **PDC coverage** (`solve_pdc_policy`): throughput `mu` = the sum of RDC
+  `target_mean` over `sku_sourcing_map.csv`. That RDC signal is averaged over a
+  `PDC_SMOOTH_WEEKS = 5` window centred on the target week, then clipped to plant
+  family/plant-wide capacity. The formulas are
+  `SS = z * sqrt(lt_wk) * mu * 1.45 * 0.5`, `ROP = SS + mu * lt_wk` and
+  `S = 4.5 * mu + SS`.
+
+All of this lives in `meio_weekly_lib.py`, shared by every script in this
+folder (and imported by `alt_models/`), so the backtest and simulation
+validate the *exact* estimation logic the live optimizer uses, not a
+re-implementation of it. `backtest_csl.py` checks RDC/CDC reorder points
+only; it does not build PDC rows.
+
+## Validate it: independent checks
 
 **Statistical CSL backtest** — replays historical weeks with no lookahead
 and checks whether realized demand-during-lead-time actually stayed within
@@ -90,6 +178,9 @@ Writes `simulation_summary.csv`, `chart_fill_rate_comparison.png`,
 `simulation_report.md` (tracked); full twin run detail goes to
 `simulation_output/` (gitignored). Useful for isolating demand-estimate
 quality, but see the finding below for why it understates the tool.
+*Currently broken:* it looks for the regenerated policy under
+`MEIO_Weekly/output/`, but the optimizer now writes to
+`output datasets/MEIO/<target_week>/` (see "Folder status").
 
 **Full twin simulation (rolling weekly policy)** — the real test. Builds a
 genuinely time-varying policy (`roll_forward_policy.py`, one row set per
@@ -99,9 +190,10 @@ genuinely time-varying policy (`roll_forward_policy.py`, one row set per
 python simulate_rolling_policy.py
 ```
 Writes `rolling_simulation_summary.csv`, `chart_rolling_fill_rate.png`,
-`rolling_simulation_report.md` (tracked); the 52-week policy itself and
-full twin run detail go to `simulation_output/` (gitignored). This required
-adding optional time-varying-policy support to `models/twin/digital_twin.py`
+`rolling_simulation_report.md` (tracked). Full twin run detail goes to
+`simulation_output/` (gitignored). The 52-week policy itself goes to
+`output datasets/MEIO/rolling_2026/meio_policy_rolling.csv` (repo-tracked).
+This required adding optional time-varying-policy support to `models/twin/digital_twin.py`
 itself (an optional `period` column on the policy CSV; falls back to the
 original single-static-policy behavior when absent — verified
 byte-for-byte identical KPIs on the existing baseline run before trusting
@@ -118,8 +210,39 @@ python multi_seed_robustness.py --seeds 2026,7,42,123,2027
 ```
 Writes `robustness_summary.csv`, `chart_robustness.png`,
 `robustness_report.md` (tracked); full per-seed twin run detail goes to
-`simulation_output/twin_runs/robustness/` (gitignored). Requires
-`roll_forward_policy.py` to have been run first.
+`simulation_output/twin_runs/robustness/` (gitignored). It needs the rolling
+policy from `roll_forward_policy.py`, but it looks for it at the old
+`MEIO_Weekly/output/rolling_2026/` location. *Currently broken* until that
+path is updated (see "Folder status").
+
+**Real-data walk-forward backtest** — the only check here scored against
+demand that actually happened. Both arms replay `orders.csv` through
+`digital_twin.py --mode history` for 156 weeks, from a cold start. The two arms
+are identical through 2025-W01: both use `input datasets/baseline_policy.csv`, and a
+parity check verifies this. For each target week 2025-W02..2025-W52 the MEIO arm
+recomputes the policy from data as of the previous week (no lookahead):
+
+```bash
+python backtest_rolling_real.py          # optional --seed (default 2026)
+```
+Writes `backtest_rolling_real_summary.csv`,
+`backtest_rolling_real_cost_summary.csv`, `chart_backtest_rolling_real.png`,
+`backtest_rolling_real_report.md` (tracked); the 156-week policy and twin
+runs go to `backtest_rolling_output/` (gitignored). Recorded result
+(segment-z era): customer fill 93.23% vs actual 93.08%, internal replen fill
+88.61% vs 93.21%, total landed cost +$1,665,951. This is the MEIO Weekly
+figure `final_submission_optimized/README.md` compares Clark-Scarf v2
+against.
+
+**Cluster-CSL rerun** — `rerun_with_cluster_csl.py` re-scores MEIO Weekly
+and Clark-Scarf v2 (alpha=0.2) on the synthetic 2026 rolling basis, with
+segmentation **v4**'s cluster z substituted via `Z_OVERRIDE_BY_SKU`.
+`cluster_csl_segment_breakdown.py` re-slices those cached runs by segment and
+cluster. Outputs: `cluster_csl_comparison.csv`, `cluster_csl_report.md`,
+`cluster_csl_segment_breakdown.csv`. Recorded result: MEIO Weekly −0.07pp
+fill / +$97,844, Clark-Scarf v2 +0.04pp / +$3,895 switching segment → cluster
+ladder. See the caveat in "Folder status" about what its control arm now
+means.
 
 ## Current finding — read before trusting the numbers
 
@@ -129,7 +252,9 @@ underperforms the baseline, but the gap has narrowed a lot** after matching
 policy()` (protection interval = review + lead time, not lead time alone;
 `ORDER_COVER_WEEKS=1.5` order-up-to cover with a 1.2x floor; per-echelon
 sigma uplift; segment-based z instead of a cost-derived one — see point 5
-in `meio_weekly_lib.py`'s module docstring for the full diagnosis):
+in `meio_weekly_lib.py`'s module docstring for the full diagnosis). Every
+round below (v1-v10) used the segment-based z; the switch to cluster-based z
+came later (2026-10-18, see "Folder status"):
 
 | | v1 (bias/CV fixes only) | v2 (formula matched to baseline) | v3 (+ PDC coverage) | v4 (+ mean-blend) | v5 (+ de-seasonalization) |
 |---|---|---|---|---|---|
@@ -272,6 +397,12 @@ different world, not just noisier demand):
 | 123 | +1.4pp | +$558K |
 | 2027 | +1.5pp | +$670K |
 
+(The tracked `robustness_report.md` / `robustness_summary.csv` were
+regenerated after v10 below, so they show the v10 figures, e.g. seed 2026
++1.78pp / +$506,401, not this v9 table. Likewise `rolling_simulation_report.md`
+(92.73% fill, +$518,205, internal replen 81.04%) is a pre-v10 run, and
+`simulation_report.md` (83.45%, +$2,653,976) is the v5 frozen-week run.)
+
 **MEIO rolling beats baseline on fill rate in 5/5 seeds.** Fill rate delta:
 mean +1.48pp, std only 0.18pp (range +1.26 to +1.76pp) -- tight and
 consistently positive, not noisy or seed-dependent. Cost delta: mean
@@ -320,5 +451,11 @@ documented as a structural tradeoff rather than force-fit further.
 across 5 seeds, +$0.5-0.8M/year cost), internal_replen_fill_rate ~80-81%
 vs baseline's ~88-89% (a real, understood, apparently structural
 tradeoff). That is where this stands.
+
+On real replayed 2025 demand (`backtest_rolling_real.py`, above) the margin
+was much thinner: 93.23% vs actual's 93.08% (+0.15pp) at +$1.67M. The
+alternative-model work in `alt_models/` then led to Clark-Scarf v2 being chosen
+instead; see `final_submission_optimized/README.md` for the final model and
+its numbers.
 
 Reported honestly rather than smoothed over.

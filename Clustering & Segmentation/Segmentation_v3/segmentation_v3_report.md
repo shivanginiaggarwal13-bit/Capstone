@@ -2,13 +2,47 @@
 
 **Differentiated service-level targets with perishability switched off**
 
+> **Note (2026-10-23): this report does not match the shipped code or outputs.** It records an
+> earlier run (generator v4, `SHELF_LIFE_PROFILE="relaxed"`, and an earlier version of
+> `segmentation_v3.py`). The outputs of that run are no longer in the repo, and the figures below
+> (k=5, 8 features in 4 blocks, fill 79–93%, $11.43M lost margin, OTD ≈ 90%, cross-dataset ARI 0.829)
+> cannot be reproduced from it. Treat them as historical.
+>
+> - **What is actually in `Output/` came from a different run and dataset vintage.** That run used
+>   a realistic-shelf-life dataset: shelf life 5–538 days in `sku_clusters.csv`, and an
+>   `sku_master` that still had `seasonal_flag`. `run_meta.json` records **k=4** (auto-selected),
+>   **10 features in 5 blocks**, all 10 ANOVA-significant, and PCA 40.9%. Only `write_off_rate` was
+>   dropped; shelf life was kept. `cluster_k_diagnostics.csv` gives silhouette 0.165 and stability
+>   ARI 0.838 at k=4. `cluster_service_levels.csv` lists four archetypes:
+>   - Flagship Core: 181 SKUs, CSL 98%
+>   - Mid-Tier Promo-Driven: 121 SKUs, 95%
+>   - Long-Tail Long-Lead: 92 SKUs, 90%
+>   - Long-Tail Perishable: 106 SKUs, 88%
+>
+>   In that output, fill rate is 100% and lost margin is $0 for every SKU. Cluster-average OTD is
+>   58–67%, and the per-SKU economic service level runs 85.0–97.3%.
+> - **The current script cannot run on the current `input datasets/`.** It merges `cost_parameters`
+>   on `category` (L209), but `cost_parameters.csv` is now keyed by `dc_id × subcategory`.
+> - **Where the current code differs from the methods described below:**
+>   - `net_revenue_usd = revenue_usd` (L128), so trade spend is **not** deducted. `trade_rate_pct`
+>     is 0 for every SKU in the shipped output.
+>   - "Lead time" is customer order `delivery_date − order_date` from `orders.csv` (L174–183), about
+>     3 days. It is not taken from `replenishment_receipts.csv`.
+>   - `otd_pct` is the share of a SKU's orders delivered at or below **its own median** lead time
+>     (L177). It is not measured against a p90 promise.
+>   - Fill rate compares demand with inventory shipments summed across **all** echelons (L186–193),
+>     so it is 100% by construction and lost margin is 0.
+>   - Write-offs are hard-coded to 0 (L198–200).
+>   - `DATASETS` (L88) configures only one dataset, so the cross-dataset ARI block (L570–574) never
+>     runs.
+
 | | |
 |---|---|
 | Dataset | `input datasets` — shared project input data |
 | Why this dataset | Shelf life **exceeds the 156-week (1,092-day) simulated span**, so nothing can expire and write-offs are exactly **zero**. Algorithms can be built and debugged without perishability confounding results. |
 | Scope | 500 SKUs · 25 subcategories · 27 stocking nodes · 156 weeks actuals (2023–2025) + 52 forward |
 | Method | **8 features in 4 block-balanced blocks** · k-means, **k=5 auto-selected** · newsvendor service-level ladder |
-| Reproduce | `python segmentation_v3.py` → `Output/segmentation_v3/` |
+| Reproduce | `python segmentation_v3.py` → `Output/segmentation_v3/`. This does **not** reproduce the figures in this report; see the note above. |
 | Script | `segmentation_v3.py` — self-contained, reads the shared input dataset |
 
 ---
@@ -54,7 +88,7 @@ for two different reasons:
 |---|---|---|
 | `write_off_rate` | PERISHABILITY | **Statistical** — exactly 0.0 for all 500 SKUs. Zero variance. |
 | `shelf_life_days` | PERISHABILITY | **Semantic** — spans 1,095–1,459 days. Statistically variable, but a 3-year and a 4-year shelf life are operationally identical over a 3-year simulation, so it is not a perishability signal. |
-| `otd_pct` | SUPPLY_RISK | **Statistical** — 90.0% ± 1.1 (CV 0.013). The dataset sets each node's promised lead time to its own p90, which makes OTD ≈ 90% everywhere by construction. |
+| `otd_pct` | SUPPLY_RISK | **Statistical** — 90.0% ± 1.1 (CV 0.013). The dataset sets each node's promised lead time to its own p90, which makes OTD ≈ 90% everywhere by construction. *(This was the earlier run. The current code (L177) defines OTD as the share of orders at or below the SKU's own median lead time, which gives 58–67% at cluster level in the shipped output.)* |
 
 The `PERISHABILITY` block empties entirely and is removed.
 
@@ -96,8 +130,9 @@ by transport mode would make OTD a live feature in both datasets.
 ### Choosing k
 
 k is selected from this run's own diagnostics: inside a business range of 4–8, take the **most
-reproducible** partition (highest bootstrap adjusted Rand index over resamples), tie-broken on
-silhouette.
+reproducible** partition (highest mean adjusted Rand index over resamples), tie-broken on
+silhouette. In the code (L239–251) the "bootstrap" is 10 subsamples of 80% of SKUs, drawn without
+replacement.
 
 | k | Inertia | Silhouette | Stability (ARI) |
 |---|---|---|---|
@@ -195,9 +230,11 @@ Otherwise delist.
 | Long-Tail Forecast-Challenged | 99.00% | **90.0%** | **value cap** |
 | Long-Tail Supply-Risk | 99.00% | **88.0%** | **value cap** |
 
-With no obsolescence term, `overstock_cost` collapses to prorated holding cost alone, which is tiny
-next to `understock_cost` (unit margin × category stockout multiplier). The critical ratio therefore
-pins at the 99% clip for every SKU.
+With shelf life far beyond the cycle, `overstock_cost` is tiny next to `understock_cost` (list-price
+unit margin × category stockout multiplier). The critical ratio therefore pins at the 99% clip for
+every SKU. In the code (L213–214), `overstock_cost` is prorated holding plus
+`unit_cost × min(cycle_days / shelf_life_days, 1)`. The obsolescence term is not removed; with a
+3–4-year shelf life it is simply under 1% of unit cost.
 
 **Implication for the charter's Service Level Optimization layer:** a service-level model built
 without a waste cost will recommend protecting everything, because understock cost dominates by
@@ -217,6 +254,9 @@ own k the underlying SKU behaviour is recognised almost identically. An earlier 
 datasets to the same k reported ARI 0.397 — most of that apparent disagreement was an artifact of
 the imposed k, not a real difference in structure.
 
+*(Note (2026-10-23): the current script configures only one dataset (`DATASETS`, L88), so it does
+not compute this ARI. Neither 0.829 nor 0.397 can be reproduced from the repo.)*
+
 ---
 
 ## 6. Recommended policy
@@ -229,9 +269,12 @@ the imposed k, not a real difference in structure.
 | Long-Tail Forecast-Challenged | 90.0% | 88.0% | 1.28 | Weekly (R,S) + S&OP; rebuild the seasonal profile first |
 | Long-Tail Supply-Risk | 88.0% | 86.0% | 1.18 | Dual-source review; expedite lane |
 
-Size safety stock as `z × sqrt(L·σ_demand² + demand²·σ_L²)` using the **realised** lead time and its
-variability from `replenishment_receipts.csv`, not a static lane parameter. Lead-time CV is the
-fourth strongest feature in this model (F=101.0) — it earns its place in the formula.
+Size safety stock as `z × sqrt(L·σ_demand² + demand²·σ_L²)` using the **realised** replenishment lead
+time and its variability, not a static lane parameter. Lead-time CV is the fourth strongest feature
+in this model (F=101.0) — it earns its place in the formula. *(Caveat: the current
+`segmentation_v3.py` does not read `replenishment_receipts.csv`. Its `lead_time_mean_days` and
+`lead_time_cv` come from customer order `delivery_date − order_date` (L174–183), so they measure
+customer delivery time, not replenishment lead time.)*
 
 The cost of service is non-linear (95%→98% adds roughly a quarter to safety stock; 98%→99.5% another
 quarter), which is why the ladder concentrates spend on the 51.2% of SKUs carrying 91.3% of net
@@ -260,8 +303,9 @@ revenue.
 - **The economic service level does not differentiate on this dataset by construction** (§5). Do not
   read the uniform 99% newsvendor ratio as evidence that every SKU deserves 99% service.
 - **Silhouette is 0.165.** These are archetypes on a continuum, not well-separated islands.
-  Bootstrap stability (0.801) and ANOVA are the stronger validation; boundary SKUs need planner
-  judgement.
+  Subsample stability (0.801) and ANOVA are the stronger validation; boundary SKUs need planner
+  judgement. ANOVA runs on the same features used to cluster, so it confirms separation but does not
+  validate it independently.
 - **k=5 is selected on stability within a 4–8 business range.** Stability is higher at k=2 and k=3,
   both rejected as too coarse for differentiated policy — a documented judgement, not a diagnostic
   optimum.
@@ -278,6 +322,9 @@ revenue.
 ---
 
 ## Appendix — outputs
+
+*The files currently at these paths come from the later k=4, realistic-shelf-life run described in
+the note at the top, not from the run this report describes.*
 
 | File | Contents |
 |---|---|

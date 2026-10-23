@@ -20,19 +20,28 @@ double-counting.
 
 ## Method
 
-1. **CDC (base echelon)**: ordinary local newsvendor, identical to MEIO Weekly's
-   `solve_policy()` — Clark-Scarf's decomposition only changes the level above the base.
+1. **CDC (base echelon)**: ordinary local (R, s, S) sizing using the same formula as MEIO
+   Weekly's `solve_policy()`: protection interval `P = 1 week review + lead time`,
+   `SS = z·sqrt(P·σ² + μ²·σ_LT²)`, and `S = max(s + 1.5·μ, 1.2·s)`. Clark-Scarf's
+   decomposition only changes the level above the base. One difference: z is read
+   directly from `Z_BY_SEGMENT` (segment z 2.05 / 1.64 / 1.28), not through `assign_z()`.
+   Since `solve_policy()` switched to cluster-based z on 2026-10-18, the two no longer use
+   the same service levels.
 2. **RDC (echelon)**: its *echelon* inventory position is defined as everything in the
    RDC–CDC subsystem — the RDC's own stock plus every downstream CDC's stock. Demand is
    pooled via King's formula (sum of variances, then square root):
-   `mu_echelon = mu_RDC_own + sum(mu_CDC)`, `sigma_echelon = sqrt(sigma_RDC_own² + sum(sigma_CDC²))`,
-   sized against the RDC's *own* replenishment lead time from the PDC — the subsystem is
-   protected as a single newsvendor over that lead time.
+   `mu_echelon = mu_RDC_own + sum(mu_CDC)`, `sigma_echelon = sqrt((1.25·sigma_RDC_own)² + sum(sigma_CDC²))`.
+   The RDC's own sigma carries `SIGMA_UPLIFT["RDC"]=1.25`. The subsystem is protected as a
+   single (R, s, S) node over `P = 1 week + L_RDC`, where `L_RDC` is the cumulative
+   Plant → PDC → RDC lead time.
 3. **RDC's local target** (what it physically holds) is the echelon target *minus* what's
    already downstream at the CDCs: `local_safety_stock = max(0, echelon_SS − sum(CDC SS))`,
-   `local_order_up_to = max(local_reorder_point, echelon_OUT − sum(CDC OUT))`. This is
-   the double-counting fix: the RDC only carries the *incremental* buffer the CDCs don't
-   already provide for themselves.
+   `local_order_up_to = max(local_reorder_point, echelon_OUT − sum(CDC OUT))`. The local
+   reorder point is the RDC's *own* direct-demand cycle stock (`mu_RDC_own · P`) plus that
+   local safety stock. This is the double-counting fix: the RDC only carries the
+   *incremental* buffer the CDCs don't already provide for themselves.
+4. **PDC** rows are appended unchanged from MEIO Weekly's `solve_pdc_policy()`
+   (push-ceiling model), not part of the echelon decomposition.
 
 **Honest scope note, stated directly in the source**: full Clark-Scarf also charges each
 echelon only its *incremental* holding cost rate (echelon holding cost = local rate minus
@@ -44,8 +53,8 @@ recursion.
 
 ## Features
 
-- Three-level echelon stock accounting (PDC → RDC → CDC), vs. MEIO Weekly's independent
-  per-DC sizing.
+- Echelon stock accounting over each RDC and the CDCs it primary-sources, vs. MEIO
+  Weekly's independent per-DC sizing. PDCs keep MEIO Weekly's own push-ceiling policy.
 - King's-formula demand pooling across an RDC and its downstream CDCs.
 - An explicit, documented double-counting-prevention mechanism (netting the RDC's local
   target against downstream stock already held).
@@ -57,9 +66,18 @@ recursion.
 - Clean, auditable three-step construction (CDC → RDC echelon → RDC local), each step
   independently checkable.
 - Became the conceptual foundation Clark-Scarf v2 generalizes, rather than being thrown
-  away outright — v2's `alpha=1` endpoint reproduces v1's full-pooling answer exactly, and
-  v2's `alpha=0` endpoint reproduces MEIO Weekly's no-pooling answer exactly, so v1's own
-  result remains inside v2's search space as a validated reference point.
+  away outright. v2's `alpha=1` endpoint is v1's full-pooling-and-netting construction,
+  and its `alpha=0` endpoint is MEIO Weekly's independent sizing. Neither endpoint
+  reproduces those answers numerically, though (`clark_scarf_v2_model.py`):
+  - v2 sizes every RDC/CDC buffer by Monte Carlo Gamma DDLT instead of closed-form z·σ.
+  - At `alpha=1`, v2's RDC cycle stock is the echelon mean DDLT rather than the RDC's own
+    demand only. Its order-up-to is `local ROP + echelon cover − downstream S`, not v1's
+    `echelon S (with the 1.2× floor) − downstream S`.
+  - v2 takes z from `assign_z()` (cluster z under the current code), while v1 uses
+    segment z.
+
+  So v1's design sits inside v2's search space, but its result is not a point on v2's
+  curve.
 
 ## Disadvantages
 
@@ -69,9 +87,9 @@ recursion.
 - **Closed-form z·σ sizing**, not Monte Carlo — same Normal-distribution assumption at
   high service-level percentiles that MEIO Weekly has, later identified as a weak fit
   for right-skewed demand and replaced in v2.
-- **Scored worst of all 6 models in the single-week bake-off** (see table below) —
-  10.43pp fill-rate *below* baseline, the second-worst total landed cost delta
-  (+$3.86M) of any model tried.
+- **Scored second-worst of all 6 policies in the single-week bake-off** (5th of 6, ahead
+  of only GSM; see table below) — 10.43pp fill-rate *below* baseline, and the
+  second-worst total landed cost delta (+$3.86M) of any model tried.
 - The incomplete-recursion scope note means this model's holding-cost accounting is not
   truly cost-optimal even on its own terms — it fixes the double-counting of *stock*,
   not of *cost*.
@@ -97,23 +115,27 @@ On this particular single-week synthetic basis, **every** model underperformed t
 dataset's own baseline policy — including this one, clearly. Clark-Scarf v1 placed 5th
 of 6, ahead of only GSM.
 
-## Real comparison snapshot: 52-week rolling walk-forward backtest, real 2025 demand
+## Related snapshot: walk-forward backtest on real 2025 demand (Clark-Scarf v2 prototype, not v1)
 
-A separate, more realistic test (`backtest_rolling_real_clark_scarf.py`) replayed real
-order history week by week (no lookahead) across the full 2025 test window:
+v1 itself (`clark_scarf_model.py`) was never run against real demand. The real-data
+walk-forward test that followed it (`backtest_rolling_real_clark_scarf.py`) runs the
+**Clark-Scarf v2 prototype** (`clark_scarf_v2_model.solve`: Monte Carlo DDLT,
+`N_SIMS=1200`, alpha=0.2, full netting) rather than v1. Its setup:
+- Real `orders.csv` is replayed through `digital_twin.py --mode history` for 156 weeks.
+- The policy is recomputed every week with no lookahead.
+- Scoring covers the 51-week test window 2025-W02..2025-W52.
 
 | arm | customer fill rate | CDC fill | RDC fill | internal replen fill | holding cost (window) |
 |---|---|---|---|---|---|
 | actual (what happened) | 93.08% | 80.21% | 95.99% | 93.21% | $696,561 |
-| clark_scarf_v2_weekly (at this stage, pre-alpha-generalization) | 94.27% | 86.32% | 96.07% | 81.99% | $952,969 |
+| clark_scarf_v2_weekly (v2 prototype, alpha=0.2) | 94.27% | 86.32% | 96.07% | 81.99% | $952,969 |
 
 Total landed cost delta attributable to the test window: **+$2,006,007** (higher cost
-than actual). This rolling backtest already reflects the early alpha-parameterized
-version of the model (the direct predecessor to what became Clark-Scarf v2's fixed
-alpha=0.2 operating point) — it beat real-demand fill rate, but at materially higher
-cost and a real internal-replenishment-fill regression (81.99% vs. actual's 93.21%),
-the same internal-fill weakness that persisted into v2 and was only partially addressed
-by the later netting-discount fix (see `Clark Scarf v2.md`).
+than actual). It beat real-demand fill rate, but at materially higher cost and with a
+real internal-replenishment-fill regression (81.99% vs. actual's 93.21%). That
+internal-fill weakness persisted into the final v2 and was only partially addressed by
+the later netting-discount fix (see `Clark Scarf v2.md`). It is listed here only as the
+direct successor's first real-data result.
 
 ## Why it was phased out
 
@@ -132,8 +154,10 @@ Two independent findings pushed past v1's hard pooling choice:
 *Fill rate and total landed cost for all six candidates on the same frozen basis.
 Clark-Scarf (v1) placed 5th of 6.*
 
-![Clark-Scarf v1/early-v2 rolling backtest vs. real 2025 demand](images/clark_scarf_v1_rolling_backtest.png)
-*52-week walk-forward, real order history, no lookahead.*
+![Clark-Scarf v2 prototype (alpha=0.2) walk-forward backtest vs. real 2025 demand](images/clark_scarf_v1_rolling_backtest.png)
+*51-week walk-forward (2025-W02..W52), real order history, no lookahead. Despite the
+file name, this is the v2 prototype's chart (identical to
+`alt_models/chart_backtest_rolling_real_clark_scarf.png`).*
 
 ## Files referenced
 

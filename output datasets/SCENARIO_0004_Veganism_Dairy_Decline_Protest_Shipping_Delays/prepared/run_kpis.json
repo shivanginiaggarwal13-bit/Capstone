@@ -1,0 +1,20 @@
+{
+  "horizon_weeks": 52,
+  "first_period": "2026-W01",
+  "last_period": "2026-W52",
+  "customer_demand_units": 14078462.0,
+  "customer_fill_rate": 0.9501,
+  "customer_fill_rate_cdc": 0.9011,
+  "customer_fill_rate_rdc": 0.9607,
+  "pct_demand_weeks_in_full": 0.918,
+  "internal_replen_fill_rate": 0.7829,
+  "avg_units_on_hand_network": 1571467.8,
+  "avg_inventory_value_usd": 7331474.27,
+  "safety_stock_value_usd": 2729462.04,
+  "holding_cost_usd": 873016.55,
+  "stockout_cost_usd": 2566360.86,
+  "transport_cost_usd": 32746348.64,
+  "total_landed_cost_usd": 36185726.05,
+  "pct_weeks_at_zero_stock": 0.0555,
+  "margin_basis": "margin_usd"
+}

@@ -108,7 +108,7 @@ PAGES = {
 }
 PAGE_ICONS = {"dashboard": ":material/dashboard:", "segmentation": ":material/pie_chart:",
               "service-levels": ":material/percent:", "allocation": ":material/calendar_view_week:",
-              "alpha": ":material/refresh_alert:", "simulation": ":material/monitoring:"}
+              "alpha": ":material/autorenew:", "simulation": ":material/monitoring:"}
 st.session_state.setdefault("page", "dashboard")
 
 
@@ -236,7 +236,7 @@ def jobs_panel(keys: tuple[str, ...] | None = None):
                          expanded=j["state"] == "running"):
             if j["state"] == "running":
                 st.progress(min(0.95, 0.05 + 0.9 * (1 - 1 / (1 + elapsed / 240))),
-                            text="Estimated: no true progress is emitted by the scripts; bar is indicative only.")
+                            text="Indicative progress only.")
                 if st.button("Stop", key=f"stop_{j['key']}"):
                     proc = j.get("proc")
                     if proc:
@@ -280,11 +280,10 @@ def agent_bridge_panel():
     if pending_req is not None:
         r = _read_json_live(pending_req)
         st.info(f"Waiting on a model call: **{r['agent']}** (model alias `{r['model']}`, call #{r['seq']})")
-        with st.expander("Full request (what a Claude session needs to read and answer)"):
+        with st.expander("Full request"):
             st.markdown(pending_req.with_suffix(".md").read_text(encoding="utf-8", errors="replace"))
-        st.caption("Ask Claude Code, in your terminal session, to \"drive the agent bridge\" and it will "
-                   "answer this (and each call after it) the same way a human operator would -- or write the "
-                   f"reply JSON to `{r['response_file']}` yourself: "
+        st.caption("The desktop model session answers this request through the bridge. A reply can also be "
+                   f"written manually to `{r['response_file']}` in the form "
                    '`{"text": "...", "tool_calls": [...], "model_id": "..."}`.')
     elif approval_req_path.exists() and not approval_res_path.exists():
         a = _read_json_live(approval_req_path)
@@ -305,7 +304,7 @@ def agent_bridge_panel():
     elif done:
         st.success(f"Session finished: {done.get('summary') or '(no summary recorded)'}")
     else:
-        st.caption("Idle -- nothing pending right now.")
+        st.caption("Idle. Nothing pending.")
 
 
 # ------------------------------------------------------------------ agent chat (in-process) --
@@ -462,7 +461,7 @@ def agent_activity_feed(chat: dict):
             feed.append(c)
     done = sum(c["answered"] for c in feed)
     total_s = sum(c["seconds"] or 0 for c in feed)
-    st.markdown(f"**:material/monitoring: Agent activity** -- {done}/{len(feed)} model calls answered, "
+    st.markdown(f"**:material/monitoring: Agent activity** · {done}/{len(feed)} model calls answered, "
                 f"{total_s / 60:,.1f} min of model time")
     with st.container(height=460, border=True):
         for c in feed:
@@ -482,14 +481,14 @@ def agent_activity_feed(chat: dict):
                             st.code(c["incoming_body"][:1500], language="json")
                 else:
                     st.markdown(f"**#{c['seq']} {label}** · {c['model']}  \n:material/arrow_forward: {c['incoming']}  \n"
-                                ":material/hourglass_top: *working -- waiting on the model through the bridge...*")
+                                ":material/hourglass_top: *waiting for the model reply...*")
 
 
 @st.fragment(run_every=2)
 def agent_chat_panel():
     chat = agent_chat_registry().get("chat")
     if not chat:
-        st.caption('No active session yet -- click "New session" above to start one.')
+        st.caption('No active session. Select "New session" to start one.')
         return
     for turn in chat["turns"]:
         with st.chat_message(turn["role"]):
@@ -502,13 +501,11 @@ def agent_chat_panel():
             progress = _agent_progress_text(chat) or "thinking..."
             st.caption(f":material/progress_activity: {progress} ({elapsed:,.0f}s)")
             if chat["profile"] == "claude" and elapsed > 300:
-                st.caption("This is taking a while -- each Claude model call times out at 300s "
-                           "(with up to 2 retries), so this should resolve, one way or another. If it "
-                           "keeps climbing, a fresh \"New session\" is the fastest way out.")
+                st.caption("Still running. Each model call times out after 300 s (up to 2 retries). "
+                           "If it does not finish, start a new session.")
             elif chat["profile"] == "desktop" and elapsed > 150:
-                st.caption("This is taking a while, but desktop-profile model calls have no "
-                           "timeout -- they're genuinely waiting on a Claude session to answer "
-                           "the bridge request below, not stuck on their own.")
+                st.caption("Still waiting for the desktop model session to answer the bridge request "
+                           "below. Desktop calls have no timeout.")
     if chat.get("pending_approval"):
         a = chat["pending_approval"]
         st.warning(f"Waiting on your approval: **{a['scenario_folder']}**")
@@ -540,6 +537,20 @@ def kpis(path: Path) -> dict | None:
     return _read_json_live(path / "run_kpis.json")
 
 
+def alpha_by_cluster_table(par: dict) -> pd.DataFrame:
+    """Alpha actually used per cluster: the per-cluster decision in meio_parameters.json,
+    falling back to the portfolio default for clusters without their own value."""
+    by_cluster = next((d["value"] for d in par.get("decisions", []) if d.get("parameter") == "alpha_by_cluster"
+                       and isinstance(d.get("value"), dict)), {})
+    sku = read_csv(str(paths()["clusters"]))
+    counts = sku["archetype"].value_counts() if sku is not None else pd.Series(dtype=int)
+    names = list(counts.index) or list(by_cluster)
+    return pd.DataFrame([{"Cluster": c, "SKUs": int(counts.get(c, 0)),
+                          "Alpha used": by_cluster.get(c, par.get("alpha")),
+                          "Source": "own cluster test" if c in by_cluster and by_cluster[c] != par.get("alpha")
+                          else "portfolio default (own test didn't beat it)"} for c in names])
+
+
 def alpha_flags() -> pd.DataFrame:
     """Proxy for per-SKU alpha flags: clusters whose own-fill-best alpha differs
     from the alpha the pipeline adopted. The repo has cluster-level evidence only.
@@ -558,21 +569,46 @@ def alpha_flags() -> pd.DataFrame:
         return pd.DataFrame()
     best = ev.loc[ev.groupby("cluster")["own_fill_mean"].idxmax(), ["cluster", "alpha", "own_fill_mean"]]
     best = best.rename(columns={"alpha": "best_alpha_own_fill", "own_fill_mean": "own_fill_at_best"})
-    at_adopted = ev[np.isclose(ev["alpha"], adopted)][["cluster", "own_fill_mean"]].rename(
-        columns={"own_fill_mean": "own_fill_at_adopted"})
-    out = best.merge(at_adopted, on="cluster", how="left")
-    out["adopted_alpha"] = adopted
+    # Compare each cluster against the alpha the pipeline actually adopted FOR THAT CLUSTER
+    # (meio_parameters.json alpha_by_cluster), not the portfolio alpha -- otherwise clusters
+    # already moved to their best alpha get flagged as "review due". A cluster is flagged only
+    # when its best alpha differs AND the fill gain clears single-seed noise (0.3pp).
+    by_cluster = next((d["value"] for d in par.get("decisions", []) if d.get("parameter") == "alpha_by_cluster"
+                       and isinstance(d.get("value"), dict)), {})
+    out = best.copy()
+    out["adopted_alpha"] = out["cluster"].map(lambda c: by_cluster.get(c, adopted))
+    own = ev.set_index(["cluster", "alpha"])["own_fill_mean"]
+    out["own_fill_at_adopted"] = [own.get((c, a), np.nan) for c, a in zip(out["cluster"], out["adopted_alpha"])]
     out["gain_pp"] = (out["own_fill_at_best"] - out["own_fill_at_adopted"]) * 100
-    out["flagged"] = ~np.isclose(out["best_alpha_own_fill"], adopted)
+    out["flagged"] = ~np.isclose(out["best_alpha_own_fill"], out["adopted_alpha"]) & (out["gain_pp"] > 0.3)
     return out
 
 
 # --------------------------------------------------------------------------- top bar
+def outputs_stale() -> str | None:
+    """Why the MEIO plan / Twin run is older than what it was built from, or None. Inputs ->
+    segmentation + tuning evidence -> rolling MEIO policy -> Twin run."""
+    p = paths()
+    def t(path: Path) -> float:
+        return path.stat().st_mtime if path.exists() else 0.0
+    policy = t(p["meio_dir"] / "rolling_2026" / "meio_policy_rolling.parquet")
+    twin = t(p["twin_dir"] / "run_kpis.json")
+    ev = max((t(f) for f in p["evidence"].glob("*multiseed*.csv")), default=0.0)
+    upstream = max(t(ROOT / "input datasets" / "orders.parquet"), t(p["clusters"]), ev)
+    if policy and upstream > policy:
+        return "inputs, segmentation or tuning evidence changed after the last MEIO run"
+    if twin and policy > twin:
+        return "the MEIO policy changed after the last Twin run"
+    return None
+
+
 def topbar():
     page = st.session_state["page"]
     flags = alpha_flags()
     n_flag = int(flags["flagged"].sum()) if len(flags) else 0
-    badge = ("sb-amber", f"{n_flag} flags") if page == "alpha" and n_flag else ("sb-green", "Up to date")
+    stale = outputs_stale()
+    badge = (("sb-amber", f"{n_flag} flags") if page == "alpha" and n_flag else
+             ("sb-amber", "Re-run needed") if stale else ("sb-green", "Up to date"))
     c1, c2, c3, c4 = st.columns([4, 1.3, 1.3, 1.5], vertical_alignment="center")
     c1.markdown(f"<span class='sb-title'>{PAGES[page]}</span><span class='sb-badge {badge[0]}'>{badge[1]}</span>",
                 unsafe_allow_html=True)
@@ -657,6 +693,42 @@ def steps_html(items: list[str]):
     st.markdown("<ol class='mod-steps'>" + "".join(f"<li>{i}</li>" for i in items) + "</ol>", unsafe_allow_html=True)
 
 
+def latest_scenario_card():
+    """The newest what-if scenario with finished arms: one row per arm and the two answers a
+    planner wants - which response serves customers best, and which is cheapest."""
+    arms = ("unprepared", "prepared", "reactive")
+    found = sorted(d for d in OUT.glob("SCENARIO_*") if any((d / a / "run_kpis.json").exists() for a in arms))
+    if not found:
+        return
+    d = found[-1]
+    ks = {a: k for a in arms if (k := kpis(d / a))}
+    title = re.sub(r"^SCENARIO_\d+_", "", d.name).replace("_", " ")
+    st.caption(f"LATEST WHAT-IF SCENARIO - {title}")
+    names = {"unprepared": "Do nothing (today's policy)", "prepared": "Plan ahead (re-plan in advance)",
+             "reactive": "React weekly (re-plan every week)"}
+    tab = pd.DataFrame({names[a]: {"Customer fill": f"{k['customer_fill_rate']:.2%}",
+                                   "Lost-sales cost": f"${k['stockout_cost_usd'] / 1e6:.2f}M",
+                                   "Avg inventory": f"${k['avg_inventory_value_usd'] / 1e6:.2f}M",
+                                   "Total landed cost": f"${k['total_landed_cost_usd'] / 1e6:.2f}M"}
+                        for a, k in ks.items()}).T
+    left, right = st.columns([3, 2], vertical_alignment="center")
+    left.dataframe(tab, width="stretch")
+    with right:
+        best = max(ks, key=lambda a: ks[a]["customer_fill_rate"])
+        cheap = min(ks, key=lambda a: ks[a]["total_landed_cost_usd"])
+        base = ks.get("unprepared")
+        st.markdown(f"**Best service:** {names[best].split(' (')[0]} - "
+                    f"{ks[best]['customer_fill_rate']:.2%} customer fill"
+                    + (f" ({(ks[best]['customer_fill_rate'] - base['customer_fill_rate']) * 100:+.1f} pp vs doing nothing)"
+                       if base and best != "unprepared" else ""))
+        st.markdown(f"**Lowest cost:** {names[cheap].split(' (')[0]} - "
+                    f"${ks[cheap]['total_landed_cost_usd'] / 1e6:.2f}M"
+                    + (f" (${(base['total_landed_cost_usd'] - ks[cheap]['total_landed_cost_usd']) / 1e3:,.0f}K "
+                       f"saved vs doing nothing)" if base and cheap != "unprepared" else ""))
+        st.button("Open in Simulation centre", icon=":material/open_in_new:", key="d_scen", width="stretch",
+                  on_click=goto, args=("simulation",))
+
+
 def page_dashboard(slot: dict):
     p = paths()
     sku = read_csv(str(p["clusters"]))
@@ -666,39 +738,50 @@ def page_dashboard(slot: dict):
 
     if n_flag and not st.session_state.get("alert_dismissed"):
         a, b = st.columns([30, 1], vertical_alignment="center")
-        a.warning(f"Alpha review due - {n_flag} cluster(s) have a better own-fill alpha than the adopted one "
-                  f"(cluster-level proxy; the repo has no SKU-level alpha drift).", icon=":material/warning:")
+        a.warning(f"Alpha review due - {n_flag} cluster(s) would fill noticeably better (>0.3 pp) at a different "
+                  f"alpha than the one adopted for them.", icon=":material/warning:")
         b.button("", icon=":material/close:", key="dismiss", help="Dismiss",
                  on_click=lambda: st.session_state.update(alert_dismissed=True))
 
-    st.caption("SUMMARY")
-    m1, m2, m3, m4 = st.columns(4)
-    if sku is not None:
-        m1.metric("Total SKUs", f"{len(sku):,}")
-        m1.caption(f"across {sku['cluster'].nunique()} clusters")
-    else:
-        m1.metric("Total SKUs", "n/a")
+    st.caption("WHAT THE MEIO PLAN DELIVERS - full year 2026, vs today's planning policy")
     if k_meio and k_base:
-        m2.metric("Fill rate (forward plan)", f"{k_meio['customer_fill_rate']:.1%}")
-        m2.caption(f"Baseline plan: {k_base['customer_fill_rate']:.1%}. The MEIO plan is "
-                   f"{(k_meio['customer_fill_rate'] - k_base['customer_fill_rate']) * 100:+.2f} percentage points higher "
-                   f"(share of customer demand filled from stock).")
-        m3.metric("Avg inventory value", f"${k_meio['avg_inventory_value_usd'] / 1e6:.2f}M")
-        m3.caption(f"Baseline plan: ${k_base['avg_inventory_value_usd'] / 1e6:.2f}M. The MEIO plan holds "
-                   f"{(k_meio['avg_inventory_value_usd'] / k_base['avg_inventory_value_usd'] - 1) * 100:+.1f}% more stock value.")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Customer fill rate", f"{k_meio['customer_fill_rate']:.1%}",
+                  f"{(k_meio['customer_fill_rate'] - k_base['customer_fill_rate']) * 100:+.1f} pp", border=True)
+        m2.metric("Total landed cost", f"${k_meio['total_landed_cost_usd'] / 1e6:.2f}M",
+                  f"{(k_meio['total_landed_cost_usd'] - k_base['total_landed_cost_usd']) / 1e6:+.2f}M",
+                  delta_color="inverse", border=True)
+        m3.metric("Lost-sales cost", f"${k_meio['stockout_cost_usd'] / 1e6:.2f}M",
+                  f"{(k_meio['stockout_cost_usd'] - k_base['stockout_cost_usd']) / 1e6:+.2f}M",
+                  delta_color="inverse", border=True)
+        m4.metric("Avg inventory value", f"${k_meio['avg_inventory_value_usd'] / 1e6:.2f}M",
+                  f"{(k_meio['avg_inventory_value_usd'] - k_base['avg_inventory_value_usd']) / 1e6:+.2f}M",
+                  delta_color="off", border=True)
+        inv = (k_meio["avg_inventory_value_usd"] - k_base["avg_inventory_value_usd"]) / 1e6
+        lost = (k_base["stockout_cost_usd"] - k_meio["stockout_cost_usd"]) / 1e6
+        net = (k_base["total_landed_cost_usd"] - k_meio["total_landed_cost_usd"]) / 1e6
+        st.success(f"The MEIO plan holds **${inv:.1f}M more stock** in the right places and in return cuts lost "
+                   f"sales by **${lost:.1f}M** - the network is **${net:.1f}M a year cheaper to run** while filling "
+                   f"{k_meio['customer_fill_rate']:.0%} of customer demand from stock "
+                   f"(up from {k_base['customer_fill_rate']:.0%}).", icon=":material/trending_up:")
     else:
-        m2.metric("Fill rate (forward plan)", "n/a")
-        m3.metric("Avg inventory value", "n/a")
-    n_sims = p["cfg"]["meio"].get("parameters", {}).get("n_sims")
-    m4.metric("MEIO n_sims", f"{n_sims:,}" if n_sims else "n/a")
-    m4.caption(f"last Twin run: {mtime(p['twin_dir'] / 'run_kpis.json')}")
+        st.info("No finished Twin runs yet - use Run all to produce the forward plan.")
+
+    latest_scenario_card()
+    par0 = read_json(str(p["weekly_dir"] / "meio_parameters.json")) or {}
+    alphas = sorted(set(alpha_by_cluster_table(par0)["Alpha used"].dropna())) if par0 else []
+    alpha_txt = (f" · alpha {alphas[0]:.1f}-{alphas[-1]:.1f} by cluster" if len(alphas) > 1
+                 else f" · alpha {alphas[0]:g}" if alphas else "")
+    st.caption(f"Network: {len(sku) if sku is not None else 500:,} SKUs in "
+               f"{sku['cluster'].nunique() if sku is not None else 6} clusters · 4 plant DCs · 8 regional DCs · "
+               f"15 customer DCs{alpha_txt} · last Twin run {mtime(p['twin_dir'] / 'run_kpis.json')}")
 
     st.caption("MODULES")
     cs = read_csv(str(p["cluster_sl"]))
     summ = read_csv(str(p["weekly_dir"] / "meio_summary_by_dc_weekly.csv"))
     par = read_json(str(p["weekly_dir"] / "meio_parameters.json")) or {}
     tabs = st.tabs([":material/pie_chart: SKU segmentation", ":material/calendar_view_week: Weekly MEIO allocation",
-                    ":material/refresh_alert: Periodic alpha check", ":material/monitoring: Simulation centre"])
+                    ":material/autorenew: Periodic alpha check", ":material/monitoring: Simulation centre"])
 
     with tabs[0]:
         if cs is not None:
@@ -744,9 +827,9 @@ def page_dashboard(slot: dict):
 
     with tabs[2]:
         if par:
-            x, y = st.columns(2)
-            x.metric("Adopted alpha", par.get("alpha"))
-            y.metric("Netting discount", par.get("netting_discount"))
+            st.caption(f"Alpha used per cluster (portfolio default {par.get('alpha')}, netting discount "
+                       f"{par.get('netting_discount')})")
+            st.dataframe(alpha_by_cluster_table(par), hide_index=True, width="stretch")
         if len(flags):
             st.caption("Latest output: best alpha per cluster")
             st.dataframe(flags[["cluster", "best_alpha_own_fill", "adopted_alpha", "gain_pp"]].rename(columns={
@@ -769,11 +852,10 @@ def run_all_panel(clicked: bool):
         st.session_state["show_run_all"] = True
     if st.session_state.get("show_run_all"):
         with st.container(border=True):
-            st.markdown("**Run all** - the routine weekly piece: MEIO policy, then Digital Twin. "
-                        "Segmentation and the alpha check are separate, standalone buttons on their own "
-                        "pages -- run those only when the business team asks for a refresh, not as part "
-                        "of this.")
-            st.warning("This runs `run_meio_then_twin.py --yes`, which CLEARS and rebuilds "
+            st.markdown("**Run all** runs the weekly cycle: MEIO policy, then the Digital Twin. "
+                        "Segmentation and the alpha check run separately from their own pages, on their "
+                        "periodic review cycle.")
+            st.warning("This runs `run_meio_then_twin.py --yes`, which clears and rebuilds "
                        f"`output datasets/MEIO/{paths()['name']}` and its Twin run. This takes a long time.")
             ok = confirm_box("I understand; rebuild the configured scenario outputs", "ra_ok")
             if st.button("Start run all", type="primary", disabled=not ok):
@@ -835,7 +917,7 @@ def seg_charts(sku: pd.DataFrame, cs: pd.DataFrame, art: Path, imgs: list):
         width="stretch")
     st.caption(f"Each dot is a SKU, projected from the 8 clustering features onto two axes "
                f"({pca.explained_variance_ratio_.sum():.0%} of variance). Dots of one colour sitting together mean a tight "
-               "group; overlap marks boundary SKUs worth a business review. Recomputed here with plain standardised "
+               "group; overlap marks boundary SKUs for business review. Recomputed with standardised "
                "features, so it approximates the saved static PCA chart.")
 
     st.subheader("3. Recommended vs economically implied service level")
@@ -967,6 +1049,47 @@ def newsvendor_recompute(holding_pct: float | None, shortage_mult: float | None)
     return g.drop(columns="rev")
 
 
+def csl_sweep_charts(ev: pd.DataFrame, cs: pd.DataFrame | None):
+    """CSL sweep as small multiples, one panel per cluster: own fill vs tested CSL (zoomed
+    axis, so the rise is visible), then cost vs CSL. The orange dot is the CSL MEIO uses today
+    (segmentation ladder); the green ring in the cost row is each cluster's cheapest CSL."""
+    import altair as alt
+    d = ev.copy()
+    used = dict(zip(cs["archetype"], cs["recommended_csl"])) if cs is not None else {}
+    d["used_today"] = [np.isclose(c, used.get(k, -1), atol=5e-4) for k, c in zip(d["cluster"], d["csl"])]
+    d["cost_m"] = d["cost_delta_mean"] / 1e6
+    d["cheapest"] = d["cost_m"] == d.groupby("cluster")["cost_m"].transform("min")
+    order = [c for c in (cs["archetype"].tolist() if cs is not None else []) if c in set(d["cluster"])] or \
+        sorted(d["cluster"].unique())
+    d["csl_label"] = d["csl"].map(lambda v: f"{v * 100:.1f}%".replace(".0%", "%"))
+    ticks = [f"{v * 100:.1f}%".replace(".0%", "%") for v in sorted(d["csl"].unique())]
+    x = alt.X("csl_label:O", title="Target service level (tested values)", sort=ticks,
+              axis=alt.Axis(labelAngle=0))
+    tip = [alt.Tooltip("cluster:N", title="Cluster"), alt.Tooltip("csl:Q", title="CSL", format=".1%"),
+           alt.Tooltip("own_fill_mean:Q", title="Own fill", format=".2%"),
+           alt.Tooltip("cost_m:Q", title="Cost vs actual ($M)", format=",.2f")]
+
+    def panel(y, color_flag, flag_color, flag_shape, y_title, y_fmt):
+        base = alt.Chart().encode(x=x)
+        line = base.mark_line(color="#2374CC", strokeWidth=2).encode(
+            y=alt.Y(f"{y}:Q", title=y_title, scale=alt.Scale(zero=False), axis=alt.Axis(format=y_fmt)))
+        pts = base.mark_point(filled=True, size=55, color="#2374CC").encode(y=f"{y}:Q", tooltip=tip)
+        flag = base.transform_filter(alt.datum[color_flag]).mark_point(
+            size=230, strokeWidth=3, color=flag_color, shape=flag_shape, filled=flag_shape == "circle").encode(
+            y=f"{y}:Q", tooltip=tip)
+        return alt.layer(line, pts, flag, data=d).properties(width=230, height=170).facet(
+            facet=alt.Facet("cluster:N", title=None, sort=order, header=alt.Header(labelFontWeight="bold")),
+            columns=3).resolve_scale(y="independent")
+
+    st.markdown("**Own-cluster fill rises with the service-level target** "
+                "<span style='color:#E8710A'>●</span> = CSL MEIO uses today", unsafe_allow_html=True)
+    st.altair_chart(panel("own_fill_mean", "used_today", "#E8710A", "circle", "Own fill", ".1%"))
+    st.markdown("**...and what it costs** (5-seed mean total landed cost above the actual 2025 policy; "
+                "lower is better) "
+                "<span style='color:#14956E'>●</span> = cheapest tested CSL", unsafe_allow_html=True)
+    st.altair_chart(panel("cost_m", "cheapest", "#14956E", "circle", "Cost vs actual ($M)", ",.2f"))
+
+
 def page_service_levels(slot: dict):
     p = paths()
     cs = read_csv(str(p["cluster_sl"]))
@@ -1022,7 +1145,9 @@ def page_service_levels(slot: dict):
             st.dataframe(res, hide_index=True, width="stretch")
             st.caption("Holding / shortage inputs do not apply here: the sweep was run at fixed cost parameters.")
             slot["df"] = res
-    st.subheader("Current recommendation (output datasets/segmentation/cluster_service_levels.csv)")
+    st.subheader("Current recommendation - used by MEIO today")
+    st.caption("The weekly MEIO takes each SKU's safety factor z from this cluster ladder (segmentation output, "
+               "sku_clusters.csv). The calculator above is a what-if: its results are not applied.")
     if cs is not None:
         st.dataframe(cs[["cluster", "archetype", "n_skus", "median_newsvendor_cr", "recommended_csl",
                          "target_case_fill_rate", "safety_factor_z"]], hide_index=True, width="stretch")
@@ -1030,12 +1155,15 @@ def page_service_levels(slot: dict):
             slot["df"] = cs
     if ev is not None:
         st.subheader("Twin-validated CSL sweep (own-cluster fill vs CSL, 5 seeds)")
-        st.line_chart(ev.pivot(index="csl", columns="cluster", values="own_fill_mean"))
+        st.caption("Built at the earlier portfolio alpha of 0.2, before alpha moved to 0.6 and per-cluster values, "
+                   "so read the shape (how fill rises with service level), not the exact percentages. "
+                   "This is why MEIO keeps the segmentation ladder rather than picking CSLs from this sweep.")
+        csl_sweep_charts(ev, cs)
         with st.expander("Evidence table"):
             st.dataframe(ev, hide_index=True, width="stretch")
     if st.button("Apply to MEIO pipeline", icon=":material/send:", disabled=True,
-                 help="Not mapped: MEIO reads per-cluster z only through meio_parameters when the sweep is complete "
-                      "and beats the segment ladder (currently 'not used')."):
+                 help="Disabled: MEIO already uses the cluster ladder above. Replacing it with sweep-picked CSLs "
+                      "needs a sweep re-run at today's alpha that beats the ladder on paired seeds."):
         pass
 
 
@@ -1105,21 +1233,59 @@ def page_allocation(slot: dict):
         slot["df"] = summ
 
 
+def alpha_sweep_panel():
+    """Re-tune alpha from the front end: the multi-seed per-cluster sweep
+    (segment_alpha_v5_real_data.py) behind two confirmations, then the alpha check, so the
+    page shows what the weekly MEIO gate would now pick."""
+    with st.expander("Re-tune alpha: run the full alpha sweep", icon=":material/science:"):
+        st.warning(
+            "**Before running**\n\n"
+            "- **Run time:** 6 clusters x 6 alphas x 5 seeds of the Digital Twin on replayed 2025 demand, "
+            "about 30-60 minutes on most CPU cores. Other jobs in the app run slower meanwhile; schedule it "
+            "outside active use.\n"
+            "- **Effect on plans:** it rewrites the alpha evidence read by the weekly MEIO "
+            "(`segment_alpha_v5_real_data_*.csv`). The next *Run allocation* or *Run all* adopts any per-cluster "
+            "alpha that passes the 5-seed test (fill gain > 2 SE, cost not worse).\n"
+            "- **Cadence:** alpha is reviewed quarterly or yearly, not weekly.\n"
+            "- The current evidence is backed up first to `results/_backup/`.",
+            icon=":material/warning:")
+        fresh = st.checkbox("Start fresh (discard earlier sweep partial results and re-run every combo)",
+                            key="sweep_fresh")
+        ack = st.checkbox("I understand this takes a long time and can change the alpha used by future MEIO runs",
+                          key="sweep_ack")
+        word = st.text_input("Type SWEEP to enable the button", key="sweep_word", disabled=not ack)
+        armed = ack and word.strip().upper() == "SWEEP"
+        if st.button("Run alpha sweep", icon=":material/play_arrow:", type="primary", disabled=not armed,
+                     key="sweep_go"):
+            sweep = ROOT / "models" / "MEIO" / "MEIO_Weekly" / "final_submission_optimized" / \
+                "segment_alpha_v5_real_data.py"
+            launch("alpha_sweep", "Alpha sweep (re-tune)", [
+                ("back up evidence", [PY, APP / "alpha_sweep_prep.py", *(["--fresh"] if fresh else [])]),
+                ("alpha sweep (6 clusters x 6 alphas x 5 seeds)", [PY, sweep, "--lean-twin-outputs"]),
+                ("alpha check (what the gate now picks)", [PY, APP / "alpha_check.py", RUNS / "alpha_receipt.json"]),
+            ])
+        jobs_panel(("alpha_sweep",))
+
+
 def page_alpha(slot: dict):
     p = paths()
     if st.button("Run alpha check", icon=":material/play_arrow:", type="primary"):
         launch("alpha", "Periodic alpha check", alpha_steps())
     jobs_panel(("alpha",))
+    alpha_sweep_panel()
     par = read_json(str(RUNS / "alpha_receipt.json")) or read_json(str(p["weekly_dir"] / "meio_parameters.json"))
     if par:
         a, b, c = st.columns(3)
-        a.metric("Adopted alpha (pooling)", par.get("alpha"))
+        a.metric("Portfolio default alpha", par.get("alpha"),
+                 help="Used for any cluster whose own test didn't beat it. Each cluster's actual alpha is below.")
         b.metric("Netting discount", par.get("netting_discount"))
         c.metric("Model", par.get("model"))
+        st.markdown("**Alpha (pooling) used per cluster**")
+        st.dataframe(alpha_by_cluster_table(par), hide_index=True, width="stretch")
         for d in par.get("decisions", []):
             st.markdown(f"- **{d['parameter']}** = `{d['value']}` - {d['reason']}")
-    st.info("Note: in this repo alpha is the Clark-Scarf v2 pooling factor, not the exponential-smoothing alpha "
-            "a demand-smoothing alpha.")
+    st.info("Note: alpha here is the Clark-Scarf v2 pooling factor (how much each RDC buffers for its CDCs' "
+            "combined demand), not the smoothing alpha of a demand forecast.")
     st.subheader("Review flags (cluster-level proxy)")
     flags = alpha_flags()
     if len(flags):
@@ -1132,10 +1298,9 @@ def page_alpha(slot: dict):
     if ev5 is not None:
         import altair as alt
         st.subheader("Own-fill vs alpha, by segment (5 seeds, real replayed demand)")
-        st.caption("Each cluster's own fill rate as ITS alpha varies, with every other cluster held at the "
-                   "live reference (0.6) -- not a portfolio-wide number. The vertical line marks the "
-                   "adopted alpha. Y-axis is NOT forced to 0-100%: at that scale every line looks flat and "
-                   "the real spread (0.9pp for Mid-Tier Core, 11.6pp for Long-Tail Erratic 2) disappears.")
+        st.caption("Each cluster's own fill rate as its alpha varies, with every other cluster held at the "
+                   "reference alpha (0.6). The vertical line marks the portfolio default. The y-axis is zoomed "
+                   "to show the spread (0.9 pp for Mid-Tier Core, 11.6 pp for Long-Tail Erratic 2).")
         adopted_alpha = (par or {}).get("alpha")
         line = alt.Chart(ev5).mark_line(point=True, strokeWidth=2).encode(
             x=alt.X("alpha:Q", title="Alpha (pooling factor)"),
@@ -1151,14 +1316,10 @@ def page_alpha(slot: dict):
         st.altair_chart(line, width="stretch")
 
         st.markdown("**Explore by segment**")
-        st.caption("Pick a cluster and its alpha varies while every other cluster stays at the live reference "
-                   "(0.6) -- a one-at-a-time view, not a simultaneous what-if across all six at once (that "
-                   "would take 6^6 twin runs, which don't exist). Only \"Own fill rate\" below is actually "
-                   "specific to the chosen cluster; the other three are portfolio-wide and read the same "
-                   "no matter which cluster is picked, unless its alpha is moved off 0.6. Cost is a single "
-                   "total-landed-cost delta vs. actual history, not broken into holding/stockout/transport "
-                   "like the portfolio view below. Fill rates are the 51-week real-demand test window and "
-                   "don't scale with the time-period toggle; cost delta does.")
+        st.caption("Select a cluster and an alpha; every other cluster stays at the reference alpha (0.6). "
+                   "Own fill rate is specific to the selected cluster; the other measures are portfolio-wide. "
+                   "Cost is the total landed cost difference against actual history. Fill rates cover the "
+                   "51-week test window; the time-period selector applies to cost only.")
         SEG_WINDOW_WEEKS = 156   # same full-run cumulative convention as alpha_cost_breakdown.py's WINDOW_WEEKS
         alphas5 = sorted(ev5["alpha"].unique().tolist())
         clusters5 = ev5["cluster"].unique().tolist()
@@ -1175,9 +1336,8 @@ def page_alpha(slot: dict):
         divisor5 = {"Week": per_week5, "Month": per_week5 * 52 / 12, "Year": per_week5 * 52, "All": 1.0}[period5]
         suffix5 = {"Week": " / week", "Month": " / month", "Year": " / year", "All": " (3-yr total)"}[period5]
         row5 = ev5[(ev5["cluster"] == cluster5) & (ev5["alpha"] == chosen5)].iloc[0]
-        portfolio_help = ("Portfolio-wide, not per-segment -- the same for every cluster whenever its alpha "
-                          "sits at the 0.6 reference, since they all read the same underlying twin run. Only "
-                          "diverges once THIS cluster's alpha moves away from 0.6.")
+        portfolio_help = ("Portfolio-wide measure. It is the same for every cluster at the 0.6 reference and "
+                          "changes only when the selected cluster's alpha moves away from 0.6.")
         mm1, mm2 = st.columns(2)
         mm1.metric("Own fill rate", f"{row5['own_fill_mean']:.1%}")
         mm2.metric("Portfolio fill rate", f"{row5['portfolio_fill_mean']:.1%}", help=portfolio_help)
@@ -1190,8 +1350,7 @@ def page_alpha(slot: dict):
     if sw_fill is not None:
         import altair as alt
         st.subheader("Portfolio totals vs alpha (51-week real-demand backtest)")
-        st.caption("Total customer and internal-replenishment fill rate at each tested alpha -- "
-                   "the portfolio-wide number a judgment call actually trades off, not a per-cluster view.")
+        st.caption("Portfolio customer fill and internal replenishment fill at each tested alpha.")
         tot = sw_fill[["alpha", "customer_fill_rate", "internal_replen_fill_rate"]].melt(
             id_vars="alpha", var_name="metric", value_name="rate")
         tot["metric"] = tot["metric"].map({"customer_fill_rate": "Customer fill rate",
@@ -1209,10 +1368,9 @@ def page_alpha(slot: dict):
     if cb is not None:
         import altair as alt
         st.subheader("Cost breakdown across alpha (156-week real-demand simulation)")
-        st.caption("Pooling (higher alpha) isn't free: it trades stockout cost for more transport cost. "
-                   "Holding stays essentially flat. A single net total hides this trade-off, so it's broken "
-                   "out below. These are cumulative totals over the full 156-week (3-year) simulation -- "
-                   "use the slider below to read off any tested alpha's numbers per week, month or year instead.")
+        st.caption("Higher alpha trades stockout cost for transport cost; holding cost stays nearly flat. "
+                   "Totals cover the full 156-week (3-year) simulation. Use the selector below for weekly, "
+                   "monthly or yearly figures.")
         long = cb.melt(id_vars="alpha", value_vars=["holding_cost_usd", "stockout_cost_usd", "transport_cost_usd"],
                        var_name="component", value_name="usd")
         long["component"] = long["component"].str.replace("_cost_usd", "", regex=False).str.title()
@@ -1235,7 +1393,7 @@ def page_alpha(slot: dict):
         st.altair_chart(alt.vconcat(*charts).resolve_scale(y="independent"), width="stretch")
 
         st.markdown("**Explore a specific alpha (portfolio-wide)**")
-        st.caption("This slider applies ONE alpha to the whole portfolio -- for the per-cluster view, see "
+        st.caption("Applies one alpha to the whole portfolio. For the per-cluster view, see "
                    "\"Explore by segment\" above.")
         alphas_sorted = sorted(cb["alpha"].unique().tolist())
         c1, c2 = st.columns([3, 1])
@@ -1259,14 +1417,13 @@ def page_alpha(slot: dict):
         m2.metric(f"Stockout cost{suffix}", f"${row['stockout_cost_usd'] * divisor:,.0f}")
         m3.metric(f"Transport cost{suffix}", f"${row['transport_cost_usd'] * divisor:,.0f}")
         m4.metric(f"Total landed cost{suffix}", f"${row['total_landed_cost_usd'] * divisor:,.0f}")
-        st.caption("Fill rates below are a rate, not a sum, so the time-period selector doesn't apply to them -- "
-                   "they're the 51-week real-demand test window specifically (2025-W02..2025-W52, where the "
-                   "swept alpha actually governs the policy), not blended with the 105-week warm-up.")
+        st.caption("Fill rates cover the 51-week test window (2025-W02 to 2025-W52) and are not affected by "
+                   "the time-period selector.")
         f1, f2 = st.columns(2)
         f1.metric("Customer fill rate", f"{row['customer_fill_rate']:.1%}")
         f2.metric("Internal replen fill rate", f"{row['internal_replen_fill_rate']:.1%}")
     else:
-        st.info("No cost breakdown yet -- run the alpha sweep (`validate_real_data.py --stage alpha_sweep` in "
+        st.info("No cost breakdown yet. Run the alpha sweep (`validate_real_data.py --stage alpha_sweep` in "
                 "final_submission_optimized/) to generate `alpha_cost_breakdown.csv`.")
 
     sw = read_csv(str(p["evidence"] / "alpha_sweep_real_data.csv"))
@@ -1299,6 +1456,8 @@ def scenario_windows(scenario: str) -> list[tuple[int, int, str]]:
         w = o.get("window")
         if w and w.get("start_period") and w.get("end_period"):
             a, b = _week_no(w["start_period"]), _week_no(w["end_period"])
+            if a <= 1 and b >= 52:                 # the whole year: same as "Full horizon"
+                continue
             seen.setdefault((a, b), []).append(o.get("measure", o.get("id", "")))
     return [(a, b, f"W{a:02d}-W{b:02d} ({', '.join(m)})") for (a, b), m in sorted(seen.items())]
 
@@ -1337,33 +1496,51 @@ WINDOW_METRICS = [("customer_fill_rate", "Customer fill (pp)", 100), ("customer_
                   ("lost_margin_usd", "Lost margin ($)", 1), ("holding_cost_usd", "Holding cost ($)", 1)]
 
 
+REACTIVE_CONTROL = "counterfactual_reactive_no_scenario"
+
+
+def _run_label(n: str) -> str:
+    if " / " in n:
+        return n.split(" / ")[-1]
+    return "no scenario + reactive" if REACTIVE_CONTROL in n else "no scenario"
+
+
 def scenario_impact_table(rows: dict, run_paths: dict):
-    """The three comparisons a scenario exists to answer, from whichever of its runs are selected:
-    what the scenario costs if ignored (unprepared vs no scenario), what re-planning buys (prepared vs
-    unprepared), and where preparing leaves you (prepared vs no scenario) -- for the full horizon or
-    for the weeks a windowed override is active."""
+    """The comparisons a scenario exists to answer, from whichever of its runs are selected:
+    what the scenario costs if ignored (unprepared vs no scenario), what re-planning in advance
+    buys (prepared vs unprepared), what re-planning every week buys (reactive vs unprepared) --
+    split, when the reactive control is selected, into the normal-year effect of weekly
+    re-planning and the reaction to this scenario -- and where preparing leaves you (prepared vs
+    no scenario). Full horizon, or the weeks a windowed override is active."""
     prep = next((n for n in rows if n.endswith(" / prepared")), None)
     unprep = next((n for n in rows if n.endswith(" / unprepared")), None)
-    base = next((n for n in rows if n.startswith("No scenario (")), None)
+    react = next((n for n in rows if n.endswith(" / reactive")), None)
+    base = next((n for n in rows if n.startswith("No scenario (") and REACTIVE_CONTROL not in n), None)
+    rbase = next((n for n in rows if n.startswith("No scenario (") and REACTIVE_CONTROL in n), None)
+    REACT, NORMAL, SCEN = ("Value of re-planning weekly (reactive - unprepared)",
+                           "   of which: weekly re-planning in a normal year (reactive control - no scenario)",
+                           "   of which: reacting to this scenario (difference of the two rows above)")
     pairs = [("Scenario impact if ignored (unprepared - no scenario)", unprep, base),
-             ("Value of re-planning (prepared - unprepared)", prep, unprep),
+             ("Value of re-planning in advance (prepared - unprepared)", prep, unprep),
+             (REACT, react, unprep), (NORMAL, rbase, base),
              ("Net position after preparing (prepared - no scenario)", prep, base)]
     if not any(a and b for _, a, b in pairs):
         return
-    scenario = (prep or unprep).split(" / ")[0]
+    arm = prep or unprep or react
+    scenario = arm.split(" / ")[0] if arm else None     # None: only the no-scenario runs have results yet
     options = {"Full horizon": None}
-    for a, b, label in scenario_windows(scenario):
+    for a, b, label in (scenario_windows(scenario) if scenario else []):
         options[f"During {label}"] = ((a, b), True)
         options[f"Outside W{a:02d}-W{b:02d}"] = ((a, b), False)
     st.markdown("**Scenario impact** (differences between the selected runs)")
     period = st.radio("Period", list(options), horizontal=True, key="impact_period",
-                      help="A short shock is diluted when averaged over the full year -- read it on its own window.")
+                      help="A short disruption is diluted in full-year averages; view it over its own window.")
     choice = options[period]
     if choice is None:
         vals, metrics = rows, IMPACT_METRICS
     else:
         vals, metrics = {}, WINDOW_METRICS
-        for n in [x for x in (prep, unprep, base) if x]:
+        for n in [x for x in (prep, unprep, react, base, rbase) if x]:
             inv = Path(run_paths[n]) / "inventory.parquet"
             k = _window_kpis(str(inv), inv.stat().st_mtime if inv.exists() else 0.0, choice[0], choice[1])
             if k:
@@ -1374,10 +1551,19 @@ def scenario_impact_table(rows: dict, run_paths: dict):
             out[label] = {name: round((float(vals[a][k]) - float(vals[b][k])) * scale, 2 if scale == 100 else 0)
                           for k, name, scale in metrics
                           if vals[a].get(k) is not None and vals[b].get(k) is not None}
+    if REACT in out and NORMAL in out:          # keep the scenario split next to the weekly-re-planning row
+        out[SCEN] = {k: round(out[REACT][k] - out[NORMAL].get(k, 0.0), 2) for k in out[REACT]}
+        order = [l for l, _, _ in pairs if l in out]
+        order.insert(order.index(NORMAL) + 1, SCEN)
+        out = {l: out[l] for l in order}
     if out:
         st.dataframe(pd.DataFrame(out).T, width="stretch")
+        if react and not rbase:
+            st.caption("Select the run 'No scenario (counterfactual_reactive_no_scenario)' too, to split weekly "
+                       "re-planning into its normal-year effect and the reaction to this scenario.")
         if choice is not None:
-            levels = {n.split(" / ")[-1] if " / " in n else "no scenario": vals[n] for n in vals}
+            levels = {(run_display_name(n).split(" · ")[0] if " / " in n else run_display_name(n)): vals[n]
+                      for n in vals}
             st.dataframe(pd.DataFrame({n: {name: round(v[k] * 100, 2) if scale == 100 else round(v[k])
                                            for k, name, scale in WINDOW_METRICS if v.get(k) is not None}
                                        for n, v in levels.items()}).T.rename(
@@ -1385,6 +1571,20 @@ def scenario_impact_table(rows: dict, run_paths: dict):
     st.caption("Fill-rate differences are percentage points; costs are USD over the selected period "
                "(windowed views recompute from each run's weekly inventory table; lost margin there "
                "counts lost-sale accounts only). Single seeded run each: small differences can be noise.")
+
+
+ARM_TITLES = {"prepared": "Prepared", "unprepared": "Unprepared", "reactive": "Reactive"}
+
+
+def run_display_name(n: str) -> str:
+    """Run type first, so it stays readable when a column or chip is narrowed: the internal
+    keys ("<scenario> / <arm>", "No scenario (<folder>)") are unchanged everywhere else."""
+    if " / " in n:
+        scn, arm = n.rsplit(" / ", 1)
+        return f"{ARM_TITLES.get(arm, arm.title())} · {scn.replace('_', ' ')}"
+    if n.startswith("No scenario ("):
+        return "No scenario · reactive" if REACTIVE_CONTROL in n else "No scenario · today's policy"
+    return n
 
 
 def page_simulation(slot: dict):
@@ -1397,8 +1597,8 @@ def page_simulation(slot: dict):
         horizon = c2.number_input("Horizon (weeks)", 4, 104, 52, 1,
                                   help="Forward data covers 2026 (52 weeks); longer values are untested.")
         seed = c3.number_input("Seed", 0, 99999, int(p["cfg"]["digital_twin"].get("seed", 2026)), 1)
-        st.caption("Not available: Iterations (the Twin is a single seeded replay), Segment scope, and the "
-                   "free demand-scenario list. Scenarios come from the Agents' override engine - see below.")
+        st.caption("Each run is a single seeded replay. Demand and supply scenarios are created with the "
+                   "scenario agents below.")
         go = st.form_submit_button("Launch simulation", icon=":material/play_arrow:", type="primary")
     if go:
         start_sim(policy_opt, int(horizon), int(seed))
@@ -1407,8 +1607,9 @@ def page_simulation(slot: dict):
     st.subheader("Results")
     runs = {"Forward plan - MEIO policy": p["twin_dir"], "Forward plan - baseline policy": p["baseline_dir"]}
     for s in list_scenarios():
-        for arm in ("prepared", "unprepared"):
-            runs[f"{s} / {arm}"] = OUT / s / arm
+        for arm in ("prepared", "unprepared", "reactive"):
+            if (OUT / s / arm / "run_kpis.json").exists() or arm != "reactive":
+                runs[f"{s} / {arm}"] = OUT / s / arm
     # No-scenario counterfactuals: today's policy, no overrides, same seed -- ad hoc runs
     # (python digital_twin_fast.py --scenario-config scenario_config.json --policy <baseline>
     # --run-name counterfactual_<label>), not launched from this UI, but worth surfacing here
@@ -1425,8 +1626,9 @@ def page_simulation(slot: dict):
     # user first knowing to go find the right entries in a dropdown themselves.
     scenario_names = [n for n in runs if " / " in n and n.split(" / ")[0] in list_scenarios()]
     counterfactual_names = [n for n in runs if n.startswith("No scenario (")]
-    smart_default = (sorted(scenario_names)[-2:] if scenario_names else []) + counterfactual_names[:1]
-    names = st.multiselect("Compare runs", list(runs),
+    newest = max((n.split(" / ")[0] for n in scenario_names), default=None)
+    smart_default = [n for n in scenario_names if n.split(" / ")[0] == newest] + counterfactual_names
+    names = st.multiselect("Compare runs", list(runs), format_func=run_display_name,
                            default=smart_default or [n for n in list(runs)[:2]])
     rows = {}
     for n in names:
@@ -1438,18 +1640,17 @@ def page_simulation(slot: dict):
         keep = ["customer_fill_rate", "customer_fill_rate_cdc", "customer_fill_rate_rdc", "pct_demand_weeks_in_full",
                 "internal_replen_fill_rate", "avg_inventory_value_usd", "safety_stock_value_usd", "holding_cost_usd",
                 "stockout_cost_usd", "transport_cost_usd", "total_landed_cost_usd", "horizon_weeks"]
-        st.dataframe(df[[c for c in keep if c in df.columns]], width="stretch")
+        st.dataframe(df[[c for c in keep if c in df.columns]].rename(index=run_display_name), width="stretch")
         slot["df"] = df.reset_index(names="run")
         scenario_impact_table(rows, {n: runs[n] for n in rows})
         sv = runs[names[0]] / "service_by_node.csv"
         node = read_csv(str(sv))
         if node is not None:
-            with st.expander(f"Service by node - {names[0]}"):
+            with st.expander(f"Service by node - {run_display_name(names[0])}"):
                 st.dataframe(node, hide_index=True, width="stretch")
     st.subheader("Scenario agents")
-    st.caption("Describe a what-if in plain English. It's a real conversation: if the agents ask a clarifying "
-               "question, just answer it below and they'll continue with the same context, instead of having "
-               "to restate everything in a brand-new run.")
+    st.caption("Describe a what-if in plain English. If the agents ask a clarifying question, reply below; "
+               "the session keeps its context.")
     server_has_claude_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     active_chat = agent_chat_registry().get("chat")
     c1, c2, c3 = st.columns([2, 2, 1])
@@ -1476,16 +1677,15 @@ def page_simulation(slot: dict):
             start_agent_chat(profile, effective_claude_key)
             st.rerun()
     if profile == "desktop":
-        st.caption("Desktop bridge: no API key needed, but each model call is relayed through a mailbox -- "
-                   "the panel below the chat shows what the session is blocked on; a model call itself still "
-                   "needs an actual Claude session to answer it. Approval happens right in the chat.")
+        st.caption("Desktop bridge: no API key needed. Each model call is relayed through a local mailbox "
+                   "and answered by the desktop model session; the panel below the chat shows the pending call. "
+                   "Approvals happen in the chat.")
     elif not has_claude_key:
-        st.warning("No Anthropic API key available -- type one in above, or set ANTHROPIC_API_KEY on the server and "
+        st.warning("No Anthropic API key available. Enter one above, or set ANTHROPIC_API_KEY on the server and "
                    "restart it.")
     else:
-        st.caption("Claude profile (Opus 5 orchestrator, Haiku 4.5 specialists): runs live -- replies appear "
-                   "directly in the chat below, including "
-                   "clarifying questions, which you can just answer.")
+        st.caption("Claude profile (Opus 5 orchestrator, Haiku 4.5 specialists): replies, including "
+                   "clarifying questions, appear in the chat below.")
     agent_chat_panel()
     if active_chat and active_chat.get("profile") == "desktop":
         agent_bridge_panel()
@@ -1514,7 +1714,7 @@ def page_simulation(slot: dict):
             st.success(f"Approved by {approval['approved_by']} at {approval['approved_at']}")
         else:
             if approval_state == "stale":
-                st.warning("Approved once, but the config changed since -- re-approval required.")
+                st.warning("The configuration changed after approval. Re-approval required.")
             name = st.text_input("Your name (recorded in approval.json)", key="scenario_approver_name")
             if st.button("Approve", type="primary", key="scenario_approve_btn", disabled=not name.strip()):
                 res = subprocess.run([PY, "-m", "Agents.tools", "approve", pick, "--by", name.strip(), "--yes"],
@@ -1531,7 +1731,7 @@ def page_simulation(slot: dict):
 # --------------------------------------------------------------------------- shell
 with st.sidebar:
     st.markdown(
-        "<div class='sb-brand'><div class='sb-brand-mark'>:material/psychology:</div>"
+        "<div class='sb-brand'><div class='sb-brand-mark'><svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='1.6' stroke-linecap='round'><path d='M12 4.5 6 12M12 4.5 18 12M6 12l-2.5 7M6 12l3 7M18 12l-3 7M18 12l2.5 7'/><circle cx='12' cy='4.5' r='2.3' fill='#fff'/><circle cx='6' cy='12' r='1.9' fill='#fff'/><circle cx='18' cy='12' r='1.9' fill='#fff'/><circle cx='3.5' cy='19' r='1.4' fill='#fff'/><circle cx='9' cy='19' r='1.4' fill='#fff'/><circle cx='15' cy='19' r='1.4' fill='#fff'/><circle cx='20.5' cy='19' r='1.4' fill='#fff'/></svg></div>"
         "<div class='sb-brand-text'><div class='sb-brand-name'>Supply Brain</div>"
         "<div class='sb-brand-sub'>MEIO Optimiser</div></div></div>",
         unsafe_allow_html=True)

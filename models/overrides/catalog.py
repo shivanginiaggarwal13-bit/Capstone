@@ -203,7 +203,7 @@ MEASURES: dict[str, Measure] = {m.name: m for m in [
     # ----------------------------------------------------------------- service
     Measure(
         name="service.target_csl",
-        summary="Target cycle service level MEIO sizes safety stock to (replaces the segment z).",
+        summary="Target cycle service level MEIO sizes safety stock to (replaces the cluster-ladder z).",
         universe="stock_pairs", scope_keys=SKU_KEYS + NODE_KEYS,
         ops={"set": Op(0.5, 0.999, ("probability",), 0.80, 0.995),
              "add": Op(-0.2, 0.2, ("probability",))},
@@ -211,8 +211,10 @@ MEASURES: dict[str, Measure] = {m.name: m for m in [
         meio_hook="meio_weekly_lib.assign_z: z = Phi^-1(CSL) per (sku, dc) and target period",
         twin_hook="none -- reaches the Twin through the policy it sizes",
         phase=1,
-        notes="Current ladder: Fast-Moving 0.98 (z 2.05), Seasonal 0.95 (z 1.64), Intermediate "
-              "0.90 (z 1.28). Clark-Scarf v2 clips z to [0.84, 3.10] (CSL 0.80-0.999). "
+        notes="Live default: the segmentation cluster ladder (sku_clusters.csv) -- Flagship Core and "
+              "Mid-Tier Core 0.97 (z 1.88), Long-Tail Erratic 2 0.957 (z 1.72), other long-tail clusters "
+              "0.90 (z 1.28); the old segment ladder (Fast-Moving 0.98, Seasonal 0.95, Intermediate 0.90) "
+              "applies only to a SKU with no cluster. Clark-Scarf v2 clips z to [0.84, 3.10] (CSL 0.80-0.999). "
               "'add' moves the current CSL by that many probability points."),
     _policy("safety_stock", "safety stock"),
     _policy("reorder_point", "reorder point (s)"),

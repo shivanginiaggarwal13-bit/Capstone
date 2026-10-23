@@ -217,9 +217,9 @@ class ScenarioGateTests(unittest.TestCase):
         self.assertEqual(scenario.approval_status(folder)["state"], "stale")
 
     def test_arms(self):
-        self.assertEqual(scenario.arms_for([{"applies_to": ["plan", "actual"]}]), ["prepared", "unprepared"])
+        self.assertEqual(scenario.arms_for([{"applies_to": ["plan", "actual"]}]), ["prepared", "unprepared", "reactive"])
         self.assertEqual(scenario.arms_for([{"applies_to": ["plan"]}]), ["prepared"])
-        self.assertEqual(scenario.arms_for([{"applies_to": ["actual"]}]), ["unprepared"])
+        self.assertEqual(scenario.arms_for([{"applies_to": ["actual"]}]), ["unprepared", "reactive"])
 
 
 @unittest.skipUnless((paths.PROJECTIONS_DIR / "SCENARIO_0002_MEIO_CLARK_SCARF_V2" / "meio_policy").exists()

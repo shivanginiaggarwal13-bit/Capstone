@@ -1,0 +1,109 @@
+{
+  "schema_version": "3.0",
+  "run_name": "counterfactual_reactive_no_scenario",
+  "label": "",
+  "mode": "forward",
+  "generated_at": "2026-10-23T07:12:20",
+  "seed": 2026,
+  "policy_override": "output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+  "margin_basis": "margin_usd",
+  "runtime_seconds": 79.8,
+  "assumptions": [
+    "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
+    "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
+    "Lead times are drawn per order line from each lane's own mean and std in network_lanes.csv, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.",
+    "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following the fulfilment_type split in the dataset, which is clean by node type.",
+    "An internal replenishment order the parent cannot cover is cancelled, not backlogged; the child re-orders at the next weekly review.",
+    "A parent holds back its own expected demand for the remainder of the review period before releasing stock downstream, implementing 'customer orders served first'.",
+    "Routing comes from sku_sourcing_map.csv, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.",
+    "Holding cost = (storage_cost_per_unit_year + carrying_pct x unit_cost) / 52, keyed on (dc_id, subcategory).",
+    "No shelf life, obsolescence or write-offs; no warehouse or lane capacity limits. Production capacity DOES bind.",
+    "Demand, lead-time and production RNG streams are independent, so two runs at the same seed differ only by the policy under test."
+  ],
+  "build_notes": {
+    "mode": "forward",
+    "seed": 2026,
+    "sourcing": {
+      "rule": "sku_sourcing_map.parquet (input table)",
+      "pairs_resolved": 11500,
+      "pairs_on_fallback": 0
+    },
+    "policy_source": "output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+    "policy_rows": 422552,
+    "policy_time_varying": true,
+    "state_source": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/history/opening_position.csv",
+    "demand_basis": "forecast_qty x volume-weighted resampled forecast-error ratio",
+    "forecast_units": 13242327.0,
+    "realised_demand_units": 14159736.0,
+    "realised_over_forecast": 1.0693,
+    "margin_basis": "margin_usd",
+    "n_nodes": 27,
+    "n_skus": 500,
+    "n_plants": 4,
+    "n_active_pairs": 8126,
+    "horizon_weeks": 52,
+    "horizon_days": 364,
+    "first_period": "2026-W01",
+    "last_period": "2026-W52"
+  },
+  "scenario": {
+    "schema_version": "1.0",
+    "scenario_number": 2,
+    "scenario_name": "MEIO_CLARK_SCARF_V2",
+    "description": "Shared scenario input for MEIO and Digital Twin runs. Ported in from Vishwajeet's final_submission_optimized port (multi_agent_orchastration branch) so its scripts can resolve paths; `meio.parameters.clusters` updated to the canonical, live v5 segmentation output (this branch's adopted default, see models/MEIO/MEIO_Weekly/meio_weekly_lib.py) instead of the frozen v4 path his original config pointed at.",
+    "changes": {},
+    "digital_twin": {
+      "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py",
+      "mode": "forward",
+      "run_name": "meio_policy",
+      "seed": 2026,
+      "data_dir": "input datasets",
+      "policy": "input datasets/baseline_policy.csv",
+      "state": "output datasets/history/opening_position.csv",
+      "output_root": "output datasets"
+    },
+    "meio": {
+      "runner_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_weekly_tools.py",
+      "weekly_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/meio_optimizer_weekly.py",
+      "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py",
+      "data_dir": "input datasets",
+      "as_of_week": "2025-W52",
+      "policy_filename": "meio_policy_rolling.parquet",
+      "output_root": "output datasets/MEIO",
+      "parameters": {
+        "model": "clark_scarf_v2",
+        "selection": "validated",
+        "min_seeds": 5,
+        "evidence": [
+          "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results",
+          "models/MEIO/MEIO_Weekly/final_submission/results"
+        ],
+        "clusters": "output datasets/segmentation/sku_clusters.csv",
+        "ddlt": "quadrature",
+        "n_sims": 4000,
+        "seed": 2026
+      }
+    },
+    "artifacts": {
+      "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_all.py",
+      "scenario": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+      "twin_output_root": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/twin_runs"
+    },
+    "overrides": {
+      "engine": "models/overrides",
+      "output_root": "output datasets/overrides"
+    },
+    "details": {
+      "owner": "Supply Planning",
+      "notes": "Copy this file into each scenario output folder as the audit input."
+    },
+    "execution": {
+      "mode": "forward",
+      "seed": 2026,
+      "horizon_weeks": null,
+      "policy": "output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+      "state": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/history/opening_position.csv",
+      "output_folder": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/SCENARIO_0002_MEIO_CLARK_SCARF_V2/counterfactual_reactive_no_scenario"
+    }
+  }
+}

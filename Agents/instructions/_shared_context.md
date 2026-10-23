@@ -47,7 +47,9 @@ Overrides on the same rows **compound in list order** (two scales multiply; a la
 - **unprepared**: today's policy meets the actual-side changes ("it hits and we do nothing").
 - **prepared**: MEIO re-plans with the plan-side changes, then the Twin simulates the actual side ("we see it coming").
 
-Unprepared minus baseline is the impact. Prepared minus unprepared is the value of re-planning. You do not need a separate "surprise" version of a known event, because the unprepared arm already is one.
+- **reactive**: MEIO is not told about the scenario. It re-plans every week from what the Twin has simulated so far (demand history, and the lead times of shipments that have arrived), the way a planner reacts once a disruption shows up ("it hits, and we adjust week by week").
+
+Unprepared minus baseline is the impact. Prepared minus unprepared is the value of re-planning in advance. Reactive minus unprepared is the value of re-planning weekly, but part of it is the general effect of weekly re-planning that would appear in a normal year too: the reactive control (`counterfactual_reactive_no_scenario`, same weekly re-planning with no scenario) measures that part, and the difference is the reaction to this scenario. You do not need a separate "surprise" version of a known event, because the unprepared and reactive arms already are one.
 
 ## Measures
 

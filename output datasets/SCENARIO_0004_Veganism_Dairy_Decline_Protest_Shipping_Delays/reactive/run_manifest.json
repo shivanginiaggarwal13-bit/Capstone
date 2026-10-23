@@ -1,0 +1,200 @@
+{
+  "schema_version": "3.0",
+  "run_name": "reactive",
+  "label": "",
+  "mode": "forward",
+  "generated_at": "2026-10-23T09:44:00",
+  "seed": 2026,
+  "policy_override": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+  "margin_basis": "margin_usd",
+  "runtime_seconds": 84.1,
+  "assumptions": [
+    "Plants build to a rolling plan (demand signal + restore ~1.5 weeks of finished-goods cover), clipped by production-family line capacity then plant-wide capacity; executed quantity = plan x schedule adherence drawn uniformly in [0.90, 1.00].",
+    "Plant DCs are PUSHED stock by production; only RDCs and CDCs pull on a weekly (R,s,S) review with R = 1 week.",
+    "Lead times are drawn per order line from each lane's own mean and std in network_lanes.csv, so every receipt arrives on its own realised transit rather than the average. The committed lead time quoted to the child is that lane's ~90th percentile.",
+    "CDC shortfalls are lost sales; PDC/RDC shortfalls backorder, following the fulfilment_type split in the dataset, which is clean by node type.",
+    "An internal replenishment order the parent cannot cover is cancelled, not backlogged; the child re-orders at the next weekly review.",
+    "A parent holds back its own expected demand for the remainder of the review period before releasing stock downstream, implementing 'customer orders served first'.",
+    "Routing comes from sku_sourcing_map.csv, an input table derived from network structure: each RDC draws a SKU from the nearest plant DC whose plant is qualified to make it, and each CDC from its min-lead-time inbound RDC. It is not mined from simulated receipts.",
+    "Holding cost = (storage_cost_per_unit_year + carrying_pct x unit_cost) / 52, keyed on (dc_id, subcategory).",
+    "No shelf life, obsolescence or write-offs; no warehouse or lane capacity limits. Production capacity DOES bind.",
+    "Demand, lead-time and production RNG streams are independent, so two runs at the same seed differ only by the policy under test."
+  ],
+  "build_notes": {
+    "mode": "forward",
+    "seed": 2026,
+    "sourcing": {
+      "rule": "sku_sourcing_map.parquet (input table)",
+      "pairs_resolved": 11500,
+      "pairs_on_fallback": 0
+    },
+    "policy_source": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+    "policy_rows": 422552,
+    "policy_time_varying": true,
+    "state_source": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/history/opening_position.csv",
+    "demand_basis": "forecast_qty x volume-weighted resampled forecast-error ratio",
+    "forecast_units": 13160147.75,
+    "realised_demand_units": 14078462.0,
+    "realised_over_forecast": 1.0698,
+    "overrides_applied": [
+      {
+        "override_id": "OVR-0002",
+        "measure": "supply.lead_time_mean",
+        "applications": 1,
+        "lanes": 76,
+        "weeks": 6,
+        "window": "2026-W01..2026-W06",
+        "avg_days_before": 4.878289473684211,
+        "avg_days_after": 5.366118421052629
+      },
+      {
+        "override_id": "OVR-0001",
+        "measure": "demand.volume",
+        "applications": 1,
+        "demand_lines": 316,
+        "forecast_rows": 16432,
+        "weeks": 52,
+        "forecast_units_before": 328717.0,
+        "forecast_units_after": 246537.75
+      }
+    ],
+    "margin_basis": "margin_usd",
+    "n_nodes": 27,
+    "n_skus": 500,
+    "n_plants": 4,
+    "n_active_pairs": 8126,
+    "horizon_weeks": 52,
+    "horizon_days": 364,
+    "first_period": "2026-W01",
+    "last_period": "2026-W52"
+  },
+  "scenario": {
+    "schema_version": "1.1",
+    "scenario_number": 4,
+    "scenario_name": "Veganism_Dairy_Decline_Protest_Shipping_Delays",
+    "description": "Structural ~25% decline in Fresh Dairy + Powdered Milk demand from the veganism-driven shift in milk consumption, plus an unrelated 6-week protest-driven 10% widening of mean lead times; both are known to the business in advance.",
+    "changes": {
+      "override_schema_version": "1.0",
+      "overrides": [
+        {
+          "id": "OVR-0001",
+          "measure": "demand.volume",
+          "scope": {
+            "category": [
+              "Dairy & Bakery"
+            ],
+            "subcategory": [
+              "Fresh Dairy",
+              "Powdered Milk"
+            ]
+          },
+          "window": {
+            "start_period": "2026-W01",
+            "end_period": "2026-W52"
+          },
+          "operation": "scale",
+          "value": 0.75,
+          "unit": "multiplier",
+          "applies_to": [
+            "plan",
+            "actual"
+          ],
+          "rationale": "Veganism-driven structural decline in dairy/milk consumption. Planner foresees this trend and expects lower demand across Fresh Dairy and Powdered Milk throughout 2026. Applies to both MEIO planning and Twin simulation.",
+          "provenance": {
+            "agent": "demand_agent",
+            "created_at": "2026-10-23T04:00:29Z"
+          }
+        },
+        {
+          "id": "OVR-0002",
+          "measure": "supply.lead_time_mean",
+          "scope": {
+            "all": true
+          },
+          "window": {
+            "start_period": "2026-W01",
+            "end_period": "2026-W06"
+          },
+          "operation": "scale",
+          "value": 1.1,
+          "unit": "multiplier",
+          "applies_to": [
+            "plan",
+            "actual"
+          ],
+          "rationale": "Protest-driven nationwide widening of shipping lead times across all lanes, 6-week duration. Known disruption both planned and actual sides. Standalone override unrelated to separate dairy-demand decline (distinct from demand_agent changes).",
+          "provenance": {
+            "agent": "supply_agent",
+            "created_at": "2026-10-23T04:02:31Z"
+          }
+        }
+      ]
+    },
+    "digital_twin": {
+      "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/digital_twin_fast.py",
+      "mode": "forward",
+      "run_name": "prepared",
+      "seed": 2026,
+      "data_dir": "input datasets",
+      "policy": "input datasets/baseline_policy.csv",
+      "state": "output datasets/history/opening_position.csv",
+      "output_root": "output datasets"
+    },
+    "meio": {
+      "runner_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_weekly_tools.py",
+      "weekly_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/meio_optimizer_weekly.py",
+      "rolling_entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/roll_forward_policy.py",
+      "data_dir": "input datasets",
+      "as_of_week": "2025-W52",
+      "policy_filename": "meio_policy_rolling.parquet",
+      "output_root": "output datasets/MEIO",
+      "parameters": {
+        "model": "clark_scarf_v2",
+        "selection": "validated",
+        "min_seeds": 5,
+        "evidence": [
+          "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/results",
+          "models/MEIO/MEIO_Weekly/final_submission/results"
+        ],
+        "clusters": "output datasets/segmentation/sku_clusters.csv",
+        "ddlt": "quadrature",
+        "n_sims": 4000,
+        "seed": 2026
+      }
+    },
+    "artifacts": {
+      "entrypoint": "models/MEIO/MEIO_Weekly/final_submission_optimized/run_all.py",
+      "scenario": "output datasets/MEIO artifacts/SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays",
+      "twin_output_root": "output datasets/MEIO artifacts/SCENARIO_0002_MEIO_CLARK_SCARF_V2/twin_runs"
+    },
+    "overrides": {
+      "engine": "models/overrides",
+      "output_root": "output datasets/overrides"
+    },
+    "evaluation": {
+      "baseline_scenario": "SCENARIO_0002_MEIO_CLARK_SCARF_V2",
+      "baseline_run": "meio_policy",
+      "arms": [
+        "prepared",
+        "unprepared",
+        "reactive"
+      ]
+    },
+    "details": {
+      "owner": "Supply Planning",
+      "hypothesis": "With a structural ~25% decline in Fresh Dairy + Powdered Milk demand and a 6-week +10% widening of mean lead times from protests, does the current policy hold customer fill rate and cost, or does it drive lost sales / inventory buildup versus baseline -- and does planning ahead (prepared) outperform reacting week by week (reactive) once the protests hit?",
+      "request": "I foresee a decline in dairy demand by 25 percent due to the rise in the Veganism movement. I also expect there to be shipping delays due to rise in protests across the country. | Dairy+Powdered Milk, assume delay to be for mean lead time to widen by 10 percent, and the protests to last for about 6 weeks. The protests are unrelated to the Vegan Movement, so assume structural change in milk consumption",
+      "created_by": "Agents draft D0001",
+      "created_at": "2026-10-23T04:08:28Z",
+      "notes": "Generated by the scenario agents; overrides apply only through models/overrides."
+    },
+    "execution": {
+      "mode": "forward",
+      "seed": 2026,
+      "horizon_weeks": null,
+      "policy": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/MEIO/SCENARIO_0002_MEIO_CLARK_SCARF_V2/rolling_2026/meio_policy_rolling.parquet",
+      "state": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/history/opening_position.csv",
+      "output_folder": "/Users/sunnel/Documents/Headquarters/AMPBA/Capstone/repo/output datasets/SCENARIO_0004_Veganism_Dairy_Decline_Protest_Shipping_Delays/reactive"
+    }
+  }
+}

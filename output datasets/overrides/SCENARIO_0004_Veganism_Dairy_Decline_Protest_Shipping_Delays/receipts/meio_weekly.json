@@ -1,0 +1,28 @@
+{
+  "model": "meio_weekly",
+  "engine_version": "1.0",
+  "overrides": [
+    {
+      "override_id": "OVR-0002",
+      "measure": "supply.lead_time_mean",
+      "applications": 1,
+      "periods": [
+        "2026-W01"
+      ],
+      "lanes": 76
+    },
+    {
+      "override_id": "OVR-0001",
+      "measure": "demand.volume",
+      "applications": 3,
+      "periods": [
+        "2026-W01",
+        "2026-W02",
+        "2026-W03"
+      ],
+      "pair_weeks": 897.0,
+      "target_units_before": 17352.1339,
+      "target_units_after": 13014.1006
+    }
+  ]
+}

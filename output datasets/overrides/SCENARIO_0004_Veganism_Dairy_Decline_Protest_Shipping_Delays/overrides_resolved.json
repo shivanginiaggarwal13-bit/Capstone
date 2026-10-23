@@ -1,0 +1,125 @@
+{
+  "engine_version": "1.0",
+  "overrides": [
+    {
+      "id": "OVR-0001",
+      "measure": "demand.volume",
+      "scope": {
+        "category": [
+          "Dairy & Bakery"
+        ],
+        "subcategory": [
+          "Fresh Dairy",
+          "Powdered Milk"
+        ]
+      },
+      "window": {
+        "start_period": "2026-W01",
+        "end_period": "2026-W52"
+      },
+      "operation": "scale",
+      "value": 0.75,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "Veganism-driven structural decline in dairy/milk consumption. Planner foresees this trend and expects lower demand across Fresh Dairy and Powdered Milk throughout 2026. Applies to both MEIO planning and Twin simulation.",
+      "provenance": {
+        "agent": "demand_agent",
+        "created_at": "2026-10-23T04:00:29Z"
+      },
+      "options": {},
+      "matched_rows": 316,
+      "universe": "demand_lines",
+      "weeks": [
+        "2026-W01",
+        "2026-W02",
+        "2026-W03",
+        "2026-W04",
+        "2026-W05",
+        "2026-W06",
+        "2026-W07",
+        "2026-W08",
+        "2026-W09",
+        "2026-W10",
+        "2026-W11",
+        "2026-W12",
+        "2026-W13",
+        "2026-W14",
+        "2026-W15",
+        "2026-W16",
+        "2026-W17",
+        "2026-W18",
+        "2026-W19",
+        "2026-W20",
+        "2026-W21",
+        "2026-W22",
+        "2026-W23",
+        "2026-W24",
+        "2026-W25",
+        "2026-W26",
+        "2026-W27",
+        "2026-W28",
+        "2026-W29",
+        "2026-W30",
+        "2026-W31",
+        "2026-W32",
+        "2026-W33",
+        "2026-W34",
+        "2026-W35",
+        "2026-W36",
+        "2026-W37",
+        "2026-W38",
+        "2026-W39",
+        "2026-W40",
+        "2026-W41",
+        "2026-W42",
+        "2026-W43",
+        "2026-W44",
+        "2026-W45",
+        "2026-W46",
+        "2026-W47",
+        "2026-W48",
+        "2026-W49",
+        "2026-W50",
+        "2026-W51",
+        "2026-W52"
+      ]
+    },
+    {
+      "id": "OVR-0002",
+      "measure": "supply.lead_time_mean",
+      "scope": {
+        "all": true
+      },
+      "window": {
+        "start_period": "2026-W01",
+        "end_period": "2026-W06"
+      },
+      "operation": "scale",
+      "value": 1.1,
+      "unit": "multiplier",
+      "applies_to": [
+        "plan",
+        "actual"
+      ],
+      "rationale": "Protest-driven nationwide widening of shipping lead times across all lanes, 6-week duration. Known disruption both planned and actual sides. Standalone override unrelated to separate dairy-demand decline (distinct from demand_agent changes).",
+      "provenance": {
+        "agent": "supply_agent",
+        "created_at": "2026-10-23T04:02:31Z"
+      },
+      "options": {},
+      "matched_rows": 76,
+      "universe": "lanes",
+      "weeks": [
+        "2026-W01",
+        "2026-W02",
+        "2026-W03",
+        "2026-W04",
+        "2026-W05",
+        "2026-W06"
+      ]
+    }
+  ]
+}

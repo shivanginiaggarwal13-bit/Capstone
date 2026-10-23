@@ -1,0 +1,36 @@
+{
+  "model": "twin_reactive",
+  "engine_version": "1.0",
+  "overrides": [
+    {
+      "override_id": "OVR-0002",
+      "measure": "supply.lead_time_mean",
+      "applications": 1,
+      "lanes": 76,
+      "weeks": 6,
+      "window": "2026-W43..2026-W48",
+      "avg_days_before": 4.8783,
+      "avg_days_after": 5.3661
+    },
+    {
+      "override_id": "OVR-0003",
+      "measure": "supply.lead_time_std",
+      "applications": 1,
+      "lanes": 76,
+      "weeks": 6,
+      "window": "2026-W43..2026-W48",
+      "avg_days_before": 1.9438,
+      "avg_days_after": 2.1382
+    },
+    {
+      "override_id": "OVR-0001",
+      "measure": "demand.volume",
+      "applications": 1,
+      "demand_lines": 316,
+      "forecast_rows": 16432,
+      "weeks": 52,
+      "forecast_units_before": 328717.0,
+      "forecast_units_after": 246537.75
+    }
+  ]
+}

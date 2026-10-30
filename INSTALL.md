@@ -1,37 +1,54 @@
 # Installing Supply Brain
 
-One installer sets up everything needed to run the project from this folder: the Streamlit front end, the MEIO
-models, the Digital Twin, segmentation and the scenario agents. Data and model outputs are already in the repository.
+One command downloads the project from GitHub and sets up everything needed to run it: the Streamlit front end, the
+MEIO models, the Digital Twin, segmentation and the scenario agents. Data and model outputs come with the download.
 
 ## What you need
 
 - **Python 3.11 or newer** ([python.org/downloads](https://www.python.org/downloads/)). Tested on Python 3.14.
-- **Git**, to download the repository (about 1.2 GB with history).
-- Around 3 GB of free disk space for the repository and the Python packages.
+  On Windows, tick "Add python.exe to PATH" during setup.
+- About 3 GB of free disk space for the project (about 500 MB) and its Python packages.
+- Git is optional: without it, the installer downloads a zip of the project instead.
 
-## 1. Get the code
+## Option A: one command (downloads and installs)
+
+**macOS / Linux**, in Terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/shivanginiaggarwal13-bit/Capstone/installer/installer/bootstrap.sh | bash
+```
+
+**Windows**, in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/shivanginiaggarwal13-bit/Capstone/installer/installer/bootstrap.ps1 | iex"
+```
+
+This downloads the project from GitHub (`shivanginiaggarwal13-bit/Capstone`, branch `installer`) into a `SupplyBrain`
+folder in your home directory, then runs the installer below. Running it again updates that copy and re-checks the
+install. Settings:
+
+| Setting | Effect | Example (macOS / Linux) |
+|---|---|---|
+| `SB_DIR` | Install somewhere else | `curl -fsSL ... \| SB_DIR=~/Projects/SupplyBrain bash` |
+| `SB_RUN=1` | Start the app when the install finishes | `curl -fsSL ... \| SB_RUN=1 bash` |
+| `SB_BRANCH` | Download a different branch | `curl -fsSL ... \| SB_BRANCH=main bash` |
+| installer options | Passed on to `install.sh` | `curl -fsSL ... \| bash -s -- --locked` |
+
+On Windows, set these first, for example `$env:SB_DIR = "D:\SupplyBrain"`.
+
+## Option B: you already have the code
+
+If you cloned the repository or downloaded and unzipped it, run the installer from the project folder:
 
 ```bash
 git clone https://github.com/shivanginiaggarwal13-bit/Capstone.git
 cd Capstone
 git checkout installer
+./installer/install.sh            # Windows: double-click installer\install.bat
 ```
 
-## 2. Install
-
-**macOS / Linux**
-
-```bash
-./installer/install.sh
-```
-
-**Windows**: double-click `installer\install.bat`, or in PowerShell:
-
-```powershell
-.\installer\install.ps1
-```
-
-The installer:
+## What the installer does
 
 1. finds Python 3.11 or newer;
 2. creates a private environment in `.venv` (nothing is installed system-wide);
@@ -51,9 +68,9 @@ Options:
 
 Running the installer again is safe: it reuses `.venv` and leaves an existing `.env` untouched.
 
-## 3. Run the front end
+## Run the front end
 
-**macOS / Linux**
+**macOS / Linux**, from the project folder (`~/SupplyBrain` if you used Option A):
 
 ```bash
 ./installer/run_app.sh          # http://localhost:8501

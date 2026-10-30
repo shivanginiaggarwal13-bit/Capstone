@@ -4,12 +4,30 @@ Supply Brain is a synthetic consumer packaged goods supply-chain decision system
 
 ## Quick start
 
-Install everything (front end, models, Digital Twin, agents) with one command, then start the app:
+You need Python 3.11 or newer ([python.org/downloads](https://www.python.org/downloads/)). One command downloads
+the project (about 500 MB) into a `SupplyBrain` folder in your home directory and installs everything: the front end,
+models, Digital Twin and scenario agents.
+
+**macOS / Linux** (Terminal):
 
 ```bash
-./installer/install.sh      # Windows: installer\install.bat
-./installer/run_app.sh      # Windows: installer\run_app.bat
+curl -fsSL https://raw.githubusercontent.com/shivanginiaggarwal13-bit/Capstone/installer/installer/bootstrap.sh | bash
 ```
+
+**Windows** (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/shivanginiaggarwal13-bit/Capstone/installer/installer/bootstrap.ps1 | iex"
+```
+
+Then start the app (it opens in your browser):
+
+```bash
+~/SupplyBrain/installer/run_app.sh          # Windows: %USERPROFILE%\SupplyBrain\installer\run_app.bat
+```
+
+Already have the code (cloned or downloaded)? Run `./installer/install.sh` (Windows: `installer\install.bat`) from the
+project folder instead.
 
 Full instructions, options and troubleshooting: [INSTALL.md](INSTALL.md).
 

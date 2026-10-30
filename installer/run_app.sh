@@ -14,5 +14,8 @@ echo "Supply Brain front end: $URL  (Ctrl+C to stop)"
 if [ -z "${SUPPLY_BRAIN_NO_BROWSER:-}" ]; then
   (sleep 4; .venv/bin/python -m webbrowser "$URL" >/dev/null 2>&1) &
 fi
-exec .venv/bin/python -m streamlit run App/streamlit_app.py --server.port "$PORT" --server.headless true \
-  --browser.gatherUsageStats false
+# Listen on this computer only, unless SUPPLY_BRAIN_SHARE=1 (then other machines on the network can connect).
+ADDRESS=localhost
+if [ "${SUPPLY_BRAIN_SHARE:-0}" = 1 ]; then ADDRESS=0.0.0.0; echo "Sharing on the local network (SUPPLY_BRAIN_SHARE=1)"; fi
+exec .venv/bin/python -m streamlit run App/streamlit_app.py --server.port "$PORT" --server.address "$ADDRESS" \
+  --server.headless true --browser.gatherUsageStats false

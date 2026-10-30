@@ -99,5 +99,6 @@ SUPPLY_BRAIN_PORT=8501  # default port for run_app
 | "Python 3.11 or newer was not found" | Install Python from python.org, then run the installer again (on Windows, tick "Add python.exe to PATH") |
 | Windows blocks the script | Use the `.bat` files, which run PowerShell with a one-off execution-policy bypass |
 | A package fails to install on an older Python | Upgrade to Python 3.12 or newer, or try `--locked` on Python 3.14 |
+| Windows Firewall asks to allow Python on private or domain networks | Click **Cancel**: the app runs on your own computer and does not need network access. The launcher only listens locally, so this should not appear; it can come up if Streamlit is started some other way, or with `SUPPLY_BRAIN_SHARE=1` |
 | Port already in use | Start on another port: `./installer/run_app.sh 8600` |
 | Check the setup at any time | `.venv/bin/python installer/check_install.py` (Windows: `.venv\Scripts\python.exe installer\check_install.py`) |

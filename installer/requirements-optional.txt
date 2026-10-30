@@ -1,0 +1,3 @@
+# Only needed for the SHAP explainability script (Clustering & Segmentation/segmentation_v5/shap_analysis_v5.py).
+xgboost>=2.0
+shap>=0.45

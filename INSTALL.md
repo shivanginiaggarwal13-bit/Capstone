@@ -1,0 +1,86 @@
+# Installing Supply Brain
+
+One installer sets up everything needed to run the project from this folder: the Streamlit front end, the MEIO
+models, the Digital Twin, segmentation and the scenario agents. Data and model outputs are already in the repository.
+
+## What you need
+
+- **Python 3.11 or newer** ([python.org/downloads](https://www.python.org/downloads/)). Tested on Python 3.14.
+- **Git**, to download the repository (about 1.2 GB with history).
+- Around 3 GB of free disk space for the repository and the Python packages.
+
+## 1. Get the code
+
+```bash
+git clone https://github.com/shivanginiaggarwal13-bit/Capstone.git
+cd Capstone
+git checkout installer
+```
+
+## 2. Install
+
+**macOS / Linux**
+
+```bash
+./installer/install.sh
+```
+
+**Windows**: double-click `installer\install.bat`, or in PowerShell:
+
+```powershell
+.\installer\install.ps1
+```
+
+The installer:
+
+1. finds Python 3.11 or newer;
+2. creates a private environment in `.venv` (nothing is installed system-wide);
+3. installs the packages in `requirements.txt`;
+4. creates `.env` from `.env.example` for optional API keys;
+5. checks packages, data files and folders (`installer/check_install.py`);
+6. runs the agent test suite.
+
+Options:
+
+| macOS / Linux | Windows | Effect |
+|---|---|---|
+| `--locked` | `-Locked` | Install the exact package versions the project was tested with (`installer/requirements-lock.txt`) |
+| `--with-shap` | `-WithShap` | Also install XGBoost and SHAP, needed only for the SHAP explainability script |
+| `--skip-tests` | `-SkipTests` | Skip the test suite |
+| `PYTHON=/path/to/python` | `-Python C:\path\python.exe` | Use a specific Python |
+
+Running the installer again is safe: it reuses `.venv` and leaves an existing `.env` untouched.
+
+## 3. Run the front end
+
+**macOS / Linux**
+
+```bash
+./installer/run_app.sh          # http://localhost:8501
+./installer/run_app.sh 8600     # another port
+```
+
+**Windows**: double-click `installer\run_app.bat`, or `.\installer\run_app.ps1`.
+
+## API keys (optional)
+
+The front end and the **Desktop bridge** agent profile work without any key. To use the other agent profiles, add
+keys to `.env`:
+
+```
+ANTHROPIC_API_KEY=...   # Claude profile
+NVIDIA_API_KEY=...      # NVIDIA profile
+SUPPLY_BRAIN_PORT=8501  # default port for run_app
+```
+
+`.env` is ignored by git, so keys stay on your machine.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "Python 3.11 or newer was not found" | Install Python from python.org, then run the installer again (on Windows, tick "Add python.exe to PATH") |
+| Windows blocks the script | Use the `.bat` files, which run PowerShell with a one-off execution-policy bypass |
+| A package fails to install on an older Python | Upgrade to Python 3.12 or newer, or try `--locked` on Python 3.14 |
+| Port already in use | Start on another port: `./installer/run_app.sh 8600` |
+| Check the setup at any time | `.venv/bin/python installer/check_install.py` (Windows: `.venv\Scripts\python.exe installer\check_install.py`) |

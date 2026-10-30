@@ -2,6 +2,17 @@
 
 Supply Brain is a synthetic consumer packaged goods supply-chain decision system. It combines a multi-echelon digital twin, SKU segmentation, and multi-echelon inventory optimization (MEIO) so inventory policies can be tested against the same network physics that generated the historical data.
 
+## Quick start
+
+Install everything (front end, models, Digital Twin, agents) with one command, then start the app:
+
+```bash
+./installer/install.sh      # Windows: installer\install.bat
+./installer/run_app.sh      # Windows: installer\run_app.bat
+```
+
+Full instructions, options and troubleshooting: [INSTALL.md](INSTALL.md).
+
 The project is designed around one practical question:
 
 > Where should inventory buffers sit, and how much protection should each SKU receive, when value, demand uncertainty, forecast quality, and replenishment risk differ across the portfolio?

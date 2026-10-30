@@ -1,0 +1,27 @@
+# Supply Brain: everything needed to run the front end, MEIO, the Digital Twin and the scenario agents.
+# Installed by installer/install.sh (macOS / Linux) or installer\install.ps1 (Windows).
+# Exact versions the project was tested with are in installer/requirements-lock.txt.
+
+# Data and modelling
+numpy>=2.0
+pandas>=2.2
+polars>=1.0
+pyarrow>=15
+scipy>=1.13
+scikit-learn>=1.4
+matplotlib>=3.8
+
+# Front end
+streamlit>=1.40
+altair>=5
+
+# Scenario agents
+langgraph>=1.2
+langchain-anthropic>=1.7
+langchain-openai>=0.1
+requests>=2.31
+jsonschema>=4.20
+pyyaml>=6.0
+
+# Tests
+pytest>=8

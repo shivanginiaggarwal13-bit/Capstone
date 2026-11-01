@@ -6,7 +6,7 @@ Generates the Supply Brain dataset for the capstone: a four-echelon packaged-
 foods supply network, three years of commercial history, a forward planning
 horizon, and the inventory record that goes with them.
 
-    Plant --0.5d--> Plant DC --> Regional DC --> Customer DC
+    Plant --0d--> Plant DC --> Regional DC --> Customer DC
 
 The plant is production-only. Plant DCs are the first stock-holding echelon
 and are pushed finished goods by production. Regional DCs carry both their own

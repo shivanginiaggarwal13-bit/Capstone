@@ -60,10 +60,12 @@ def next_scenario_number() -> int:
 
 
 def arms_for(overrides: list[dict]) -> list[str]:
+    """`reactive` runs whenever the Twin simulates something: MEIO re-plans every week from
+    what has been simulated so far, without being told about the scenario."""
     sides = {s for o in overrides for s in o["applies_to"]}
     if "plan" in sides and "actual" in sides:
-        return ["prepared", "unprepared"]
-    return ["prepared"] if "plan" in sides else ["unprepared"]
+        return ["prepared", "unprepared", "reactive"]
+    return ["prepared"] if "plan" in sides else ["unprepared", "reactive"]
 
 
 def scenario_dir(folder: str):
@@ -181,7 +183,8 @@ def render_card(config: dict, folder: str, report: dict, sha: str) -> str:
              f"(seed {config['digital_twin']['seed']}; MEIO as defined in the config: "
              f"`{config['meio'].get('rolling_entrypoint')}`)", "",
              f"**Runs:** {', '.join(ev['arms'])} -- prepared = MEIO re-plans with the plan-side changes; "
-             f"unprepared = today's policy meets the actual-side changes.", "",
+             f"unprepared = today's policy meets the actual-side changes; reactive = MEIO is not told and "
+             f"re-plans every week from what the Twin has simulated so far.", "",
              "## Overrides", "",
              "| ID | Measure | Change | Scope | Weeks | MEIO plans for it | Twin simulates it | Why |",
              "|---|---|---|---|---|---|---|---|"]
@@ -337,7 +340,7 @@ def run_job(folder: str) -> int:
         status.update(state="refused", detail=approval)
         _write_status(status_path, status)
         return 2
-    order = [a for a in ("prepared", "unprepared") if a in config["evaluation"]["arms"]]
+    order = [a for a in ("prepared", "unprepared", "reactive") if a in config["evaluation"]["arms"]]
     twin_entry = paths.REPO_ROOT / config["digital_twin"]["entrypoint"]
     rc = 0
     for arm in order:
@@ -347,6 +350,9 @@ def run_job(folder: str) -> int:
             cmd = [sys.executable, str(paths.REPO_ROOT / "run_meio_then_twin.py"), "--scenario-config", str(cfg_path)]
             if approval.get("allow_overwrite"):
                 cmd.append("--yes")
+        elif arm == "reactive":
+            cmd = [sys.executable, str(twin_entry.parent / "reactive_twin.py"), "--scenario-config", str(cfg_path),
+                   "--policy", str(baseline_policy_path(config)), "--seed", str(config["digital_twin"]["seed"])]
         else:
             cmd = [sys.executable, str(twin_entry), "--scenario-config", str(cfg_path),
                    "--policy", str(baseline_policy_path(config)), "--run-name", "unprepared",
@@ -359,7 +365,34 @@ def run_job(folder: str) -> int:
         _write_status(status_path, status)
         if rc != 0:
             break
+    if rc == 0 and "reactive" in order:
+        rc = _ensure_reactive_control(config, twin_entry, status, status_path)
     status.update(state="succeeded" if rc == 0 else "failed", finished_at=drafts.now())
+    _write_status(status_path, status)
+    return rc
+
+
+REACTIVE_CONTROL = "counterfactual_reactive_no_scenario"
+
+
+def _ensure_reactive_control(config: dict, twin_entry, status: dict, status_path) -> int:
+    """The reactive arm's no-scenario control: the same weekly re-planning with nothing
+    changed, same policy and seed. Reactive minus unprepared includes the general effect of
+    re-planning weekly; subtracting (control - no-scenario baseline) leaves the part that is
+    a reaction to this scenario. Built once per baseline and seed, then reused."""
+    ev, seed = config["evaluation"], str(config["digital_twin"]["seed"])
+    control = paths.PROJECTIONS_DIR / ev["baseline_scenario"] / REACTIVE_CONTROL
+    manifest = control / "run_manifest.json"
+    if manifest.exists() and str(json.loads(manifest.read_text(encoding="utf-8")).get("seed")) == seed:
+        return 0
+    status["arms"]["reactive_control"] = {"state": "running", "started_at": drafts.now()}
+    _write_status(status_path, status)
+    cmd = [sys.executable, str(twin_entry.parent / "reactive_twin.py"), "--scenario-config", str(paths.ROOT_CONFIG),
+           "--policy", str(baseline_policy_path(config)), "--seed", seed, "--run-name", REACTIVE_CONTROL]
+    print(f"=== reactive control: {' '.join(cmd)}", flush=True)
+    rc = subprocess.run(cmd, cwd=paths.REPO_ROOT).returncode
+    status["arms"]["reactive_control"].update(state="succeeded" if rc == 0 else "failed", returncode=rc,
+                                              finished_at=drafts.now(), output=paths.rel(control))
     _write_status(status_path, status)
     return rc
 

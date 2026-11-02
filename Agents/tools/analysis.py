@@ -7,6 +7,10 @@ The decomposition the analyst reports comes straight from the arms:
   impact if unprepared  = unprepared - baseline
   value of re-planning  = prepared   - unprepared
   net position          = prepared   - baseline
+  value of reacting     = reactive   - unprepared (MEIO re-plans weekly from simulated history)
+    of which, scenario  = (reactive - unprepared) - (reactive control - baseline); the control
+                          (counterfactual_reactive_no_scenario) is the same weekly re-planning
+                          with no scenario, so subtracting it removes the general effect
 Runs are single-seed; differences of a few tenths of a point in fill rate are
 within seed-to-seed noise (the MEIO multi-seed studies saw ~0.1-0.3pp spreads).
 """
@@ -68,13 +72,16 @@ def compare_runs(scenario: str, runs: list[str] | None = None, baseline_scenario
     b_scn, b_run = _baseline_of(scenario, baseline_scenario, baseline_run)
     folder = paths.PROJECTIONS_DIR / scenario
     if runs is None:
-        runs = [a for a in ("unprepared", "prepared") if (folder / a / "run_kpis.json").exists()]
+        runs = [a for a in ("unprepared", "prepared", "reactive") if (folder / a / "run_kpis.json").exists()]
         runs += sorted(p.name for p in folder.glob("*") if (p / "run_kpis.json").exists() and p.name not in runs) \
             if folder.is_dir() else []
     if not runs:
         raise ValueError(f"{scenario} has no finished runs yet")
     base = kpis(b_scn, b_run)
     arms = {r: kpis(scenario, r) for r in runs}
+    control_dir = paths.PROJECTIONS_DIR / b_scn / "counterfactual_reactive_no_scenario"
+    control = kpis(b_scn, "counterfactual_reactive_no_scenario") if (control_dir / "run_kpis.json").exists() \
+        and "reactive" in arms else None
     table = []
     for key in KPI_ORDER:
         if key not in base:
@@ -85,11 +92,19 @@ def compare_runs(scenario: str, runs: list[str] | None = None, baseline_scenario
             if isinstance(k.get(key), (int, float)) and isinstance(base[key], (int, float)):
                 delta = k[key] - base[key]
                 row[f"{r}_vs_baseline"] = round(delta * 100, 2) if key in RATE_KPIS else round(delta, 2)
+        scale = 100 if key in RATE_KPIS else 1
         if "prepared" in arms and "unprepared" in arms and isinstance(arms["prepared"].get(key), (int, float)):
             delta = arms["prepared"][key] - arms["unprepared"][key]
-            row["replan_value"] = round(delta * 100, 2) if key in RATE_KPIS else round(delta, 2)
+            row["replan_value"] = round(delta * scale, 2)
+        if "reactive" in arms and "unprepared" in arms and isinstance(arms["reactive"].get(key), (int, float)):
+            delta = arms["reactive"][key] - arms["unprepared"][key]
+            row["react_value"] = round(delta * scale, 2)
+            if control and isinstance(control.get(key), (int, float)) and isinstance(base[key], (int, float)):
+                row["react_value_normal_year"] = round((control[key] - base[key]) * scale, 2)
+                row["react_value_scenario"] = round(row["react_value"] - row["react_value_normal_year"], 2)
         table.append(row)
     return {"scenario": scenario, "baseline": f"{b_scn}/{b_run}", "runs": runs, "kpis": table,
+            "reactive_control": f"{b_scn}/counterfactual_reactive_no_scenario" if control else None,
             "units": "rate deltas are percentage points; money in USD; units are whole units",
             "caveat": "single seed -- fill-rate differences under ~0.3pp are within seed noise"}
 
@@ -145,7 +160,8 @@ def scope_service(scenario: str, override_id: str, baseline_scenario: str | None
     pairs = rows[["dc_id", "sku_id"]].drop_duplicates()
     periods = context.window_periods(o.get("window"))
     b_scn, b_run = _baseline_of(scenario, baseline_scenario, baseline_run)
-    arms = [("baseline", b_scn, b_run)] + [(a, scenario, a) for a in config["evaluation"]["arms"]
+    names = list(dict.fromkeys(list(config["evaluation"]["arms"]) + ["reactive"]))
+    arms = [("baseline", b_scn, b_run)] + [(a, scenario, a) for a in names
                                             if (paths.PROJECTIONS_DIR / scenario / a / "run_kpis.json").exists()]
     out = {}
     for label, scn, run in arms:
@@ -160,6 +176,8 @@ def scope_service(scenario: str, override_id: str, baseline_scenario: str | None
             out[label]["vs_baseline_pp"] = round((out[label]["customer_fill"] - out["baseline"]["customer_fill"]) * 100, 2)
     if "prepared" in out and "unprepared" in out and out["prepared"]["customer_fill"] is not None:
         out["replan_value_pp"] = round((out["prepared"]["customer_fill"] - out["unprepared"]["customer_fill"]) * 100, 2)
+    if "reactive" in out and "unprepared" in out and out["reactive"]["customer_fill"] is not None:
+        out["react_value_pp"] = round((out["reactive"]["customer_fill"] - out["unprepared"]["customer_fill"]) * 100, 2)
     return {"scenario": scenario, "override_id": override_id, "measure": o["measure"],
             "pairs": int(len(pairs)), "window": f"{periods[0]}..{periods[-1]}", "arms": out,
             "basis": "customer demand and unmet units at the scoped DC-SKU pairs in the window"}

@@ -265,6 +265,33 @@ impact if ignored) is −0.06pp fill, +$226K cost.
   working-example validation, not a multi-seed/multi-scenario one — treat
   it as "the mechanism works," not "this exact 0.09pp number is robust."
 
+## Reactive arm: MEIO re-plans every week from the simulation (`reactive_twin.py`)
+
+`prepared` sizes all 52 weeks up front with the scenario known; `unprepared` keeps today's
+policy. Neither learns from the simulated year. `reactive` closes the loop inside one twin
+run: week 1 uses today's policy, and before every later week's review MEIO re-sizes that
+week as of the week before, after (1) writing every simulated week into its demand history
+(bias factor, CV and seasonal level update) and (2) scaling the planning lane table by the
+observed lead time of shipments that have fully settled (dispatched at least mean + 3 std
+days ago, so slow draws are not censored out; a lane moves only beyond 5% and 3 standard
+errors). The scenario's plan side is NOT applied -- MEIO only learns what it observes. Same
+seed, so demand and lead-time draws match the other arms.
+
+`Agents.tools run-job` runs it as a third arm and, once per baseline and seed, a control
+`counterfactual_reactive_no_scenario` (the same weekly re-planning with no scenario).
+Reactive minus unprepared mixes two things; the control separates them:
+
+| SCENARIO_0003 (dairy -25%, lanes +10% W43-W48) | Customer fill | Fill W43-W48 | CDC fill W43-W48 | Total landed cost |
+|---|---|---|---|---|
+| Re-planning weekly (reactive - unprepared) | +1.12pp | +2.05pp | +1.12pp | +$225K |
+| ...normal-year effect (control - no scenario) | +1.15pp | +1.65pp | +0.18pp | +$298K |
+| ...reaction to this scenario | -0.03pp | **+0.40pp** | **+0.94pp** | **-$74K** |
+
+Detection: the lane slowdown is picked up one to two weeks after it starts (ratio 1.08-1.10
+vs the true 1.10) and released two to three weeks after it ends; the dairy bias factor falls
+from ~0.99 to ~0.79 by week 12. Weekly re-planning also holds ~11% more inventory and lowers
+internal replenishment fill (-3.3pp in the normal year). Single seed.
+
 ## Known limitations — stated up front, not left for a reviewer to find
 
 - **Write-off minimization** (one of the charter's three named KPIs) is not

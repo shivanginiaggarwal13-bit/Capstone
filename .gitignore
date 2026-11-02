@@ -16,3 +16,6 @@ output datasets/MEIO artifacts/*/validation_output/
 output datasets/_archive_*/
 # Zipped duplicate of the "Model Documentation/" folder.
 Model Documentation.zip
+
+# Local Python environment for the app, MEIO pipeline and agents.
+.venv/
